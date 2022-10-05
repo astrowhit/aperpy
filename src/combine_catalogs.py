@@ -13,8 +13,8 @@ import extinction
 # DET_TYPE = 'noise-equal'
 # PHOT_NICKNAMES = ('f150w', 'f200w') #  will loop over these so you only run detection once!
 
-DET_NICKNAME =  'LW_f356w-f444w'  
-# DET_NICKNAME = 'SW_f150w-f200w' 
+# DET_NICKNAME =  'LW_f356w-f444w'  
+DET_NICKNAME = 'SW_f150w-f200w' 
 KERNEL = 'f160w'
 
 DET_TYPE = 'noise-equal'
@@ -61,7 +61,7 @@ def sigma_ref_total(sigma1, alpha, beta, kronrad_circ, wht_ref, medwht_ref, flux
     # equation 7
     term1 = ((sigma1 * alpha * (np.pi * kronrad_circ**2)**(beta/2.)) / np.sqrt(wht_ref / medwht_ref) )**2
     g_ref = 1.
-    # term2 = flux_refauto / g_ref 
+    # term2 = flux_refauto / g_ref
     return np.sqrt(term1) # + term2)
 
 def sigma_full(sigma_total, sigma_ref_total, sigma_total_ref):
@@ -73,11 +73,11 @@ def sigma_full(sigma_total, sigma_ref_total, sigma_total_ref):
 def flux_ref_total(flux_ref_auto, frac):
     # equation 9
     return flux_ref_auto  / frac
-    
+
 def flux_total(flux_aper, flux_ref_total, flux_ref_aper):
     # equation 10
     return flux_aper * ( flux_ref_total / flux_ref_aper )
-    
+
 
 # loop over filters
 for filter in PHOT_NICKNAMES:
@@ -92,7 +92,7 @@ for filter in PHOT_NICKNAMES:
     # rename columns if needed:
     for coln in cat.colnames:
         if 'RADIUS' in coln or 'APER' in coln or 'FLAG' in coln or 'AUTO' in coln or 'WHT' in coln:
-            
+
             newcol = f'{filter}_{coln}'.replace('.', '_')
             print(f'   {cat[coln].name} --> {newcol}')
             cat[coln].name = newcol
@@ -150,10 +150,10 @@ cumcurve = np.array([0.        , 0.13354114, 0.13354114, 0.36966026, 0.36966026,
 # use F444W Kron to correct to total fluxes and ferr
 alpha, beta, sig1 = 0.20, 1.72, 0.0010 #TODO -- do this on the fly!
 f_ref_auto = maincat[f'f444w_FLUX_AUTO']
-kronrad_circ = np.sqrt(maincat['a'] * maincat['b'] * maincat['f444w_KRON_RADIUS']**2) 
+kronrad_circ = np.sqrt(maincat['a'] * maincat['b'] * maincat['f444w_KRON_RADIUS']**2)
 kronrad_circ[kronrad_circ<3.5] = 3.5 # PHOT_AUTOPARAMS[1]
-psffrac_ref_auto = cumcurve[np.array([np.argmin(abs(px - i)) for i in kronrad_circ])] 
-# F160W kernel convolved F444W PSF + missing flux from F160W beyond 2" radius 
+psffrac_ref_auto = cumcurve[np.array([np.argmin(abs(px - i)) for i in kronrad_circ])]
+# F160W kernel convolved F444W PSF + missing flux from F160W beyond 2" radius
 f_ref_total = f_ref_auto / psffrac_ref_auto # equation 9
 wht_ref = maincat[f'f444w_SRC_MEDWHT']
 medwht_ref = maincat[f'f444w_MED_WHT']
@@ -176,20 +176,20 @@ for apersize in (0.16, 0.35, 0.7, 2.0):
         f_total = flux_total(f_aper, f_ref_total, f_ref_aper)
         wht = maincat[f'{filter}_SRC_MEDWHT']
         medwht = maincat[f'{filter}_MED_WHT']
-        
+
         # get the flux uncertainty in the aperture for this band
         sig_aper = sigma_aper(filter, wht, medwht, apersize)
 
         # Convert the flux uncertainty in the aperture to the total using F444W auto and aper
         # if filter != 'f444w':
-            
+
         # else:
         #     sig_total = sigma_ref_total # defined already for kron radii
 
         sig_total = sigma_total(sig_aper, f_ref_total, f_ref_aper) # do again for each aperture
         sig_full = sigma_full(sig_total, sig_ref_total, sig_total_ref)
 
-  
+
         # add new columns
         newcoln = f'{filter}_FLUX_APER{str_aper}_COLOR'
         maincat.add_column(Column(f_aper, newcoln))
@@ -213,8 +213,8 @@ for apersize in (0.16, 0.35, 0.7, 2.0):
         # maincat.add_column(Column(mag_total, newcoln))
         # newcoln =f'{filter}_MAGERR_APER{str_aper}_FULL'
         # maincat.add_column(Column(merr_full, newcoln))
-        
-    
+
+
 # ADD SFD maps (2011 scales by 0.86, which is default. otherwise use scaling=1.0)
 m = sfdmap.SFDMap(DIR_SFD)
 ebmv = m.ebv(maincat['RA'], maincat['DEC'])
@@ -222,7 +222,7 @@ maincat.add_column(Column(ebmv, name='EBV'), 1+np.where(np.array(maincat.colname
 print(ebmv)
 Av_mean = np.mean(ebmv)*3.1
 
-# Perform a MW correction (add new columns to the master) 
+# Perform a MW correction (add new columns to the master)
 filter_table = vstack([SvoFps.get_filter_list('JWST'),\
                      SvoFps.get_filter_list('HST')])
 filter_pwav = OrderedDict()
