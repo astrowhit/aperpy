@@ -13,8 +13,8 @@ import extinction
 # DET_TYPE = 'noise-equal'
 # PHOT_NICKNAMES = ('f150w', 'f200w') #  will loop over these so you only run detection once!
 
-# DET_NICKNAME =  'LW_f356w-f444w'  
-DET_NICKNAME = 'SW_f150w-f200w' 
+DET_NICKNAME =  'LW_f356w-f444w'  
+# DET_NICKNAME = 'SW_f150w-f200w' 
 KERNEL = 'f160w'
 
 DET_TYPE = 'noise-equal'
