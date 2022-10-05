@@ -22,9 +22,11 @@ for FILENAME in glob.glob(os.path.join(DIR_IMAGES, 'ceers-full-grizli-v4.0-*_sci
 
     head = fits.getheader(fn_sci)
     img = fits.getdata(fn_sci)
+    wht = fits.getdata(fn_wht)
     mask = None
 
     back = compute_background(img, mask, BACKTYPE.upper(), BACKPARAMS)
+    back[wht<=0.] = 0.
 
     if BACKTYPE == 'var':
         for key in BACKPARAMS:

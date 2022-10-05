@@ -12,13 +12,13 @@ import os, sys, glob
 from photutils.aperture import aperture_photometry, CircularAperture
 from astropy.convolution import Gaussian2DKernel
 from regions import EllipseSkyRegion, Regions, CircleSkyRegion
-from webb_tools import compute_background
+from webb_tools import compute_background, emtpy_apertures
 
 import convenience as conv
 
 # MAIN PARAMETERS
-DET_NICKNAME = 'LW_f356w-f444w' 
-# DET_NICKNAME = 'SW_f150w-f200w'
+# DET_NICKNAME = 'LW_f356w-f444w' 
+DET_NICKNAME = 'SW_f150w-f200w'
 DET_TYPE = 'noise-equal'
 KERNEL = 'f160w'
 
@@ -67,7 +67,7 @@ DETECTION_PARAMS = dict(
 PHOT_BACKPARAMS = dict(bw=64, bh=64, fw=8, fh=8, maskthresh=1, fthresh=0.)
 PHOT_BACKTYPE = 'NONE' # VAR, GLOBAL, NONE
 
-PHOT_APER = [0.16, 0.35, 0.7, 2.0] # diameter in arcsec
+PHOT_APER = [0.16, 0.24, 0.35, 0.5, 0.7, 1.0, 1.5, 2.0] # diameter in arcsec
 PHOT_AUTOPARAMS = 2.5, 3.5 # for MAG_AUTO
 PHOT_FLUXFRAC = 0.5, 0.6 # FLUX_RADIUS at 50% and 60% of flux
 
@@ -161,13 +161,14 @@ if PHOT_NICKNAMES == 'None':
     sys.exit()
 
 areas = {}
+stats = {}
 for ind, PHOT_NICKNAME in enumerate(PHOT_NICKNAMES):
 
     print(PHOT_NICKNAME)
 
     PATH_PHOTSCI = glob.glob(f'./data/intermediate/v4/ceers-full-grizli-v4.0-{PHOT_NICKNAME}*_sci_skysubvar_{KERNEL}-matched.fits.gz')[0]
     PATH_PHOTHEAD = PATH_PHOTSCI
-    PATH_PHOTWHT = glob.glob(f'./data/external/egs-grizli-v4/ceers-full-grizli-v4.0-{PHOT_NICKNAME}*_wht.fits.gz')[0]
+    PATH_PHOTWHT = glob.glob(f'./data/intermediate/v4/ceers-full-grizli-v4.0-{PHOT_NICKNAME}*_wht_{KERNEL}-matched.fits.gz')[0]
     PATH_PHOTMASK = 'None'
     HEADEXT = 1
 
@@ -180,6 +181,7 @@ for ind, PHOT_NICKNAME in enumerate(PHOT_NICKNAMES):
     photsci = fits.getdata(PATH_PHOTSCI).byteswap().newbyteorder()
     print(PATH_PHOTSCI)
     photwht = fits.getdata(PATH_PHOTWHT).byteswap().newbyteorder()
+    photsci[photwht<=0.] = 0. # double check!
     print(PATH_PHOTWHT)
     if PATH_PHOTMASK != 'None':
         photmask = fits.getdata(PATH_PHOTMASK).byteswap().newbyteorder().astype(float)
@@ -191,7 +193,6 @@ for ind, PHOT_NICKNAME in enumerate(PHOT_NICKNAMES):
     photwcs = WCS(phothead)
     print(photwcs)
 
-    
     photerr = np.where((photwht==0) | np.isnan(photwht), np.inf, 1./np.sqrt(photwht))
     photerr[~np.isfinite(photerr)] = np.median(photerr[np.isfinite(photerr)]) # HACK fill in holes with median weight.
     # fits.ImageHDU(photerr).writeto('PHOTERR.fits')
@@ -203,7 +204,6 @@ for ind, PHOT_NICKNAME in enumerate(PHOT_NICKNAMES):
     print(f'Area of photometry image: {area} deg2')
     areas[PHOT_NICKNAME] = area
 
-    
 
     # REGISTER BACKGROUNDS
     back = compute_background(photsci, None, PHOT_BACKTYPE, PHOT_BACKPARAMS)
@@ -257,8 +257,8 @@ for ind, PHOT_NICKNAME in enumerate(PHOT_NICKNAMES):
     
         catalog[f'FLUX_APER{diam}'] = flux * conv_flux(PHOT_ZPT)
         catalog[f'FLUXERR_APER{diam}'] = fluxerr * conv_flux(PHOT_ZPT)
-        catalog[f'MAG_APER{diam}'] = PHOT_ZPT - 2.5*np.log10(flux)
-        catalog[f'MAGERR_APER{diam}'] = 2.5 / np.log(10) / ( flux / fluxerr )
+        # catalog[f'MAG_APER{diam}'] = PHOT_ZPT - 2.5*np.log10(flux)
+        # catalog[f'MAGERR_APER{diam}'] = 2.5 / np.log(10) / ( flux / fluxerr )
         catalog[f'FLAG_APER{diam}'] = flag
 
     # KRON RADII AND MAG_AUTO
@@ -356,6 +356,11 @@ for ind, PHOT_NICKNAME in enumerate(PHOT_NICKNAMES):
     medwht = np.nanmedian(photwht[photwht>0])
     catalog['MED_WHT'] = medwht
 
+    # COMPUTE EMPTY APERTURE ERRORS + SAVE TO MASTER FILE
+    empty_aper = list(PHOT_APER)+list(np.linspace(PHOT_APER[0], PHOT_APER[-1], 30))
+    empty_aper = np.sort(empty_aper)
+    plotname = os.path.join(DIR_OUTPUT, f'{PHOT_NICKNAME}_emptyaper.pdf')
+    stats[PHOT_NICKNAME] = emtpy_apertures(photsci, segmap, N=int(1e3), aper=empty_aper, plotname=plotname)
 
     # WRITE OUT
     print(f'DONE. Writing out catalog.')
@@ -363,6 +368,7 @@ for ind, PHOT_NICKNAME in enumerate(PHOT_NICKNAMES):
 
     # conv.jarvis(f'Photometry of {PHOT_NICKNAME} has finished!')
 
+np.save(os.path.join(DIR_OUTPUT, f'{DET_NICKNAME}_emptyaper_stats.npy'), stats)
 with open(os.path.join(DIR_OUTPUT, f'{DET_NICKNAME}_AREAS.dat'), 'w') as f:
     for filt in PHOT_NICKNAMES:
         area = areas[filt]

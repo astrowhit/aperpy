@@ -24,40 +24,31 @@ FILTERS = ['F115W', 'F150W',
 FILTERS += ['F606W', 'F606WU', 'F814W', 'F105W', 'F125W', 'F140W', 'F160W',
             'F435W']
 
-FILTERS = ['F150W'] #'F115W', 'F200W']
+FILTERS = ['F150W', 'F115W', 'F200W']
 
 for FILT in FILTERS:
     images = {}
     for region in ('ne', 'sw'):
-        for itype in ('sci', 'wht'):
-            # get file
-            pattern = f'ceers-{region}-grizli-v4.0-{FILT.lower()}'
-            print(pattern)
-            tryout = os.path.join(WORKING_DIR, pattern)
-            for fn in FILENAMES:
-                if fn.startswith(tryout) & fn.endswith(f'{itype}.fits.gz'):
+        # get file
+        pattern = f'ceers-{region}-grizli-v4.0-{FILT.lower()}'
+        print(pattern)
+        tryout = os.path.join(WORKING_DIR, pattern)
+        for fn in FILENAMES:
+            if fn.startswith(tryout) & fn.endswith(f'.fits.gz'):
+                if 'sci' in fn:
+                    sci, header = fits.getdata(fn), fits.getheader(fn)
+                elif 'wht' in fn:
+                    wht = fits.getdata(fn)
                     save_fn = fn
-                    break
-            hdul = fits.open(fn)
-            header = hdul[0].header
-            wcs = WCS(header)
-            img = hdul[0].data
+                    
+        wcs = WCS(header)
+        # blocked_wht = block_reduce(wht, 2, func=np.sum) / 4**2
+        # blocked_sci = block_reduce(sci*wht, 2, func=np.sum) / blocked_wht / 4
 
-            print(pattern, itype, np.shape(img))
-            print(save_fn)
-            # print(wcs)
-
-            if FILT in SW_FILTERS:
-                # block reduce from 20mas to 40mas
-                if itype == 'sci': newsub = block_reduce(img, 2)
-                # # if itype == 'sci':
-                # #     newsub /= 2**2
-                if itype == 'wht':
-                    newsub = 1. / block_reduce(1./img, 2)
-            else:
-                newsub = img
-
-            images[itype+'_'+region] = newsub
+        if FILT in SW_FILTERS:
+            # block reduce from 20mas to 40mas
+            images['wht_'+region] = block_reduce(wht, 2, func=np.sum) / 4**2
+            images['sci_'+region] = block_reduce(sci*wht, 2, func=np.sum) / images['wht_'+region] / 4
 
     # stitch together
     for itype in ('sci', 'wht'):
@@ -82,7 +73,7 @@ for FILT in FILTERS:
         header['CD2_2']   =  7.1420845520726E-06
 
         # write out
-        outpath = save_fn.replace('sw', 'full').replace('.fits.gz', '.fits.gz')
+        outpath = save_fn.replace('sw', 'full')
         if itype not in outpath:
             if itype == 'wht':
                 outpath = outpath.replace('sci', 'wht')

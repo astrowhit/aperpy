@@ -1,5 +1,5 @@
 # This is just a wrapper around the webb_tool
-from webb_tools import get_psf
+from FOOwebb_tools import get_psf
 from astropy.io import fits
 import numpy as np
 import os
