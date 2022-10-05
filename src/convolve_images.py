@@ -15,7 +15,7 @@ IMG_EXT = 1
 for FILENAME in glob.glob(os.path.join(DIR_IMAGES, 'ceers-full-grizli-v4.0-*_sci_skysubvar.fits.gz')):
 
     band = FILENAME.split('ceers-full-grizli-v4.0-')[1][:5]
-    if not (('f150w' in FILENAME) or ('f115w' in FILENAME)or ('f200w' in FILENAME)): continue
+    # if not (('f150w' in FILENAME) or ('f115w' in FILENAME)or ('f200w' in FILENAME)): continue
     hdul = fits.open(FILENAME)
     if band != TARGET_BAND:
         print(f'PSF-matching {band} to {TARGET_BAND}')
