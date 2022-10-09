@@ -24,7 +24,7 @@ FILTERS = ['F115W', 'F150W',
 FILTERS += ['F606W', 'F606WU', 'F814W', 'F105W', 'F125W', 'F140W', 'F160W',
             'F435W']
 
-FILTERS = ['F150W', 'F115W', 'F200W']
+# FILTERS = ['F150W', 'F115W', 'F200W']
 
 for FILT in FILTERS:
     images = {}
@@ -49,6 +49,9 @@ for FILT in FILTERS:
             # block reduce from 20mas to 40mas
             images['wht_'+region] = block_reduce(wht, 2, func=np.sum) / 4**2
             images['sci_'+region] = block_reduce(sci*wht, 2, func=np.sum) / images['wht_'+region] / 4
+        else:
+            images['wht_'+region] = wht
+            images['sci_'+region] = sci
 
     # stitch together
     for itype in ('sci', 'wht'):

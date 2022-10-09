@@ -5,9 +5,9 @@ import glob
 from astropy.convolution import convolve, convolve_fft
 import time
 
-TARGET_BAND = 'f160w'
+KERNEL = 'f444w'
 DIR_IMAGES = '/Volumes/External1/Projects/Current/CEERS/data/intermediate/v4/'
-DIR_KERNELS = f'/Volumes/External1/Projects/Current/CEERS/data/intermediate/v4/{TARGET_BAND}_matched_psf_shapelets/'
+DIR_KERNELS = f'/Volumes/External1/Projects/Current/CEERS/data/external/psf_jrw_v4/{KERNEL}_matched_psf_regularization/'
 DIR_WEIGHTS = '/Volumes/External1/Projects/Current/CEERS/data/external/egs-grizli-v4/'
 DIR_OUTPUT = '/Volumes/External1/Projects/Current/CEERS/data/intermediate/v4/'
 IMG_EXT = 1
@@ -21,8 +21,8 @@ for FILENAME in glob.glob(os.path.join(DIR_IMAGES, 'ceers-full-grizli-v4.0-*_sci
     fn_weight = FILENAME.replace(DIR_IMAGES, DIR_WEIGHTS).replace('sci_skysubvar', 'wht')
     hdul_wht = fits.open(fn_weight)
 
-    if band != TARGET_BAND:
-        print(f'PSF-matching sci {band} to {TARGET_BAND}')
+    if band != KERNEL:
+        print(f'PSF-matching sci {band} to {KERNEL}')
         tstart = time.time()
         fn_kernel = os.path.join(DIR_KERNELS, f'{band}_kernel.fits')
         # fn_kernel = '/Volumes/External1/Projects/Current/CEERS/data/external/ceers_kernels_v2/F444W.fits'
@@ -40,7 +40,7 @@ for FILENAME in glob.glob(os.path.join(DIR_IMAGES, 'ceers-full-grizli-v4.0-*_sci
         hdul_wht[WHT_EXT].data[weight==0] = 0.
         print(f'Finished in {time.time()-tstart:2.2f}s')
 
-    hdul.writeto(FILENAME.replace(DIR_IMAGES, DIR_OUTPUT).replace('_skysubvar.fits.gz', f'_skysubvar_{TARGET_BAND}-matched.fits.gz'), overwrite=True)
-    hdul_wht.writeto(FILENAME.replace(DIR_IMAGES, DIR_OUTPUT).replace('_sci_skysubvar.fits.gz', f'_wht_{TARGET_BAND}-matched.fits.gz'), overwrite=True)
+    hdul.writeto(FILENAME.replace(DIR_IMAGES, DIR_OUTPUT).replace('_skysubvar.fits.gz', f'_skysubvar_{KERNEL}-matched.fits.gz'), overwrite=True)
+    hdul_wht.writeto(FILENAME.replace(DIR_IMAGES, DIR_OUTPUT).replace('_sci_skysubvar.fits.gz', f'_wht_{KERNEL}-matched.fits.gz'), overwrite=True)
 
 

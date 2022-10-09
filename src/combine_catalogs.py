@@ -1,5 +1,4 @@
-from typing import OrderedDict
-from xml.etree.ElementPath import prepare_self
+from collections import OrderedDict
 from astropy.io import fits, ascii
 from astropy.table import Table, hstack, Column, vstack
 import numpy as np
@@ -13,12 +12,8 @@ from webb_tools import psf_cog, fit_apercurve
 from astropy.convolution import convolve
 
 
-# DET_NICKNAME = 'SW_f150w-f200w'
-# DET_TYPE = 'noise-equal'
-# PHOT_NICKNAMES = ('f150w', 'f200w') #  will loop over these so you only run detection once!
-
-# DET_NICKNAME =  'LW_f356w-f444w'  
-DET_NICKNAME = 'SW_f150w-f200w' 
+DET_NICKNAME =  'LW_f277w-f356w-f444w'  
+# DET_NICKNAME = 'SW_f150w-f200w' 
 KERNEL = 'f444w'
 REF_BAND = 'f444w'
 REF_PIXEL_SCALE = 0.04 # arcsec / px
@@ -27,7 +22,7 @@ DET_TYPE = 'noise-equal'
 DIR_CATALOGS = f'./data/output/v4/{DET_NICKNAME}_{DET_TYPE}_{KERNEL}/'
 DIR_REFPSF = f'./data/external/psf_jrw_v4/psf_ceers_F444W_4arcsec.fits'
 def DIR_KERNEL(band):
-    return glob.glob(f'./data/intermediate/v4/{KERNEL}*/{band.lower()}_kernel.fits')[0]
+    return glob.glob(f'./data/external/psf_jrw_v4/{KERNEL}*/{band.lower()}_kernel.fits')[0]
 stats = np.load(os.path.join(DIR_CATALOGS, f'{DET_NICKNAME}_emptyaper_stats.npy'), allow_pickle=True).item()
 APPLY_MWDUST = True
 DIR_SFD = '~/Projects/Common/py_tools/sfddata-master'
@@ -54,7 +49,7 @@ PHOT_NICKNAMES = list(PHOT_ZP.keys())
 def sigma_aper(filter, weight, weight_med, apersize=0.7):
     # Equation 5
     # apersize = str(apersize).replace('.', '_') + 'arcsec'
-    sigma_nmad_filt = stats[filter.lower()][apersize]['fit_std']
+    sigma_nmad_filt = stats[filter.lower()][apersize]['snmad']
     # sigma_nmad_filt = ERROR_TABLE[f'e{apersize}'][ERROR_TABLE['filter']==filter.lower()][0] 
     # g_i = 1.*2834.508 # here's to hoping.  EFFECTIVE GAIN!
     fluxvar = ( sigma_nmad_filt / np.sqrt(weight / weight_med) )**2  #+ (flux_aper / g_i)
@@ -72,11 +67,11 @@ def sigma_ref_total(sigma1, alpha, beta, kronrad_circ, wht_ref, medwht_ref, flux
     # term2 = flux_refauto / g_ref 
     return np.sqrt(term1) # + term2)
 
-def sigma_full(sigma_total, sigma_ref_total, sigma_total_ref):
-    # equation 8
-    sig_full = sigma_total**2 + sigma_ref_total**2 - sigma_total_ref**2
-    # print(np.sum(sig_full < 0) / len(sig_full))
-    return np.sqrt(sig_full)
+# def sigma_full(sigma_total, sigma_ref_total, sigma_total_ref):
+#     # equation 8
+#     sig_full = sigma_total**2 + sigma_ref_total**2 - sigma_total_ref**2
+#     # print(np.sum(sig_full < 0) / len(sig_full))
+#     return np.sqrt(sig_full)
 
 def flux_ref_total(flux_ref_auto, frac):
     # equation 9
@@ -132,7 +127,7 @@ else:
 # use REF_BAND Kron to correct to total fluxes and ferr
 plotname = os.path.join(DIR_CATALOGS, f'aper_{REF_BAND}_nmad.pdf')
 p, pcov, sig1 = fit_apercurve(stats[REF_BAND], plotname=plotname, stat_type=['snmad', 'fit_std'])
-alpha, beta = p['fit_std']
+alpha, beta = p['snmad']
 f_ref_auto = maincat[f'{REF_BAND}_FLUX_AUTO']
 kronrad_circ = np.sqrt(maincat['a'] * maincat['b'] * maincat[f'{REF_BAND}_KRON_RADIUS']**2) 
 kronrad_circ[kronrad_circ<3.5] = 3.5 # PHOT_AUTOPARAMS[1]
@@ -164,7 +159,7 @@ for apersize in (0.16, 0.35, 0.7, 2.0):
         sig_aper = sigma_aper(filter, wht, medwht, apersize)
         # do again for each aperture
         sig_total = sigma_total(sig_aper, f_ref_total, f_ref_aper) 
-        sig_full = sigma_full(sig_total, sig_ref_total, sig_total_ref)
+        # sig_full = sigma_full(sig_total, sig_ref_total, sig_total_ref)
 
         # add new columns
         newcoln = f'{filter}_FLUX_APER{str_aper}_COLOR'
@@ -177,8 +172,8 @@ for apersize in (0.16, 0.35, 0.7, 2.0):
         newcoln = f'{filter}_FLUXERR_APER{str_aper}_TOTAL'
         maincat.add_column(Column(sig_total, newcoln))
 
-        newcoln =f'{filter}_FLUXERR_APER{str_aper}_FULL'
-        maincat.add_column(Column(sig_full, newcoln))
+        # newcoln =f'{filter}_FLUXERR_APER{str_aper}_FULL'
+        # maincat.add_column(Column(sig_full, newcoln))
         
     
 # ADD SFD maps (2011 scales by 0.86, which is default. otherwise use scaling=1.0)

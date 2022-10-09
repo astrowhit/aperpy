@@ -17,10 +17,10 @@ from webb_tools import compute_background, emtpy_apertures
 import convenience as conv
 
 # MAIN PARAMETERS
-# DET_NICKNAME = 'LW_f356w-f444w' 
-DET_NICKNAME = 'SW_f150w-f200w'
+DET_NICKNAME = 'LW_f277w-f356w-f444w' 
+# DET_NICKNAME = 'SW_f150w-f200w'
 DET_TYPE = 'noise-equal'
-KERNEL = 'f160w'
+KERNEL = 'f444w'
 
 PHOT_ZP = OrderedDict()
 PHOT_ZP['f435w'] = 28.9
@@ -360,7 +360,8 @@ for ind, PHOT_NICKNAME in enumerate(PHOT_NICKNAMES):
     empty_aper = list(PHOT_APER)+list(np.linspace(PHOT_APER[0], PHOT_APER[-1], 30))
     empty_aper = np.sort(empty_aper)
     plotname = os.path.join(DIR_OUTPUT, f'{PHOT_NICKNAME}_emptyaper.pdf')
-    stats[PHOT_NICKNAME] = emtpy_apertures(photsci, segmap, N=int(1e3), aper=empty_aper, plotname=plotname)
+    zpt_factor = conv_flux(PHOT_ZPT)
+    stats[PHOT_NICKNAME] = emtpy_apertures(photsci, photwht, segmap, N=int(1e3), aper=empty_aper, plotname=plotname, zpt_factor=zpt_factor)
 
     # WRITE OUT
     print(f'DONE. Writing out catalog.')

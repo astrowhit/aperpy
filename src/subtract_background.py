@@ -15,7 +15,6 @@ BACKTYPE = 'var'
 
 # 150, 200, 356, 444
 for FILENAME in glob.glob(os.path.join(DIR_IMAGES, 'ceers-full-grizli-v4.0-*_sci.fits.gz')):
-    if not (('f150w' in FILENAME) or ('f115w' in FILENAME)or ('f200w' in FILENAME)): continue
     fn_sci = os.path.join(DIR_IMAGES, FILENAME)
     fn_wht = os.path.join(DIR_IMAGES, FILENAME.replace('sci', 'wht'))
     print(fn_sci, fn_wht)

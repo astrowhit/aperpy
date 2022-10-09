@@ -14,7 +14,7 @@ images = OrderedDict()
 # images['f115w'] = os.path.join(DIR_IMAGES, 'ceers-grizli-v4-f115w-clear_drc_sci_skysubvar.fits.gz')
 images['f150w'] = os.path.join(DIR_IMAGES, 'ceers-full-grizli-v4.0-f150w-clear_drc_sci_skysubvar.fits.gz')
 images['f200w'] = os.path.join(DIR_IMAGES, 'ceers-full-grizli-v4.0-f200w-clear_drc_sci_skysubvar.fits.gz')
-# images['f277w'] = os.path.join(DIR_IMAGES, 'ceers-full-grizli-v4.0-f277w-clear_drc_sci_skysubvar.fits.gz')
+images['f277w'] = os.path.join(DIR_IMAGES, 'ceers-full-grizli-v4.0-f277w-clear_drc_sci_skysubvar.fits.gz')
 images['f356w'] = os.path.join(DIR_IMAGES, 'ceers-full-grizli-v4.0-f356w-clear_drc_sci_skysubvar.fits.gz')
 images['f444w'] = os.path.join(DIR_IMAGES, 'ceers-full-grizli-v4.0-f444w-clear_drc_sci_skysubvar.fits.gz')
 
@@ -26,7 +26,7 @@ BACKTYPE = 'NONE'
 HEADEXT = 1
 
 blue = ('f150w', 'f200w')
-red = ('f356w', 'f444w')
+red = ('f277w', 'f356w', 'f444w')
 
 # chi-mean, noise-equalized, stack
 def chi_mean(bands, outname):
@@ -120,4 +120,4 @@ def sumstack(bands, outname):
 
 for func in (opt_avg,):
     func(blue, os.path.join(DIR_OUTPUT, 'SW_'+'-'.join(blue)))
-    # func(red, os.path.join(DIR_OUTPUT,'LW_'+'-'.join(red)))
+    func(red, os.path.join(DIR_OUTPUT,'LW_'+'-'.join(red)))
