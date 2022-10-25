@@ -26,14 +26,28 @@ for filt in FILTERS:
 def renorm_hst_psf(filt, field, dir=DIR_PSFS, pixscl=PIXEL_SCALE, fov=PSF_FOV):
     psfmodel = fits.getdata(os.path.join(dir, f'{filt.lower()}_psf_unmatched.fits'))
 
-    encircled = {} # rounded to nearest 100nm, see hst docs
-    encircled['F105W'] = 0.975
+    # encircled = {} # rounded to nearest 100nm, see hst docs
+    # encircled['F105W'] = 0.975
+    # encircled['F125W'] = 0.969
+    # encircled['F140W'] = 0.967
+    # encircled['F160W'] = 0.967
+    # encircled['F435W'] = 0.989
+    # encircled['F606W'] = 0.980
+    # encircled['F814W'] = 0.976
+
+    # Encircled energy for WFC3 IR, ACS Optical, and UVIS from HST docs
+    encircled = {}
+    encircled['F225W'] = 0.993
+    encircled['F275W'] = 0.984
+    encircled['F336W'] = 0.9905
+    encircled['F435W'] = 0.979
+    encircled['F606W'] = 0.975
+    encircled['F814W'] = 0.972
+    encircled['F098M'] = 0.974
+    encircled['F105W'] = 0.973
     encircled['F125W'] = 0.969
     encircled['F140W'] = 0.967
-    encircled['F160W'] = 0.967
-    encircled['F435W'] = 0.989
-    encircled['F606W'] = 0.980
-    encircled['F814W'] = 0.976
+    encircled['F160W'] = 0.966
 
     # Normalize to correct for missing flux
     # Has to be done encircled! Ensquared were calibated to zero angle...
