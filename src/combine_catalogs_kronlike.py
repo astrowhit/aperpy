@@ -68,7 +68,7 @@ def flux_total(flux_aper, flux_ref_total, flux_ref_aper):
 
 # loop over filters
 for filter in PHOT_NICKNAMES:
-    filename = os.path.join(FULLDIR_CATALOGS, f'{filter}_{DET_NICKNAME}_PHOT_CATALOG.fits')
+    filename = os.path.join(FULLDIR_CATALOGS, f'{filter}_{DET_NICKNAME}_K{KERNEL}_PHOT_CATALOG.fits')
     if not os.path.exists(filename):
         print(f'ERROR :: {filename} not found!')
         sys.exit()
@@ -98,7 +98,7 @@ for filter in PHOT_NICKNAMES:
 
 # add ID at the end
 maincat.add_column(Column(1+np.arange(len(maincat)), name='ID'), 0)
-outfilename = os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_COMBINED_CATALOG.fits')
+outfilename = os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_COMBINED_CATALOG.fits')
 
 # grab REF_BAND PSF convolved to kernel
 psfmodel = fits.getdata(FNAME_REF_PSF)

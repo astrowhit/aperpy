@@ -323,7 +323,7 @@ for ind, PHOT_NICKNAME in enumerate(PHOT_NICKNAMES):
 
     # WRITE OUT
     print(f'DONE. Writing out catalog.')
-    catalog.write(os.path.join(FULLDIR_CATALOGS, f'{PHOT_NICKNAME}_{DET_NICKNAME}_PHOT_CATALOG.fits'), overwrite=True)
+    catalog.write(os.path.join(FULLDIR_CATALOGS, f'{PHOT_NICKNAME}_{DET_NICKNAME}_K{KERNEL}_PHOT_CATALOG.fits'), overwrite=True)
 
 np.save(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_emptyaper_stats.npy'), stats)
 with open(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_AREAS.dat'), 'w') as f:

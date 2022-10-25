@@ -8,6 +8,10 @@ import sep
 import os
 from astropy.io import fits
 
+import sys
+PATH_CONFIG = __file__.replace('src/webb_tools.py', 'config/')
+sys.path.insert(0, PATH_CONFIG)
+
 def compute_background(raw_img, mask, BACKTYPE, BACKPARAMS, DIR_OUTPUT=None, NICKNAME=None, HEADER=None):
     if BACKTYPE == 'VAR':
         bkg = sep.Background(raw_img.byteswap().newbyteorder(), mask=mask, **BACKPARAMS)
@@ -265,16 +269,14 @@ def get_psf(filt, field='uncover', angle=None, fov=4, og_fov=10, pixscl=0.04, da
     import os
     from astropy.io import ascii
 
+    from config import SW_FILTERS, LW_FILTERS
+
     # Check if filter is valid and get correction term
-    DIR_CORR = '/Users/jweaver/Projects/Software/aperpy/config/'
-    if filt in ['F070W', 'F090W', 'F115W', 'F140M', 'F150W', 'F162M', 'F164N',
-                'F150W2', 'F182M', 'F187N', 'F200W', 'F210M', 'F212N']:
+    if filt in SW_FILTERS:
         # 17 corresponds with 2" radius (i.e. 4" FOV)
-        encircled = ascii.read(os.path.join(DIR_CORR, 'Encircled_Energy_SW.txt'))[17][filt]
-    elif filt in ['F250M', 'F277W', 'F300M', 'F322W2', 'F323N', 'F335M',
-                'F360M', 'F356W', 'F405N', 'F410M', 'F430M', 'F444W', 'F460M',
-                'F466N', 'F470N', 'F480M']:
-        encircled = ascii.read(os.path.join(DIR_CORR, 'Encircled_Energy_LW.txt'))[17][filt]
+        encircled = ascii.read(os.path.join(PATH_CONFIG, 'Encircled_Energy_SW.txt'))[17][filt]
+    elif filt in LW_FILTERS:
+        encircled = ascii.read(os.path.join(PATH_CONFIG, 'Encircled_Energy_LW.txt'))[17][filt]
     else:
         print(f'{filt} is NOT a valid NIRCam filter!')
         return
@@ -317,3 +319,114 @@ def get_psf(filt, field='uncover', angle=None, fov=4, og_fov=10, pixscl=0.04, da
     newhdu.writeto(outname+'.fits', overwrite=True)
 
     return rotated
+
+
+
+def make_cutout(ra, dec, size, nickname, filters, dir_images, row=None, plot=True, write=True, include_rgb=False, rgb=['f444w', 'f356w', 'f150w'], redshift=-99):
+    import astropy.units as u
+    from astropy.coordinates import SkyCoord
+    from astropy.wcs import WCS
+    from astropy.nddata import Cutout2D
+    from matplotlib.colors import SymLogNorm
+    import matplotlib.pyplot as plt
+    import glob, sys
+
+    coord = SkyCoord(ra=ra*u.deg, dec=dec*u.deg)
+    print(coord)
+
+    hdul = fits.HDUList()
+
+    if include_rgb:
+        from astropy.visualization import make_lupton_rgb
+    
+    if plot:
+        fig, axes = plt.subplots(ncols=6, nrows=2, figsize=(3*6, 3*2))
+
+    for filt, ax in zip(filters, axes.flatten()):
+
+        # print(filt)
+        fn = glob.glob(os.path.join(dir_images, f'*{filt}*_sci_skysubvar.fits.gz'))[0]
+        if not os.path.exists(fn):
+            print(f'WARNING -- image for {filt} does not exist at {fn}. Skipping!')
+            continue
+        hdu = fits.open(fn)[0]
+        img = hdu.data
+        # if plot: # get these from the big mosaic!
+        #     mean, median, rms = sigma_clipped_stats(img[img!=0], sigma=3)
+        wcs = WCS(hdu.header)
+        if not wcs.footprint_contains(coord):
+            print(f'CRITICAL -- {coord} is not within the image footprint!')
+            sys.exit()
+        try:
+            cutout = Cutout2D(img, position=coord, size=size*u.arcsec, wcs=wcs)
+        except:
+            ax.axes.xaxis.set_visible(False)
+            ax.axes.yaxis.set_visible(False)
+            continue
+
+        if plot: # get these from the big mosaic!
+            img = cutout.data
+            mean, median, rms = sigma_clipped_stats(img[img!=0], sigma=3)
+            img -= median
+            if np.isnan(rms):
+                rms = 0.002
+
+        if write:
+            hdu.data = cutout.data
+            hdu.header.update(cutout.wcs.to_header())
+            hdu.name = filt
+            hdul.append(hdu)
+
+        if plot: # nice stamp pdfs scaled optimally to show noise + structure
+
+            if filt == rgb[0]:
+                r = img * 1.4
+            if filt == rgb[1]:
+                g = img * 1
+            if filt == rgb[2]: 
+                b = img * 0.35
+
+            if row is None:
+                mag, magerr = -99, -99
+                snr = -99
+            if f'f_{filt.upper()}' not in row.colnames:
+                mag, magerr = -99, -99
+                snr = -99
+            else:
+                flux, fluxerr = row[f'f_{filt.upper()}'][0], row[f'e_{filt.upper()}'][0]
+                snr = flux / fluxerr
+
+                mag = 25 - 2.5*np.log10(flux)
+                magerr = 2.5 / np.log(10) / (flux/fluxerr)
+
+                if flux <=0:
+                    mag, magerr = -1, flux/fluxerr
+
+                # print(filt)
+                # print(flux, fluxerr)
+                # print(mag, magerr)
+            scale = np.nanmax(img)
+            if scale <= 0:
+                scale = 0.02
+            elif np.isnan(scale):
+                scale = 1
+            # print(rms, scale)
+            ax.imshow(img, cmap='RdGy', norm=SymLogNorm(3*rms, 1, -scale, scale))
+            ax.text(0.05, 1.05, f'{filt.upper()}\n{mag:2.2f}+/-{magerr:2.2f} AB (S/N:{snr:2.2f})', transform=ax.transAxes)
+            ax.axes.xaxis.set_visible(False)
+            ax.axes.yaxis.set_visible(False)
+    
+
+    if plot:
+        img = make_lupton_rgb(r, g, b, stretch=0.1, minimum=-0.01)
+        fig_rgb, ax_rgb = plt.subplots(figsize=(5,5))
+        ax_rgb.imshow(img)
+        ax_rgb.text(0.01, 0.01, f'{rgb[0].upper()}+{rgb[1].upper()}+{rgb[2].upper()}', transform=ax_rgb.transAxes, color='w', fontsize=15)
+        ax_rgb.text(0.01, 0.90, f'{nickname} $z$ = {redshift:2.2f}', transform=ax_rgb.transAxes, color='w', fontsize=20)
+        ax_rgb.axes.xaxis.set_visible(False)
+        ax_rgb.axes.yaxis.set_visible(False)
+        fig.savefig(f'cutouts/{nickname}.pdf', dpi=300)
+        fig_rgb.savefig(f'cutouts/{nickname}_RGB.pdf', dpi=300)
+
+    if write:
+        hdul.writeto(f'cutouts/{nickname}.fits', overwrite=True)
