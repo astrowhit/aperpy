@@ -1,4 +1,7 @@
 # Compute background
+import enum
+from turtle import position
+from typing import OrderedDict
 from astropy.stats import sigma_clipped_stats
 import numpy as np
 import sep
@@ -38,17 +41,77 @@ def compute_background(raw_img, mask, BACKTYPE, BACKPARAMS, DIR_OUTPUT=None, NIC
     return back
 
 
+# Compute empty aperture curve
+def fit_apercurve(stats, plotname=None, pixelscale=0.04, stat_type=['fit_std', 'snmad'], init=(1, 5)):
+    py = []
+    psizes = []
+    for size in stats:
+        if size == 'snmad_1':
+            s = stats[size]
+            # print(size, s)
+            continue
+        if size in ('Naper', 'sigma_1', 'positions', 'fit_mean', 'fit_std'):
+            continue
+        py.append([stats[size][stype] for stype in stat_type])
+        psizes.append(size)
+        
+    psizes = np.array(psizes)
+    py = np.array(py)
+    N = np.sqrt(np.pi*(psizes/pixelscale/2.)**2)
+    px = np.arange(psizes[0], psizes[-1], 0.001)
+    pN = np.sqrt(np.pi*(px/pixelscale/2.)**2)
+        
+    from scipy.optimize import curve_fit
+    def func(N, a, b):
+        return s * a * N**b
+
+    p, pcov = {}, {}
+    for i, st in enumerate(stat_type):
+        p[st], pcov[st] = curve_fit(func, N, py[:,i], p0=init)
+
+    if plotname is not None:
+        import matplotlib.pyplot as plt
+        plt.ioff()
+        py = np.array(py)
+        fig, ax = plt.subplots(figsize=(5, 5))
+        for i, st in enumerate(stat_type):
+            # print(psizes)
+            # print(py[:,i])
+            ax.scatter(psizes, py[:,i])
+    
+
+            label=f'{st}: {s:2.2f}$x${p[st][0]:2.2f}$N^{{{p[st][1]:2.2f}}}$'
+
+            plt.plot(px, func(pN, *p[st]), label=label)
+    #     print(p)
+
+        # ax.plot(px, func(pN, 0.05, 2.1))
+        upper = func(pN, p[st][0], 2)
+        ax.plot(px[upper<py[-1,i]], upper[upper<py[-1,i]], ls='dashed', c='grey')
+        ax.plot(px, func(pN, p[st][0], 1), ls='dashed', c='grey')
+
+        ax.legend(fontsize=15)
+        ax.set(xlim=(0, 1.1*px[-1]))
+        ax.set(xlabel='Aperture Diam (\")', ylabel='$\sigma_{\\rm NMAD}$')
+        fig.tight_layout()
+        fig.savefig(plotname)
+
+    return p, pcov, s
+
 # Empty Apertures
-def emtpy_apertures(img, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=0.04):
+def emtpy_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=0.04, plotname=None, zpt_factor=1.):
     from alive_progress import alive_bar
     import numpy as np
     import scipy.stats as stats
     import astropy.units as u
+    from astropy.stats import mad_std
     from astropy.stats import sigma_clipped_stats
     from photutils.aperture import CircularAperture, aperture_photometry
 
-    aperrad = np.array(aper) / 2. / pixscl # diam sky to rad pix
-    maxaper = int(np.max(aper)) + 1
+
+    aper = np.array(aper)
+    aperrad = aper / 2. / pixscl # diam sky to rad pix
+    maxaper = int(np.max(aperrad)) + 1
 
     size = np.shape(img)
     try:
@@ -64,9 +127,9 @@ def emtpy_apertures(img, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=0.04):
             px, py = np.random.uniform(0, 1, 2)
             x, y = int(px * size[0]), int(py * size[1])
             box = slice(x-maxaper,x+maxaper), slice(y-maxaper,y+maxaper)
-            subseg, subimg = segmap[box], img[box]
+            subseg, subimg, subwht = segmap[box], img[box], wht[box]
             # print(x, y)
-            if np.all(subseg==0) & (not np.any((subimg==0.0) | np.isnan(subimg))):
+            if np.all(subseg==0) & (not np.any((subwht==0.0) | np.isnan(subimg))):
                 positions[kept] = y, x
                 kept += 1
                 bar()
@@ -75,41 +138,125 @@ def emtpy_apertures(img, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=0.04):
     apertures = [CircularAperture(positions, r=r) for r in aperrad]
     output = aperture_photometry(img, apertures)
 
-    aperstats = {}
-    aperstats['sigma_1'] = np.nanstd(img[segmap==0])
-    # measure moments + percentiles; AD test
-    for i, radius in enumerate(aper):
-        phot = output[f'aperture_sum_{i}']
-        # print(phot)
-        aperstats[radius] = {}
-        aperstats[radius]['mean'] = np.mean(phot)
-        aperstats[radius]['std'] = np.std(phot)
-        aperstats[radius]['snmad'] = 1.48 * np.median(np.abs(phot))
-        aperstats[radius]['norm'] = stats.normaltest(phot)
-        aperstats[radius]['median'] = np.median(phot)
-        kmean, kmed, kstd = sigma_clipped_stats(phot)
-        aperstats[radius]['kmean'] = kmean
-        aperstats[radius]['kmed'] = kmed
-        aperstats[radius]['kstd'] = kstd
-        pc = np.percentile(phot, q=(5, 16, 84, 95))
-        aperstats[radius]['pc'] = pc
-        aperstats[radius]['interquart_68'] = pc[2] - pc[1] # 68pc
+    aperstats = OrderedDict()
+    clean_img = img[(img!=0) & (segmap==0) & (~np.isnan(img))].flatten() * zpt_factor
+    aperstats['sigma_1'] = np.nanstd(clean_img)
+    aperstats['snmad_1'] = mad_std(clean_img)
+    aperstats['Naper'] = N
 
-        # print(radius)
+    # Define the Gaussian function
+    from scipy.stats import norm
+
+    pc = np.nanpercentile(clean_img, q=(1, 99))
+    bins = np.linspace(pc[0], pc[1], 20)
+    px = np.linspace(pc[0], pc[1], 1000)
+    p = norm.fit(clean_img, loc=np.nanmedian(clean_img), scale=aperstats['snmad_1'])
+
+    aperstats['fit_mean'] = p[0]
+    aperstats['fit_std'] = p[1]
+
+    if plotname is not None:
+        import matplotlib.pyplot as plt
+        plt.ioff()
+        ncols = 5
+        nrows = int((len(aper)+1)/ncols) + 1
+        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(5*ncols, 5*nrows))
+        axes = axes.flatten()
+        # ax.set(xlab)
+        axes[0].hist(clean_img, bins=bins, color='k', histtype='step', density=True)
+        axes[0].plot(px, norm.pdf(px, *p), c='k', label=f'1px @ {p[1]:2.2f}/{aperstats["snmad_1"]:2.2f})')
+        axes[0].legend(loc='upper left') 
+        # ax.axvline(-aperstats['sigma_1'], color='k', ls='dashed')
+        # ax.axvline(aperstats['sigma_1'], color='k', ls='dashed')
+        colors = plt.get_cmap('rainbow', len(aper))
+
+    # measure moments + percentiles; AD test
+    for i, diam in enumerate(aper):
+        phot = output[f'aperture_sum_{i}'] * zpt_factor
+        phot = phot[phot!=0.]
+        # print(phot)
+        aperstats[diam] = {}
+        aperstats[diam]['phot'] = phot
+        ax = axes[i+1]
+
+        snmad = mad_std(phot)
+        med = np.nanmedian(phot)
+
+        pc = np.nanpercentile(phot, q=(1, 99))
+        bins = np.linspace(pc[0], pc[1], 20)
+        px = np.linspace(pc[0], pc[1], 1000)
+        from scipy.optimize import curve_fit
+        p = norm.fit(phot, loc=med, scale=snmad)
+        aperstats[diam]['fit_mean'] = p[0]
+        aperstats[diam]['fit_std'] = p[1]
+
+        if plotname is not None:
+            ax.hist(phot, bins=bins, color=colors(i) , histtype='step', density=True)
+            ax.plot(px, norm.pdf(px, *p), c=colors(i), label=f'{diam:2.2f}\" @ {p[1]:2.2f}/{snmad:2.2f})')
+            ax.legend(loc='upper left')
+            # ax.axvline(-p[1], color=colors(i), ls='dashed')
+            # ax.axvline(p[1], color=colors(i), ls='dashed')
+
+        aperstats[diam]['mean'] = np.mean(phot)
+        aperstats[diam]['std'] = np.std(phot)
+        aperstats[diam]['snmad'] = snmad
+        aperstats[diam]['norm'] = stats.normaltest(phot)
+        aperstats[diam]['median'] = med
+        kmean, kmed, kstd = sigma_clipped_stats(phot)
+        aperstats[diam]['kmean'] = kmean
+        aperstats[diam]['kmed'] = kmed
+        aperstats[diam]['kstd'] = kstd
+        pc = np.percentile(phot, q=(5, 16, 84, 95))
+        aperstats[diam]['pc'] = pc
+        aperstats[diam]['interquart_68'] = pc[2] - pc[1] # 68pc
+
         # for key in aperstats[radius]:
         #     print(key, aperstats[radius][key])
         # print()
 
-    return aperstats
+    if plotname:
+        fig.tight_layout()
+        fig.savefig(plotname)
 
+    return aperstats
 # Star finder
 
 
 # Make auto mask
 
+def new_workingspace(version, path='.'):
+    trypath = os.path.join(path, version)
+    if os.path.exists(trypath):
+        raise RuntimeError(f'Path already exists! {trypath}')
+    os.mkdir(trypath)
+    for dirname in ('external', 'intermediate', 'output', 'catalogs'):
+        os.mkdir(os.path.join(path, f'{version}/{dirname}'))
+
+
+# Compute COG for PSF
+def psf_cog(psfmodel, nearrad=None):
+    x = np.arange(-np.shape(psfmodel)[0]/2,  np.shape(psfmodel)[0]/2)
+    y = x.copy()
+    px = np.arange(0, np.shape(psfmodel)[0]/2, 0.2) 
+    xv, yv = np.meshgrid(x, y)
+    radius = np.sqrt(xv**2 + yv**2)
+    cumcurve = np.array([np.sum(psfmodel[radius<i]) for i in px])
+    import scipy.interpolate
+    modcumcurve = scipy.interpolate.interp1d(px, cumcurve, fill_value = 'extrapolate')
+
+    if nearrad is None:
+        return px, cumcurve, modcumcurve
+    
+    return modcumcurve(nearrad)
+
+def get_date():
+    from datetime import datetime
+    now = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    print(now)
+    return now
 
 # Make and rotate PSF
-def get_psf(filt, field='ceers', angle=None, fov=4, og_fov=10, pixscl=0.04):
+def get_psf(filt, field='uncover', angle=None, fov=4, og_fov=10, pixscl=0.04, date=None, output=''):
     # makes the PSF at og_fov and clips down to fov. Works with 0.04 "/px
     import webbpsf
     from astropy.io import fits
@@ -119,7 +266,7 @@ def get_psf(filt, field='ceers', angle=None, fov=4, og_fov=10, pixscl=0.04):
     from astropy.io import ascii
 
     # Check if filter is valid and get correction term
-    DIR_CORR = '.'
+    DIR_CORR = '/Users/jweaver/Projects/Software/aperpy/config/'
     if filt in ['F070W', 'F090W', 'F115W', 'F140M', 'F150W', 'F162M', 'F164N',
                 'F150W2', 'F182M', 'F187N', 'F200W', 'F210M', 'F212N']:
         # 17 corresponds with 2" radius (i.e. 4" FOV)
@@ -133,15 +280,17 @@ def get_psf(filt, field='ceers', angle=None, fov=4, og_fov=10, pixscl=0.04):
         return
 
     # Observed PA_V3 for fields
-    angles = {'ceers': 130.7889803307112, 'smacs': 144.6479834976019, 'glass': 251.2973235468314}
+    angles = {'ceers': 130.7889803307112, 'smacs': 144.6479834976019, 'glass': 251.2973235468314, 'uncover': 40.98680919}
     if angle is None:
         angle = angles[field]
     nc = webbpsf.NIRCam()
     nc.options['parity'] = 'odd'
     
-    outname = 'psf_'+field+'_'+filt+'_'+str(fov)+'arcsec' # what to save as?
+    outname = os.path.join(output, 'psf_'+field+'_'+filt+'_'+str(fov)+'arcsec') # what to save as?
 
     # make an oversampled webbpsf
+    if date is not None:
+        nc.load_wss_opd_by_date(date, plot=False)
     nc.filter = filt
     nc.pixelscale = pixscl
     psf = nc.calc_psf(oversample=1, fov_arcsec=og_fov)[0].data

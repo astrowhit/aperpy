@@ -1,27 +1,30 @@
 # This is just a wrapper around the webb_tool
-from FOOwebb_tools import get_psf
+from webb_tools import get_psf, get_date
 from astropy.io import fits
 import numpy as np
-import os
+import os, sys
 
-WEBB_FILTERS = ['F070W', 'F090W', 'F115W', 'F140M', 'F150W', 'F162M', 'F164N',
-                'F150W2', 'F182M', 'F187N', 'F200W', 'F210M', 'F212N']
-WEBB_FILTERS += ['F250M', 'F277W', 'F300M', 'F322W2', 'F323N', 'F335M',
-                'F360M', 'F356W', 'F405N', 'F410M', 'F430M', 'F444W', 'F460M',
-                'F466N', 'F470N', 'F480M']
-HST_FILTERS = ['F105W', 'F125W', 'F140W', 'F160W', 'F435W', 'F606W', 'F814W']
+PATH_CONFIG = sys.argv[1]
+sys.path.insert(0, PATH_CONFIG)
 
-FIELD = 'ceers'
-ANGLE = 0. # use to override quick 'field' PAs:
-# {'ceers': 130.7889803307112, 'smacs': 144.6479834976019, 'glass': 251.2973235468314}
+from config import WEBB_FILTERS, FIELD, ANGLE, DIR_PSFS, PIXEL_SCALE, PSF_FOV, HST_FILTERS, USE_NEAREST_DATE, FILTERS
+
+
+if USE_NEAREST_DATE:
+    date = get_date()
+else:
+    date = None
 
 # Default behavior generates a 10" FOV PSF and clips down to 4" FOV; 0.04 "/px
-# for filt in WEBB_FILTERS:
-#     get_psf(filt, FIELD, ANGLE)
+for filt in FILTERS:
+    filt = filt.upper()
+    if filt not in WEBB_FILTERS: continue
+    print(f'Fetching WebbPSF for {filt} at PA {ANGLE}deg...')
+    get_psf(filt, FIELD, ANGLE, output=DIR_PSFS, date=date)
 
 
-def renorm_hst_psf(filt, field, dir='/Volumes/External1/Projects/Current/CEERS/data/external/psf_jrw_v4/hst_psfs_v4', pixscl=0.04, fov=4):
-    psfmodel = fits.getdata(os.path.join(dir, f'{filt.lower()}_psf.fits'))
+def renorm_hst_psf(filt, field, dir=DIR_PSFS, pixscl=PIXEL_SCALE, fov=PSF_FOV):
+    psfmodel = fits.getdata(os.path.join(dir, f'{filt.lower()}_psf_unmatched.fits'))
 
     encircled = {} # rounded to nearest 100nm, see hst docs
     encircled['F105W'] = 0.975
@@ -44,7 +47,10 @@ def renorm_hst_psf(filt, field, dir='/Volumes/External1/Projects/Current/CEERS/d
 
     # and save
     newhdu = fits.PrimaryHDU(psfmodel)
-    newhdu.writeto(f'psf_{field}_{filt}_{fov}arcsec.fits', overwrite=True)
+    newhdu.writeto(os.path.join(DIR_PSFS, f'psf_{field}_{filt}_{fov}arcsec.fits'), overwrite=True)
 
 for filt in HST_FILTERS:
+    filt = filt.upper()
+    if filt not in HST_FILTERS: continue
+    print(f'Normalizing HST PSF for {filt}...')
     renorm_hst_psf(filt, FIELD)

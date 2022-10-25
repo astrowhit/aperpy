@@ -1,46 +1,50 @@
-import os
+import os, sys
 from astropy.io import fits
 import numpy as np
 import glob
 from astropy.convolution import convolve, convolve_fft
 import time
 
-KERNEL = 'f444w'
-DIR_IMAGES = '/Volumes/External1/Projects/Current/CEERS/data/intermediate/v4/'
-DIR_KERNELS = f'/Volumes/External1/Projects/Current/CEERS/data/external/psf_jrw_v4/{KERNEL}_matched_psf_regularization/'
-DIR_WEIGHTS = '/Volumes/External1/Projects/Current/CEERS/data/external/egs-grizli-v4/'
-DIR_OUTPUT = '/Volumes/External1/Projects/Current/CEERS/data/intermediate/v4/'
-IMG_EXT = 1
-WHT_EXT = 0
+import sys
+PATH_CONFIG = sys.argv[1]
+sys.path.insert(0, PATH_CONFIG)
 
-for FILENAME in glob.glob(os.path.join(DIR_IMAGES, 'ceers-full-grizli-v4.0-*_sci_skysubvar.fits.gz')):
+from config import DIR_OUTPUT, DIR_IMAGES, DIR_KERNELS, DIR_OUTPUT, FILTERS
+
+KERNEL = sys.argv[2]
+SCI_FILENAMES = list(glob.glob(DIR_OUTPUT+'/*_sci_skysubvar.fits.gz'))
+
+for filename in SCI_FILENAMES:
+    if f'sci_skysubvar' not in filename: continue
     # if not (('f410m' in FILENAME) or ('f444w' in FILENAME)): continue
-    band = FILENAME.split('ceers-full-grizli-v4.0-')[1][:5]
-    # if not ('f444w' in FILENAME): continue
-    hdul = fits.open(FILENAME)
-    fn_weight = FILENAME.replace(DIR_IMAGES, DIR_WEIGHTS).replace('sci_skysubvar', 'wht')
+    for band in FILTERS:
+        if band in filename:
+            break
+    # if not ('f444w' in filename): continue
+    hdul = fits.open(filename)
+    fn_weight = filename.replace(DIR_OUTPUT, DIR_IMAGES).replace(f'sci_skysubvar', 'wht')
     hdul_wht = fits.open(fn_weight)
 
     if band != KERNEL:
         print(f'PSF-matching sci {band} to {KERNEL}')
         tstart = time.time()
-        fn_kernel = os.path.join(DIR_KERNELS, f'{band}_kernel.fits')
-        # fn_kernel = '/Volumes/External1/Projects/Current/CEERS/data/external/ceers_kernels_v2/F444W.fits'
+        fn_kernel = os.path.join(DIR_KERNELS, f'{KERNEL}_matched_psfs/{band}_kernel.fits')
         kernel = fits.getdata(fn_kernel)
         kernel /= np.sum(kernel)
 
-        weight = hdul_wht[WHT_EXT].data
+        weight = hdul_wht[0].data
 
-        hdul[IMG_EXT].data = convolve_fft(hdul[IMG_EXT].data, kernel, allow_huge=True)
-        hdul[IMG_EXT].data[weight==0] = 0.
+        print(np.shape(hdul[0].data))
+        hdul[0].data = convolve_fft(hdul[0].data, kernel, allow_huge=True)
+        hdul[0].data[weight==0] = 0.
 
         err = np.where(weight==0, 0, 1/np.sqrt(weight))
-        err_conv = convolve_fft(err, kernel, allow_huge=True) #, allow_huge=True)
-        hdul_wht[WHT_EXT].data = np.where(err_conv==0, 0, 1./(err**2))
-        hdul_wht[WHT_EXT].data[weight==0] = 0.
+        err_conv = convolve_fft(err, kernel, allow_huge=True) 
+        hdul_wht[0].data = np.where(err_conv==0, 0, 1./(err**2))
+        hdul_wht[0].data[weight==0] = 0.
         print(f'Finished in {time.time()-tstart:2.2f}s')
 
-    hdul.writeto(FILENAME.replace(DIR_IMAGES, DIR_OUTPUT).replace('_skysubvar.fits.gz', f'_skysubvar_{KERNEL}-matched.fits.gz'), overwrite=True)
-    hdul_wht.writeto(FILENAME.replace(DIR_IMAGES, DIR_OUTPUT).replace('_sci_skysubvar.fits.gz', f'_wht_{KERNEL}-matched.fits.gz'), overwrite=True)
+    hdul.writeto(filename.replace(DIR_IMAGES, DIR_OUTPUT).replace(f'_skysubvar.fits.gz', f'_skysubvar_{KERNEL}-matched.fits.gz'), overwrite=True)
+    hdul_wht.writeto(filename.replace(DIR_IMAGES, DIR_OUTPUT).replace(f'_sci_skysubvar.fits.gz', f'_wht_{KERNEL}-matched.fits.gz'), overwrite=True)
 
 

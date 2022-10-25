@@ -11,40 +11,24 @@ import extinction
 from webb_tools import psf_cog, fit_apercurve
 from astropy.convolution import convolve
 
+import sys
+PATH_CONFIG = sys.argv[1]
+sys.path.insert(0, PATH_CONFIG)
 
-DET_NICKNAME =  'LW_f277w-f356w-f444w'  
-# DET_NICKNAME = 'SW_f150w-f200w' 
-KERNEL = 'f444w'
-REF_BAND = 'f444w'
-REF_PIXEL_SCALE = 0.04 # arcsec / px
+from config import PHOT_NICKNAMES, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, \
+    REF_BAND, PIXEL_SCALE, PHOT_APER, DIR_KERNELS, DIR_PSFS, FIELD, ZSPEC, MAX_SEP
+
+DET_NICKNAME =  sys.argv[2] #'LW_f277w-f356w-f444w'  
+KERNEL = sys.argv[3] #'f444w'
 
 DET_TYPE = 'noise-equal'
-DIR_CATALOGS = f'./data/output/v4/{DET_NICKNAME}_{DET_TYPE}_{KERNEL}/'
-DIR_REFPSF = f'./data/external/psf_jrw_v4/psf_ceers_F444W_4arcsec.fits'
+FULLDIR_CATALOGS = os.path.join(DIR_CATALOGS, f'{DET_NICKNAME}_{DET_TYPE}/{KERNEL}/')
+
 def DIR_KERNEL(band):
-    return glob.glob(f'./data/external/psf_jrw_v4/{KERNEL}*/{band.lower()}_kernel.fits')[0]
-stats = np.load(os.path.join(DIR_CATALOGS, f'{DET_NICKNAME}_emptyaper_stats.npy'), allow_pickle=True).item()
-APPLY_MWDUST = True
-DIR_SFD = '~/Projects/Common/py_tools/sfddata-master'
+    return glob.glob(os.path.join(DIR_KERNELS, f'{KERNEL}*/{band.lower()}_kernel.fits'))[0]
+stats = np.load(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_emptyaper_stats.npy'), allow_pickle=True).item()
 
-
-PHOT_ZP = OrderedDict()
-PHOT_ZP['f435w'] = 28.9
-PHOT_ZP['f606w'] = 28.9
-PHOT_ZP['f814w'] = 28.9
-## PHOT_ZP['f098m'] = 28.9
-PHOT_ZP['f105w'] = 28.9
-PHOT_ZP['f125w'] = 28.9
-PHOT_ZP['f140w'] = 28.9
-PHOT_ZP['f160w'] = 28.9
-PHOT_ZP['f115w'] = 28.9
-PHOT_ZP['f150w'] = 28.9
-PHOT_ZP['f200w'] = 28.9
-PHOT_ZP['f277w'] = 28.9
-PHOT_ZP['f410m'] = 28.9
-PHOT_ZP['f356w'] = 28.9
-PHOT_ZP['f444w'] = 28.9
-PHOT_NICKNAMES = list(PHOT_ZP.keys())
+FNAME_REF_PSF = f'{DIR_PSFS}/psf_{FIELD}_{REF_BAND.upper()}_4arcsec.fits'
 
 def sigma_aper(filter, weight, weight_med, apersize=0.7):
     # Equation 5
@@ -84,7 +68,7 @@ def flux_total(flux_aper, flux_ref_total, flux_ref_aper):
 
 # loop over filters
 for filter in PHOT_NICKNAMES:
-    filename = os.path.join(DIR_CATALOGS, f'{filter}_{DET_NICKNAME}_PHOT_CATALOG.fits')
+    filename = os.path.join(FULLDIR_CATALOGS, f'{filter}_{DET_NICKNAME}_PHOT_CATALOG.fits')
     if not os.path.exists(filename):
         print(f'ERROR :: {filename} not found!')
         sys.exit()
@@ -114,10 +98,10 @@ for filter in PHOT_NICKNAMES:
 
 # add ID at the end
 maincat.add_column(Column(1+np.arange(len(maincat)), name='ID'), 0)
-outfilename = os.path.join(DIR_CATALOGS, f'{DET_NICKNAME}_COMBINED_CATALOG.fits')
+outfilename = os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_COMBINED_CATALOG.fits')
 
 # grab REF_BAND PSF convolved to kernel
-psfmodel = fits.getdata(DIR_REFPSF)
+psfmodel = fits.getdata(FNAME_REF_PSF)
 if KERNEL == REF_BAND:
     conv_psfmodel = psfmodel.copy()
 else:
@@ -125,7 +109,7 @@ else:
     conv_psfmodel = convolve(psfmodel, kernel)
 
 # use REF_BAND Kron to correct to total fluxes and ferr
-plotname = os.path.join(DIR_CATALOGS, f'aper_{REF_BAND}_nmad.pdf')
+plotname = os.path.join(FULLDIR_CATALOGS, f'aper_{REF_BAND}_nmad.pdf')
 p, pcov, sig1 = fit_apercurve(stats[REF_BAND], plotname=plotname, stat_type=['snmad', 'fit_std'])
 alpha, beta = p['snmad']
 f_ref_auto = maincat[f'{REF_BAND}_FLUX_AUTO']
@@ -141,7 +125,7 @@ newcoln =f'{REF_BAND}_FLUXERR_REFTOTAL'
 maincat.add_column(Column(sig_ref_total, newcoln))
 
 
-for apersize in (0.16, 0.35, 0.7, 2.0):
+for apersize in PHOT_APER:
     str_aper = str(apersize).replace('.', '_')
     f_ref_aper = maincat[f'{REF_BAND}_FLUX_APER{str_aper}']
     tot_corr = f_ref_total / f_ref_aper
@@ -222,16 +206,25 @@ is_star = np.zeros(len(maincat), dtype=bool)
 maincat.add_column(Column(is_star.astype(int), name='star_flag'))
 
 # z-spec
-ztable = Table.read('./data/external/EGS_z_spec.fits')
-ztable = ztable[(ztable['dec'] >= -90.) & (ztable['dec'] <= 90.)]
-zcoords = SkyCoord(ztable['ra']*u.deg, ztable['dec']*u.deg)
+ztable = Table.read(ZSPEC)
+ztable = ztable[(ztable['DEC'] >= -90.) & (ztable['DEC'] <= 90.)]
+zcoords = SkyCoord(ztable['RA']*u.deg, ztable['DEC']*u.deg)
 catcoords = SkyCoord(maincat['RA'], maincat['DEC'])
 idx, d2d, d3d = catcoords.match_to_catalog_sky(zcoords)
-z_spec = -99. * np.ones(len(maincat))
-max_sep = 0.3 * u.arcsec
+max_sep = MAX_SEP
 sep_constraint = d2d < max_sep
-z_spec[sep_constraint] = ztable[idx[sep_constraint]]['z_spec']
-maincat.add_column(Column(z_spec, name='z_spec'))
+for colname in ztable.colnames:
+    filler = np.zeros(len(maincat), dtype=ztable[colname].dtype)
+    try:
+        np.nan * filler
+    except:
+        pass
+    filler[sep_constraint] = ztable[idx[sep_constraint]][colname]
+    if colname == 'z':
+        colname = 'z_spec'
+    else:
+        colname = f'z_spec_{colname}'
+    maincat.add_column(Column(filler, name=colname))
 
 # use flag (minimum SNR cut + not a star)
 snr_ref = maincat[f'{REF_BAND}_FLUX_APER0_7_COLOR'] / maincat[f'{REF_BAND}_FLUXERR_APER0_7_COLOR']
@@ -250,43 +243,52 @@ maincat.write(outfilename, overwrite=True)
 print(f'Added date stamp! ({today})')
 print('Wrote first-pass combined catalog to ', outfilename)
 
-# restrict + rename columns to be a bit more informative
-cols = OrderedDict()
-cols['ID'] = 'id'
-cols['x'] = 'x'
-cols['y'] = 'y'
-cols['RA'] = 'ra'
-cols['DEC'] = 'dec'
-cols['EBV'] = 'ebv_mw'
-cols[f'{REF_BAND}_FLUX_APER0_7_COLOR'] = f'faper_{REF_BAND}'
-cols[f'{REF_BAND}_FLUXERR_APER0_7_COLOR'] = f'eaper_{REF_BAND}'
+for apersize in PHOT_APER:
+    str_aper = str(apersize).replace('.', '_')
+    # restrict + rename columns to be a bit more informative
+    cols = OrderedDict()
+    cols['ID'] = 'id'
+    cols['x'] = 'x'
+    cols['y'] = 'y'
+    cols['RA'] = 'ra'
+    cols['DEC'] = 'dec'
+    cols['EBV'] = 'ebv_mw'
+    cols[f'{REF_BAND}_FLUX_APER{str_aper}_COLOR'] = f'faper_{REF_BAND}'
+    cols[f'{REF_BAND}_FLUXERR_APER{str_aper}_COLOR'] = f'eaper_{REF_BAND}'
 
-for filter in PHOT_NICKNAMES:
-    cols[f'{filter}_FLUX_APER0_7_TOTAL'] = f'f_{filter}'
-    cols[f'{filter}_FLUXERR_APER0_7_TOTAL'] = f'e_{filter}'
+    for filter in PHOT_NICKNAMES:
+        cols[f'{filter}_FLUX_APER{str_aper}_TOTAL'] = f'f_{filter}'
+        cols[f'{filter}_FLUXERR_APER{str_aper}_TOTAL'] = f'e_{filter}'
 
-cols[f'{REF_BAND}_FLUXERR_REFTOTAL'] = 'tot_ekron_F444w'
-cols['TOTAL_CORR_APER0_7'] = 'tot_cor'
-# wmin?
-cols['z_spec'] = 'z_spec'
-cols['star_flag'] = 'star_flag'
-cols[f'{REF_BAND}_KRON_RADIUS'] = 'kron_radius'
-cols['a'] = 'a_image'
-cols['b'] = 'b_image'
-cols['theta'] = 'theta_J2000' # double check this!
-cols[f'{REF_BAND}_FLUX_RADIUS_0_5'] = 'flux_radius' # arcsec
-cols['use_phot'] = 'use_phot'
+    cols[f'{REF_BAND}_FLUXERR_REFTOTAL'] = 'tot_ekron_F444w'
+    cols[f'TOTAL_CORR_APER{str_aper}'] = 'tot_cor'
+    # wmin?
+    cols['z_spec'] = 'z_spec'
+    cols['star_flag'] = 'star_flag'
+    cols[f'{REF_BAND}_KRON_RADIUS'] = 'kron_radius'
+    cols['a'] = 'a_image'
+    cols['b'] = 'b_image'
+    cols['theta'] = 'theta_J2000' # double check this!
+    cols[f'{REF_BAND}_FLUX_RADIUS_0_5'] = 'flux_radius' # arcsec
+    cols['use_phot'] = 'use_phot'
 
-maincat = maincat[list(cols.keys())]
+    subcat = maincat[list(cols.keys())].copy()
 
-for coln in maincat.colnames:
-    newcol = cols[coln]
-    print(f'   {maincat[coln].name} --> {newcol}')
-    maincat[coln].name = newcol
+    for coln in subcat.colnames:
+        newcol = cols[coln]
+        print(f'   {subcat[coln].name} --> {newcol}')
+        subcat[coln].name = newcol
 
-maincat['flux_radius'] *= REF_PIXEL_SCALE # from pixel to arcsec
-# maincat['theta_J2000'] = np.rad2deg(maincat['theta_J2000'])  # radians to degrees
+    # use flag (minimum SNR cut + not a star)
+    snr_ref = subcat[f'faper_{REF_BAND}'] / subcat[f'eaper_{REF_BAND}']
+    use_phot = np.zeros(len(subcat))
+    use_phot[snr_ref >= 3] = 1
+    use_phot[is_star] = 0
+    subcat['use_phot'] = use_phot
 
-outfilename = outfilename.replace('COMBINED', 'SCIREADY')
-maincat.write(outfilename, overwrite=True)
-print('Wrote formatted combined catalog to ', outfilename)
+    subcat['flux_radius'] *= PIXEL_SCALE # from pixel to arcsec
+    # subcat['theta_J2000'] = np.rad2deg(subcat['theta_J2000'])  # radians to degrees
+
+    sub_outfilename = outfilename.replace('COMBINED', f'SCIREADY_{str_aper}')
+    subcat.write(sub_outfilename, overwrite=True)
+    print('Wrote formatted combined catalog to ', sub_outfilename)

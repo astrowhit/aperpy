@@ -1,78 +1,38 @@
-from typing import OrderedDict
+
 import numpy as np 
-import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm, Normalize
 from astropy.table import Table
 from astropy.io import fits
-from astropy.stats import sigma_clipped_stats
 from astropy.wcs import WCS, utils
 import astropy.units as u
 import sep
 import os, sys, glob
-from photutils.aperture import aperture_photometry, CircularAperture
 from astropy.convolution import Gaussian2DKernel
 from regions import EllipseSkyRegion, Regions, CircleSkyRegion
-from webb_tools import compute_background, emtpy_apertures
+from webb_tools import emtpy_apertures
 
-import convenience as conv
+import sys
+PATH_CONFIG = sys.argv[1]
+sys.path.insert(0, PATH_CONFIG)
+
+from config import TARGET_ZPT, PHOT_APER, PHOT_AUTOPARAMS, PHOT_FLUXFRAC, DETECTION_PARAMS,\
+         DIR_IMAGES, PHOT_ZP, PHOT_NICKNAMES, DIR_OUTPUT, DIR_CATALOGS
 
 # MAIN PARAMETERS
-DET_NICKNAME = 'LW_f277w-f356w-f444w' 
-# DET_NICKNAME = 'SW_f150w-f200w'
+DET_NICKNAME = sys.argv[2] #'LW_f277w-f356w-f444w' 
+KERNEL = sys.argv[3] # f444w or f160w or None
+
 DET_TYPE = 'noise-equal'
-KERNEL = 'f444w'
-
-PHOT_ZP = OrderedDict()
-PHOT_ZP['f435w'] = 28.9
-PHOT_ZP['f606w'] = 28.9
-PHOT_ZP['f814w'] = 28.9
-# PHOT_ZP['f098m'] = 28.9
-PHOT_ZP['f105w'] = 28.9
-PHOT_ZP['f125w'] = 28.9
-PHOT_ZP['f140w'] = 28.9
-PHOT_ZP['f160w'] = 28.9
-PHOT_ZP['f115w'] = 28.9
-PHOT_ZP['f150w'] = 28.9
-PHOT_ZP['f200w'] = 28.9
-PHOT_ZP['f277w'] = 28.9
-PHOT_ZP['f410m'] = 28.9
-PHOT_ZP['f356w'] = 28.9
-PHOT_ZP['f444w'] = 28.9
-PHOT_NICKNAMES = list(PHOT_ZP.keys())
-
-# PHOT_NICKNAMES = 'None' # detection only!
-# Set to 'None' if you don't want to run photometry
+FULLDIR_CATALOGS = os.path.join(DIR_CATALOGS, f'{DET_NICKNAME}_{DET_TYPE}/{KERNEL}/')
+if not os.path.exists(FULLDIR_CATALOGS):
+    os.mkdir(FULLDIR_CATALOGS)
 
 # SECONDARY PARAMETERS
-DIR_OUTPUT = f'./data/output/v4/{DET_NICKNAME}_{DET_TYPE}_{KERNEL}/'
-if not os.path.exists(DIR_OUTPUT):
-    os.system(f'mkdir {DIR_OUTPUT}') # AUTO MAKES OUTPUT DIRECTORY IF IT DOESNT EXIST!
-
-PATH_DETSCI = f'./data/intermediate/v4/{DET_NICKNAME}_{DET_TYPE}.fits.gz'
+PATH_DETSCI = os.path.join(DIR_CATALOGS, f'{DET_NICKNAME}_{DET_TYPE}/{DET_NICKNAME}_{DET_TYPE}.fits.gz')
 PATH_DETWHT = 'None'
-PATH_DETMASK = 'None' # 1 is masked
-HEADEXT = 1
-
-DET_BACKPARAMS = dict(bw=64, bh=64, fw=8, fh=8, maskthresh=1, fthresh=0.)
-DET_BACKTYPE = 'NONE' # VAR, GLOBAL, NONE
-DETECTION_PARAMS = dict(
-    thresh =  2,
-    minarea = 10,
-    kernelfwhm = 1.00170,
-    deblend_nthresh = 16,
-    deblend_cont = 0.00315,
-    clean_param = 1.66776,
-    )
-
-PHOT_BACKPARAMS = dict(bw=64, bh=64, fw=8, fh=8, maskthresh=1, fthresh=0.)
-PHOT_BACKTYPE = 'NONE' # VAR, GLOBAL, NONE
-
-PHOT_APER = [0.16, 0.24, 0.35, 0.5, 0.7, 1.0, 1.5, 2.0] # diameter in arcsec
-PHOT_AUTOPARAMS = 2.5, 3.5 # for MAG_AUTO
-PHOT_FLUXFRAC = 0.5, 0.6 # FLUX_RADIUS at 50% and 60% of flux
+PATH_DETMASK = 'None'
 
 
-def conv_flux(in_zpt, out_zpt=25.0):
+def conv_flux(in_zpt, out_zpt=TARGET_ZPT):
     return 10** (-0.4 * (in_zpt - out_zpt))
 
 # 1 DETECTION
@@ -91,7 +51,7 @@ if PATH_DETMASK != 'None':
     print(PATH_DETMASK)
 else:
     detmask = np.zeros_like(detsci)
-dethead = fits.getheader(PATH_DETSCI, HEADEXT)
+dethead = fits.getheader(PATH_DETSCI, 0)
 detwcs = WCS(dethead)
 print(detwcs)
 
@@ -106,10 +66,6 @@ pixel_scale = utils.proj_plane_pixel_scales(detwcs)[0] * 3600
 print(f'Pixel scale: {pixel_scale}')
 area = np.sum((detwht!=0) & (detmask==0)) * (pixel_scale  / 3600)**2
 print(f'Area of detection image: {area} deg2')
-
-# BACKGROUNDS
-back = compute_background(detsci, None, DET_BACKTYPE, DET_BACKPARAMS)
-detsci -= back
 
 # SOURCE DETECTION
 print('SOURCE DETECTION...')
@@ -129,7 +85,7 @@ print(f'Detected {len(objects)} objects.')
 
 hdul = fits.HDUList()
 hdul.append(fits.ImageHDU(name='SEGMAP', data=segmap, header=dethead))
-hdul.writeto(os.path.join(DIR_OUTPUT, f'{DET_NICKNAME}_SEGMAP.fits.gz'), overwrite=True)
+hdul.writeto(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_SEGMAP.fits.gz'), overwrite=True)
 
 # CLEAN UP
 catalog = Table(objects)
@@ -147,7 +103,7 @@ for coord, obj in zip(detcoords, catalog):
     # regs.append(PointSkyRegion(coord))
 regs = np.array(regs)
 bigreg = Regions(regs)
-bigreg.write(os.path.join(DIR_OUTPUT, f'{DET_NICKNAME}_OBJECTS.reg'), overwrite=True, format='ds9')
+bigreg.write(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_OBJECTS.reg'), overwrite=True, format='ds9')
 
 del detsci
 del detwht
@@ -157,7 +113,7 @@ del deterr
 if PHOT_NICKNAMES == 'None':
     # WRITE OUT
     print(f'DONE. Writing out catalog.')
-    catalog.write(os.path.join(DIR_OUTPUT, f'{DET_NICKNAME}_DET_CATALOG.fits.gz'), overwrite=True)
+    catalog.write(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_DET_CATALOG.fits.gz'), overwrite=True)
     sys.exit()
 
 areas = {}
@@ -165,12 +121,17 @@ stats = {}
 for ind, PHOT_NICKNAME in enumerate(PHOT_NICKNAMES):
 
     print(PHOT_NICKNAME)
-
-    PATH_PHOTSCI = glob.glob(f'./data/intermediate/v4/ceers-full-grizli-v4.0-{PHOT_NICKNAME}*_sci_skysubvar_{KERNEL}-matched.fits.gz')[0]
+    ext = ''
+    dir_weight = DIR_IMAGES
+    if KERNEL != 'None':
+        ext=f'_{KERNEL}-matched'
+        dir_weight = DIR_OUTPUT
+    print(DIR_OUTPUT)
+    print(f'*{PHOT_NICKNAME}*_sci_skysubvar{ext}.fits.gz')
+    PATH_PHOTSCI = glob.glob(os.path.join(DIR_OUTPUT, f'*{PHOT_NICKNAME}*_sci_skysubvar{ext}.fits.gz'))[0]
     PATH_PHOTHEAD = PATH_PHOTSCI
-    PATH_PHOTWHT = glob.glob(f'./data/intermediate/v4/ceers-full-grizli-v4.0-{PHOT_NICKNAME}*_wht_{KERNEL}-matched.fits.gz')[0]
+    PATH_PHOTWHT = glob.glob(os.path.join(dir_weight, f'*{PHOT_NICKNAME}*_wht{ext}.fits.gz'))[0]
     PATH_PHOTMASK = 'None'
-    HEADEXT = 1
 
     PHOT_ZPT = PHOT_ZP[PHOT_NICKNAME.lower()] #calc_zpt(PHOT_NICKNAME)
     print(f'Zeropoint for {PHOT_NICKNAME}: {PHOT_ZPT}')
@@ -189,7 +150,7 @@ for ind, PHOT_NICKNAME in enumerate(PHOT_NICKNAMES):
         photsci[photmask==1.0] = 0
     else:
         photmask = None
-    phothead = fits.getheader(PATH_PHOTHEAD, HEADEXT)
+    phothead = fits.getheader(PATH_PHOTHEAD, 0)
     photwcs = WCS(phothead)
     print(photwcs)
 
@@ -203,11 +164,6 @@ for ind, PHOT_NICKNAME in enumerate(PHOT_NICKNAMES):
     area = np.sum(np.isfinite(photwht) & (photwht > 0.)) * (pixel_scale  / 3600)**2
     print(f'Area of photometry image: {area} deg2')
     areas[PHOT_NICKNAME] = area
-
-
-    # REGISTER BACKGROUNDS
-    back = compute_background(photsci, None, PHOT_BACKTYPE, PHOT_BACKPARAMS)
-    photsci -= back
 
     # Hack the x,y coords
     xphot,yphot = photwcs.wcs_world2pix(catalog['RA'], catalog['DEC'],1)
@@ -233,15 +189,15 @@ for ind, PHOT_NICKNAME in enumerate(PHOT_NICKNAMES):
         print(f'{pc_ORbad*100:2.5f}% have BAD fluxes OR fluxerrs')
         print(f'{pc_ANDbad*100:2.5f}% have BAD fluxes AND fluxerrs')
 
-        # # diagnostic region files
+        # diagnostic region files
         # regs = []
         # for coord, obj in zip(detcoords, catalog):
         #     regs.append(CircleSkyRegion(coord, rad*u.arcsec))
         # regs = np.array(regs)
         # bigreg = Regions(regs[badflux])
-        # bigreg.write(os.path.join(DIR_OUTPUT, f'{PHOT_NICKNAME}_{DET_NICKNAME}_BADFLUX{diam}_OBJECTS.reg'), overwrite=True, format='ds9')
+        # bigreg.write(os.path.join(FULLDIR_CATALOGS, f'{PHOT_NICKNAME}_{DET_NICKNAME}_BADFLUX{diam}_OBJECTS.reg'), overwrite=True, format='ds9')
         # bigreg = Regions(regs[badfluxerr])
-        # bigreg.write(os.path.join(DIR_OUTPUT, f'{PHOT_NICKNAME}_{DET_NICKNAME}_BADFLUXERR{diam}_OBJECTS.reg'), overwrite=True, format='ds9')
+        # bigreg.write(os.path.join(FULLDIR_CATALOGS, f'{PHOT_NICKNAME}_{DET_NICKNAME}_BADFLUXERR{diam}_OBJECTS.reg'), overwrite=True, format='ds9')
 
         bad = badflux | badfluxerr
 
@@ -265,6 +221,8 @@ for ind, PHOT_NICKNAME in enumerate(PHOT_NICKNAMES):
     print(f"{PHOT_NICKNAME} :: MEASURING PHOTOMETRY in kron-corrected AUTO apertures...")
     kronrad, krflag = sep.kron_radius(photsci, xphot, yphot, #objects['x'], objects['y'],
                                         objects['a'], objects['b'], objects['theta'], 6.0) # SE uses 6
+    kronrad[np.isnan(kronrad)] = 0.
+    print(np.isnan(kronrad).sum(), np.max(kronrad), np.min(kronrad))
     objects['theta'][objects['theta'] > np.pi / 2.] = np.pi / 2. # numerical rounding correction!
     flux, fluxerr, flag = sep.sum_ellipse(photsci, xphot, yphot, #objects['x'], objects['y'],
                                         objects['a'], objects['b'], objects['theta'], PHOT_AUTOPARAMS[0]*kronrad,
@@ -346,7 +304,6 @@ for ind, PHOT_NICKNAME in enumerate(PHOT_NICKNAMES):
         boxwht = photwht[inty-4:inty+5, intx-4:intx+5]
         srcmedwht[i] = np.nanmedian(boxwht[boxwht>0])
         srcmeanwht[i] = np.nanmean(boxwht[boxwht>0])
-        # print(intx, inty, np.shape(boxwht), srcmedwht[i], srcmeanwht[i])
 
     srcmeanwht[srcmeanwht<=0.] = np.nan
     srcmedwht[srcmedwht<=0.] = np.nan
@@ -359,21 +316,18 @@ for ind, PHOT_NICKNAME in enumerate(PHOT_NICKNAMES):
     # COMPUTE EMPTY APERTURE ERRORS + SAVE TO MASTER FILE
     empty_aper = list(PHOT_APER)+list(np.linspace(PHOT_APER[0], PHOT_APER[-1], 30))
     empty_aper = np.sort(empty_aper)
-    plotname = os.path.join(DIR_OUTPUT, f'{PHOT_NICKNAME}_emptyaper.pdf')
+    plotname = os.path.join(FULLDIR_CATALOGS, f'{PHOT_NICKNAME}_K{KERNEL}emptyaper.pdf')
     zpt_factor = conv_flux(PHOT_ZPT)
+    print(np.shape(photsci), np.shape(photwht), np.shape(segmap))
     stats[PHOT_NICKNAME] = emtpy_apertures(photsci, photwht, segmap, N=int(1e3), aper=empty_aper, plotname=plotname, zpt_factor=zpt_factor)
 
     # WRITE OUT
     print(f'DONE. Writing out catalog.')
-    catalog.write(os.path.join(DIR_OUTPUT, f'{PHOT_NICKNAME}_{DET_NICKNAME}_PHOT_CATALOG.fits'), overwrite=True)
+    catalog.write(os.path.join(FULLDIR_CATALOGS, f'{PHOT_NICKNAME}_{DET_NICKNAME}_PHOT_CATALOG.fits'), overwrite=True)
 
-    # conv.jarvis(f'Photometry of {PHOT_NICKNAME} has finished!')
-
-np.save(os.path.join(DIR_OUTPUT, f'{DET_NICKNAME}_emptyaper_stats.npy'), stats)
-with open(os.path.join(DIR_OUTPUT, f'{DET_NICKNAME}_AREAS.dat'), 'w') as f:
+np.save(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_emptyaper_stats.npy'), stats)
+with open(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_AREAS.dat'), 'w') as f:
     for filt in PHOT_NICKNAMES:
         area = areas[filt]
         f.write(f'{filt} {area}')
         f.write('\n')
-
-conv.jarvis(f'Photometry of bands from {DET_NICKNAME} is complete')
