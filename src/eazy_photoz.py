@@ -82,7 +82,7 @@ print(ez.lnp)
 
 ez.zphot_zspec(include_errors=False)
 fig = plt.gcf()
-fig.savefig(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_photoz-specz_.pdf'))
+fig.savefig(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_photoz-specz.pdf'))
 
 
 zout, hdu = ez.standard_output(rf_pad_width=0.5, rf_max_err=2, 
