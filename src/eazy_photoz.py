@@ -116,7 +116,7 @@ axt.set(xlim=(0.05, 5))
 ax.set(ylim=(-0.5, 0.5), xlim=(0.1, 5), xlabel='Observed Wavelength ($\mu$m)', ylabel='Flux $\\frac{\\rm{observed}-\\rm{model}}{\\rm{model}}$')
 
 fig.tight_layout()
-fig.savefig(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_wavdiffmodel_.pdf'))
+fig.savefig(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_wavdiffmodel.pdf'))
 
 #
 diff = ez.fnu - ez.fmodel
@@ -134,7 +134,7 @@ axt.set(xlim=(0.05, 5))
 ax.set(ylim=(-3, 3), xlim=(0.1, 5), xlabel='Observed Wavelength ($\mu$m)', ylabel='Flux $\\frac{\\rm{observed}-\\rm{model}}{\\rm uncertainty}}$')
 
 fig.tight_layout()
-fig.savefig(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_wavdiffmodel_ztest_.pdf'))
+fig.savefig(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_wavdiffmodel_ztest.pdf'))
 
 
 # 2. mod - obs vs. z, per band
@@ -174,7 +174,7 @@ for i, (filt, fname, ax) in enumerate(zip(FILTERS, ez.filters, axes)):
     ax.fill_between(bin_centers, bstd[0], bstd[1], color='royalblue', alpha=0.2)
 
 fig.tight_layout()
-fig.savefig(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_zdiffmodel_.pdf'))
+fig.savefig(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_zdiffmodel.pdf'))
 
 
 #
@@ -215,7 +215,7 @@ for i, (filt, fname, ax) in enumerate(zip(FILTERS, ez.filters, axes)):
     ax.fill_between(bin_centers, bstd[0], bstd[1], color='royalblue', alpha=0.2)
 
 fig.tight_layout()
-fig.savefig(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_zdiffmodel_ztest_.pdf'))
+fig.savefig(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_zdiffmodel_ztest.pdf'))
 
 
 
