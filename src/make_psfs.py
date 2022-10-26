@@ -26,7 +26,7 @@ for filt in FILTERS:
 def renorm_hst_psf(filt, field, dir=DIR_PSFS, pixscl=PIXEL_SCALE, fov=PSF_FOV):
     psfmodel = fits.getdata(os.path.join(dir, f'{filt.lower()}_psf_unmatched.fits'))
 
-    encircled = {} # rounded to nearest 100nm, see hst docs
+    encircled = {} # rounded to nearest 100nm, see hst docs, 2"
     encircled['F105W'] = 0.975
     encircled['F125W'] = 0.969
     encircled['F140W'] = 0.967

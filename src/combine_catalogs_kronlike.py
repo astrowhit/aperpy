@@ -15,7 +15,7 @@ import sys
 PATH_CONFIG = sys.argv[1]
 sys.path.insert(0, PATH_CONFIG)
 
-from config import PHOT_NICKNAMES, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, \
+from config import FILTERS, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, \
     REF_BAND, PIXEL_SCALE, PHOT_APER, DIR_KERNELS, DIR_PSFS, FIELD, ZSPEC, MAX_SEP
 
 DET_NICKNAME =  sys.argv[2] #'LW_f277w-f356w-f444w'  
@@ -67,7 +67,7 @@ def flux_total(flux_aper, flux_ref_total, flux_ref_aper):
     
 
 # loop over filters
-for filter in PHOT_NICKNAMES:
+for filter in FILTERS:
     filename = os.path.join(FULLDIR_CATALOGS, f'{filter}_{DET_NICKNAME}_K{KERNEL}_PHOT_CATALOG.fits')
     if not os.path.exists(filename):
         print(f'ERROR :: {filename} not found!')
@@ -90,7 +90,7 @@ for filter in PHOT_NICKNAMES:
             except:
                 pass
 
-    if filter == PHOT_NICKNAMES[0]:
+    if filter == FILTERS[0]:
         maincat = cat
     else:
         newcols = [coln for coln in cat.colnames if coln not in maincat.colnames]
@@ -110,7 +110,7 @@ else:
 
 # use REF_BAND Kron to correct to total fluxes and ferr
 plotname = os.path.join(FULLDIR_CATALOGS, f'aper_{REF_BAND}_nmad.pdf')
-p, pcov, sig1 = fit_apercurve(stats[REF_BAND], plotname=plotname, stat_type=['snmad', 'fit_std'])
+p, pcov, sig1 = fit_apercurve(stats[REF_BAND], plotname=plotname, stat_type=['snmad'])
 alpha, beta = p['snmad']
 f_ref_auto = maincat[f'{REF_BAND}_FLUX_AUTO']
 kronrad_circ = np.sqrt(maincat['a'] * maincat['b'] * maincat[f'{REF_BAND}_KRON_RADIUS']**2) 
@@ -133,7 +133,7 @@ for apersize in PHOT_APER:
     sig_ref_aper = sigma_aper(REF_BAND.upper(), wht_ref, medwht_ref, apersize) # sig_aper,REF_BAND
     sig_total_ref = sigma_total(sig_ref_aper, f_ref_total, f_ref_aper) # sig_total,REF_BAND
 
-    for filter in PHOT_NICKNAMES:
+    for filter in FILTERS:
         f_aper =maincat[f'{filter}_FLUX_APER{str_aper}']
         f_total = flux_total(f_aper, f_ref_total, f_ref_aper)
         wht = maincat[f'{filter}_SRC_MEDWHT']
@@ -173,7 +173,7 @@ if APPLY_MWDUST:
                         SvoFps.get_filter_list('HST')])
     filter_pwav = OrderedDict()
     print('Building directory of pivot wavelengths')
-    for filter in PHOT_NICKNAMES:
+    for filter in FILTERS:
         filter_pwav[filter] = np.nan # ensures the order
         for i, tryfilt in enumerate(filter_table['filterID']):
             if filter == 'f410m':
@@ -186,8 +186,8 @@ if APPLY_MWDUST:
                         # print(filter, filter_table[i]['filterID'], filter_pwav[filter])
 
     atten_mag = extinction.fm07(np.array(list(filter_pwav.values())), Av_mean) # atten_mag in magnitudes from Fitzpatrick + Massa 2007
-    atten_factor = 10** (-0.4 * atten_mag) # corresponds in order to PHOT_NICKNAMES
-    for i, filter in enumerate(PHOT_NICKNAMES):
+    atten_factor = 10** (-0.4 * atten_mag) # corresponds in order to FILTERS
+    for i, filter in enumerate(FILTERS):
         print(f'{filter} ::  {atten_factor[i]:2.5f}x or {atten_mag[i]:2.5f} AB')
 
     print('Applying Milky Way Attenuation correction (FM+07)')
@@ -196,10 +196,10 @@ if APPLY_MWDUST:
             continue
         filtname = coln.split('_')[0]
         if 'FLUX' in coln:
-            maincat[coln] /= atten_factor[np.array(PHOT_NICKNAMES) == filtname][0]
+            maincat[coln] /= atten_factor[np.array(FILTERS) == filtname][0]
 
         elif 'MAG' in coln:
-            maincat[coln] -= atten_mag[np.array(PHOT_NICKNAMES) == filtname][0]
+            maincat[coln] -= atten_mag[np.array(FILTERS) == filtname][0]
 
 # star-galaxy flag # TODO LATER
 is_star = np.zeros(len(maincat), dtype=bool)
@@ -256,7 +256,7 @@ for apersize in PHOT_APER:
     cols[f'{REF_BAND}_FLUX_APER{str_aper}_COLOR'] = f'faper_{REF_BAND}'
     cols[f'{REF_BAND}_FLUXERR_APER{str_aper}_COLOR'] = f'eaper_{REF_BAND}'
 
-    for filter in PHOT_NICKNAMES:
+    for filter in FILTERS:
         cols[f'{filter}_FLUX_APER{str_aper}_TOTAL'] = f'f_{filter}'
         cols[f'{filter}_FLUXERR_APER{str_aper}_TOTAL'] = f'e_{filter}'
 
