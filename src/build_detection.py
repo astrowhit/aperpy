@@ -37,9 +37,12 @@ def chi_mean(bands, outname):
     for ni in np.unique(n):
         mu[n == ni] = chi.stats(df=ni, moments='m')
     img = ( np.sqrt(img) - mu ) / np.sqrt( n - mu**2 )
-    
-    fits.PrimaryHDU(data=img.astype(np.float32), header=head).writeto(f'{outname}_chimean.fits.gz', overwrite=True)
-    
+
+    chiout = f'{outname}_chimean.fits'
+    if '.gz' in fn_sci:
+        chiout += '.gz'
+    fits.PrimaryHDU(data=img.astype(np.float32), header=head).writeto(chiout, overwrite=True)
+
 # optimum average, so "noise equalized"
 def noise_equalized(bands, outname):
     # SUM( X * WHT) / SUM(WHT)
@@ -64,12 +67,20 @@ def noise_equalized(bands, outname):
             bot += wht
             del raw_img
 
-    optavg = top / bot
+    optavg = np.where(bot==0., 0., top / bot)
     opterr = np.sqrt(np.where(bot<=0, 0., 1. / bot))
     comb = optavg / opterr # signal / noise
-    fits.PrimaryHDU(data=optavg.astype(np.float32), header=head).writeto(f'{outname}_optavg.fits.gz', overwrite=True)
-    fits.PrimaryHDU(data=opterr.astype(np.float32), header=head).writeto(f'{outname}_opterr.fits.gz', overwrite=True)
-    fits.PrimaryHDU(data=comb.astype(np.float32), header=head).writeto(f'{outname}_noise-equal.fits.gz', overwrite=True)
+
+    avgout = f'{outname}_optavg.fits'
+    errout = f'{outname}_opterr.fits'
+    neqout = f'{outname}_noise-equal.fits'
+    if '.gz' in fn_sci:
+        avgout += '.gz'
+        errout += '.gz'
+        neqout += '.gz'
+    fits.PrimaryHDU(data=optavg.astype(np.float32), header=head).writeto(avgout, overwrite=True)
+    fits.PrimaryHDU(data=opterr.astype(np.float32), header=head).writeto(errout, overwrite=True)
+    fits.PrimaryHDU(data=comb.astype(np.float32), header=head).writeto(neqout, overwrite=True)
 
 
 def sumstack(bands, outname):
@@ -90,9 +101,14 @@ def sumstack(bands, outname):
             img += raw_img
             wht += fits.getdata(fn_wht)
             del raw_img
-    
-    fits.PrimaryHDU(data=img.astype(np.float32), header=head).writeto(f'{outname}_sumstack_sci.fits.gz', overwrite=True)
-    fits.PrimaryHDU(data=wht.astype(np.float32), header=head).writeto(f'{outname}_sumstack_wht.fits.gz', overwrite=True)
+
+    sciout = f'{outname}_sumstack_sci.fits'
+    whtout = f'{outname}_sumstack_wht.fits'
+    if '.gz' in fn_sci:
+        sciout += '.gz'
+        whtout += '.gz'
+    fits.PrimaryHDU(data=img.astype(np.float32), header=head).writeto(sciout, overwrite=True)
+    fits.PrimaryHDU(data=wht.astype(np.float32), header=head).writeto(whtout, overwrite=True)
 
 DET_NICKNAME = sys.argv[2]
 outpath = os.path.join(DIR_CATALOGS, f'{DET_NICKNAME}_{DET_TYPE}')
