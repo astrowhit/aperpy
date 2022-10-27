@@ -90,9 +90,9 @@ def fit_apercurve(stats, plotname=None, pixelscale=0.04, stat_type=['fit_std', '
     #     print(p)
 
         # ax.plot(px, func(pN, 0.05, 2.1))
-        upper = func(pN, p[st][0], 2)
-        ax.plot(px[upper<py[-1,i]], upper[upper<py[-1,i]], ls='dashed', c='grey')
-        ax.plot(px, func(pN, p[st][0], 1), ls='dashed', c='grey')
+            upper = func(pN, p[st][0], 2)
+            ax.plot(px[upper<py[-1,i]], upper[upper<py[-1,i]], ls='dashed', c='grey')
+            ax.plot(px, func(pN, p[st][0], 1), ls='dashed', c='grey')
 
         ax.legend(fontsize=15)
         ax.set(xlim=(0, 1.1*px[-1]))
@@ -111,6 +111,8 @@ def emtpy_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=0.04,
     from astropy.stats import mad_std
     from astropy.stats import sigma_clipped_stats
     from photutils.aperture import CircularAperture, aperture_photometry
+
+    from config import TARGET_ZP
 
 
     aper = np.array(aper)
@@ -174,6 +176,10 @@ def emtpy_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=0.04,
         # ax.axvline(aperstats['sigma_1'], color='k', ls='dashed')
         colors = plt.get_cmap('rainbow', len(aper))
 
+        fig2, axes2 = plt.subplots(ncols=2, figsize=(10,5))
+        axes2[0].set(xlabel='aperture diameter (arcsec)', ylabel='Depth (AB; $\sigma_{\\rm NMAD}$)')
+        axes2[1].set(xlabel='aperture diameter (arcsec)', ylabel='Sky (Flux; median)')
+
     # measure moments + percentiles; AD test
     for i, diam in enumerate(aper):
         phot = output[f'aperture_sum_{i}'] * zpt_factor
@@ -194,13 +200,6 @@ def emtpy_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=0.04,
         aperstats[diam]['fit_mean'] = p[0]
         aperstats[diam]['fit_std'] = p[1]
 
-        if plotname is not None:
-            ax.hist(phot, bins=bins, color=colors(i) , histtype='step', density=True)
-            ax.plot(px, norm.pdf(px, *p), c=colors(i), label=f'{diam:2.2f}\" @ {p[1]:2.2f}/{snmad:2.2f})')
-            ax.legend(loc='upper left')
-            # ax.axvline(-p[1], color=colors(i), ls='dashed')
-            # ax.axvline(p[1], color=colors(i), ls='dashed')
-
         aperstats[diam]['mean'] = np.mean(phot)
         aperstats[diam]['std'] = np.std(phot)
         aperstats[diam]['snmad'] = snmad
@@ -214,13 +213,32 @@ def emtpy_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=0.04,
         aperstats[diam]['pc'] = pc
         aperstats[diam]['interquart_68'] = pc[2] - pc[1] # 68pc
 
+        if plotname is not None:
+            ax.hist(phot, bins=bins, color=colors(i) , histtype='step', density=True)
+            ax.plot(px, norm.pdf(px, *p), c=colors(i), label=f'{diam:2.2f}\" @ {p[1]:2.2f}/{snmad:2.2f})')
+            ax.legend(loc='upper left')
+
+            # ax.axvline(-p[1], color=colors(i), ls='dashed')
+            # ax.axvline(p[1], color=colors(i), ls='dashed')
+
+
         # for key in aperstats[radius]:
         #     print(key, aperstats[radius][key])
         # print()
 
-    if plotname:
+    if plotname is not None:
+
         fig.tight_layout()
         fig.savefig(plotname)
+
+        aper_snmad = [aperstats[diam]['snmad'] for diam in aper]
+        aper_median = [aperstats[diam]['median'] for diam in aper]
+        axes2[0].plot(aper, TARGET_ZP - 2.5*np.log10(aper_snmad), marker='o')
+        axes2[1].plot(aper, aper_median, marker='o')
+
+        fig2.tight_layout()
+        fig2.savefig(plotname.replace('emptyaper', 'depth'))
+        
 
     return aperstats
 # Star finder
@@ -389,11 +407,11 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, row=None, plot=Tru
             if row is None:
                 mag, magerr = -99, -99
                 snr = -99
-            if f'f_{filt.upper()}' not in row.colnames:
+            if f'f_{filt}' not in row.colnames:
                 mag, magerr = -99, -99
                 snr = -99
             else:
-                flux, fluxerr = row[f'f_{filt.upper()}'][0], row[f'e_{filt.upper()}'][0]
+                flux, fluxerr = row[f'f_{filt}'], row[f'e_{filt}']
                 snr = flux / fluxerr
 
                 mag = 25 - 2.5*np.log10(flux)
@@ -412,7 +430,7 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, row=None, plot=Tru
                 scale = 1
             # print(rms, scale)
             ax.imshow(img, cmap='RdGy', norm=SymLogNorm(3*rms, 1, -scale, scale))
-            ax.text(0.05, 1.05, f'{filt.upper()}\n{mag:2.2f}+/-{magerr:2.2f} AB (S/N:{snr:2.2f})', transform=ax.transAxes)
+            ax.text(0.05, 1.05, f'{filt}\n{mag:2.2f}+/-{magerr:2.2f} AB (S/N:{snr:2.2f})', transform=ax.transAxes)
             ax.axes.xaxis.set_visible(False)
             ax.axes.yaxis.set_visible(False)
     
@@ -421,12 +439,59 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, row=None, plot=Tru
         img = make_lupton_rgb(r, g, b, stretch=0.1, minimum=-0.01)
         fig_rgb, ax_rgb = plt.subplots(figsize=(5,5))
         ax_rgb.imshow(img)
-        ax_rgb.text(0.01, 0.01, f'{rgb[0].upper()}+{rgb[1].upper()}+{rgb[2].upper()}', transform=ax_rgb.transAxes, color='w', fontsize=15)
+        ax_rgb.text(0.01, 0.01, f'{rgb[0]}+{rgb[1]}+{rgb[2]}', transform=ax_rgb.transAxes, color='w', fontsize=15)
         ax_rgb.text(0.01, 0.90, f'{nickname} $z$ = {redshift:2.2f}', transform=ax_rgb.transAxes, color='w', fontsize=20)
         ax_rgb.axes.xaxis.set_visible(False)
         ax_rgb.axes.yaxis.set_visible(False)
-        fig.savefig(f'cutouts/{nickname}.pdf', dpi=300)
-        fig_rgb.savefig(f'cutouts/{nickname}_RGB.pdf', dpi=300)
+        if write:
+            fig.savefig(f'cutouts/{nickname}.pdf', dpi=300)
+            fig_rgb.savefig(f'cutouts/{nickname}_RGB.pdf', dpi=300)
 
     if write:
         hdul.writeto(f'cutouts/{nickname}.fits', overwrite=True)
+
+
+def histedges_equalN(x, nbin):
+    npt = len(x)
+    return np.interp(np.linspace(0, npt, nbin + 1),
+                     np.arange(npt),
+                     np.sort(x))
+
+def binned_med(X, Y, xrange=None, dbins=1.0, bins=None, use_scott=False):
+    if use_scott:
+        from astropy.stats import scott_bin_width
+        __, bins = scott_bin_width(X, return_bins=True)
+    elif bins is not None:
+        bins = bins
+    else:
+        bins = np.arange(xrange[0], xrange[1], dbins)
+    # delta = bins[1]-bins[0]
+    
+    Y = Y[X<bins[-1]]
+    X = X[X<bins[-1]]
+    idx  = np.digitize(X,bins[:-1])
+    foo = np.array([median_confidence_interval(Y[idx==k]) for k in range(1, len(bins))])
+    binned_median, running_std = foo[:,0], np.array((foo[:,1], foo[:,2]))
+    Nbins = np.array([np.sum(idx==k) for k in range(1, len(bins))])
+    bin_centers = bins[:-1] + np.diff(bins)/2.
+    return Nbins, bin_centers, binned_median, running_std
+
+def median_confidence_interval(data, confidence=0.34):
+    if len(data) == 0:
+        return np.nan, np.nan, np.nan
+
+    m = np.nanmedian(data)
+    sdata = np.sort(data)
+    hdata = sdata[sdata > m]
+    ldata = sdata[sdata <= m]
+    n_hdata = len(hdata)
+    n_ldata = len(ldata)
+    try:
+        hmax = hdata[(np.arange(n_hdata) / n_hdata) < confidence][-1]
+    except:
+        hmax = m
+    try:
+        hmin = ldata[::-1][(np.arange(n_ldata) / n_ldata) < confidence][-1]
+    except:
+        hmin = m
+    return m, hmin, hmax

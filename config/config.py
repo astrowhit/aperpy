@@ -93,8 +93,8 @@ PHOT_ZP['f200w'] = 28.9
 PHOT_ZP['f277w'] = 28.9
 PHOT_ZP['f356w'] = 28.9
 PHOT_ZP['f444w'] = 28.9
-PHOT_NICKNAMES = list(PHOT_ZP.keys()) # PHOT_NICKNAMES = 'None' # detection only!
-TARGET_ZPT = 25.0
+FILTERS = list(PHOT_ZP.keys()) # FILTERS = 'None' # detection only!
+TARGET_ZP = 25.0
 
 FILTERS = [x for x in list(PHOT_ZP.keys())]
 

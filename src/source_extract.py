@@ -14,8 +14,8 @@ import sys
 PATH_CONFIG = sys.argv[1]
 sys.path.insert(0, PATH_CONFIG)
 
-from config import TARGET_ZPT, PHOT_APER, PHOT_AUTOPARAMS, PHOT_FLUXFRAC, DETECTION_PARAMS,\
-         DIR_IMAGES, PHOT_ZP, PHOT_NICKNAMES, DIR_OUTPUT, DIR_CATALOGS
+from config import TARGET_ZP, PHOT_APER, PHOT_AUTOPARAMS, PHOT_FLUXFRAC, DETECTION_PARAMS,\
+         DIR_IMAGES, PHOT_ZP, FILTERS, DIR_OUTPUT, DIR_CATALOGS
 
 # MAIN PARAMETERS
 DET_NICKNAME = sys.argv[2] #'LW_f277w-f356w-f444w' 
@@ -32,7 +32,7 @@ PATH_DETWHT = 'None'
 PATH_DETMASK = 'None'
 
 
-def conv_flux(in_zpt, out_zpt=TARGET_ZPT):
+def conv_flux(in_zpt, out_zpt=TARGET_ZP):
     return 10** (-0.4 * (in_zpt - out_zpt))
 
 # 1 DETECTION
@@ -110,7 +110,7 @@ del detwht
 del detmask
 del deterr
 
-if PHOT_NICKNAMES == 'None':
+if FILTERS == 'None':
     # WRITE OUT
     print(f'DONE. Writing out catalog.')
     catalog.write(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_DET_CATALOG.fits.gz'), overwrite=True)
@@ -118,7 +118,7 @@ if PHOT_NICKNAMES == 'None':
 
 areas = {}
 stats = {}
-for ind, PHOT_NICKNAME in enumerate(PHOT_NICKNAMES):
+for ind, PHOT_NICKNAME in enumerate(FILTERS):
 
     print(PHOT_NICKNAME)
     ext = ''
@@ -316,7 +316,7 @@ for ind, PHOT_NICKNAME in enumerate(PHOT_NICKNAMES):
     # COMPUTE EMPTY APERTURE ERRORS + SAVE TO MASTER FILE
     empty_aper = list(PHOT_APER)+list(np.linspace(PHOT_APER[0], PHOT_APER[-1], 30))
     empty_aper = np.sort(empty_aper)
-    plotname = os.path.join(FULLDIR_CATALOGS, f'{PHOT_NICKNAME}_K{KERNEL}emptyaper.pdf')
+    plotname = os.path.join(FULLDIR_CATALOGS, f'{PHOT_NICKNAME}_K{KERNEL}_emptyaper.pdf')
     zpt_factor = conv_flux(PHOT_ZPT)
     print(np.shape(photsci), np.shape(photwht), np.shape(segmap))
     stats[PHOT_NICKNAME] = emtpy_apertures(photsci, photwht, segmap, N=int(1e3), aper=empty_aper, plotname=plotname, zpt_factor=zpt_factor)
@@ -327,7 +327,7 @@ for ind, PHOT_NICKNAME in enumerate(PHOT_NICKNAMES):
 
 np.save(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_emptyaper_stats.npy'), stats)
 with open(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_AREAS.dat'), 'w') as f:
-    for filt in PHOT_NICKNAMES:
+    for filt in FILTERS:
         area = areas[filt]
         f.write(f'{filt} {area}')
         f.write('\n')

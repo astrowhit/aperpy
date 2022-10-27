@@ -148,5 +148,3 @@ for filt in FILTERS:
     axes[1].set(ylim=(20, 33))
     fig.tight_layout()
     fig.savefig(os.path.join(DIR_FIGURES, f'phot_unc_{filt}_{STR_APER}.pdf'))
-
-# Crossmatch with some other catalog... dmag, dcolor, dphotoz...etc.
