@@ -27,7 +27,7 @@ REF_BAND = 'f444w'
 APPLY_MWDUST = True
 
 SCI_APER = 0.7 # science aperture
-CORRECT_ALL = True # make aperture corrected catalogs for all apertures
+MAKE_SCIREADY_ALL = True # make aperture corrected catalogs for all apertures
 
 ### DIRECTORIES
 WORKING_DIR = '/Volumes/External1/Projects/Current/UNCOVER/data/vTest'

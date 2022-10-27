@@ -17,7 +17,7 @@ sys.path.insert(0, PATH_CONFIG)
 
 from config import PHOT_NICKNAMES, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, \
     REF_BAND, PIXEL_SCALE, PHOT_APER, DIR_KERNELS, DIR_PSFS, FIELD, ZSPEC, \
-    MAX_SEP, SCI_APER, CORRECT_ALL
+    MAX_SEP, SCI_APER, MAKE_SCIREADY_ALL
 
 DET_NICKNAME =  sys.argv[2] #'LW_f277w-f356w-f444w'
 KERNEL = sys.argv[3] #'f444w'
@@ -245,7 +245,7 @@ print(f'Added date stamp! ({today})')
 print('Wrote first-pass combined catalog to ', outfilename)
 
 for apersize in PHOT_APER:
-    if apersize==str(SCI_APER) or CORRECT_ALL:
+    if apersize==str(SCI_APER) or MAKE_SCIREADY_ALL:
         str_aper = str(apersize).replace('.', '_')
         # restrict + rename columns to be a bit more informative
         cols = OrderedDict()
