@@ -42,7 +42,9 @@ def renorm_hst_psf(filt, field, dir=DIR_PSFS, pixscl=PIXEL_SCALE, fov=PSF_FOV):
     encircled['F336W'] = 0.9905
     encircled['F435W'] = 0.979
     encircled['F606W'] = 0.975
+    encircled['F775W'] = 0.972
     encircled['F814W'] = 0.972
+    encircled['F850LP'] = 0.970
     encircled['F098M'] = 0.974
     encircled['F105W'] = 0.973
     encircled['F125W'] = 0.969
