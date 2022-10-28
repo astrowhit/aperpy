@@ -7,7 +7,7 @@ import sys
 PATH_CONFIG = sys.argv[1]
 sys.path.insert(0, PATH_CONFIG)
 
-from config import DIR_CATALOGS, DETECTION_GROUPS, DETECTION_IMAGES, DET_TYPE, DIRWHT_REPLACE
+from config import DIR_CATALOGS, DETECTION_GROUPS, DETECTION_IMAGES, DET_TYPE, DIRWHT_REPLACE, IS_COMPRESSED
 
 WHT_REPLACE = ('sci_skysubvar', 'wht')
 
@@ -39,7 +39,7 @@ def chi_mean(bands, outname):
     img = ( np.sqrt(img) - mu ) / np.sqrt( n - mu**2 )
 
     chiout = f'{outname}_chimean.fits'
-    if '.gz' in fn_sci:
+    if IS_COMPRESSED:
         chiout += '.gz'
     fits.PrimaryHDU(data=img.astype(np.float32), header=head).writeto(chiout, overwrite=True)
 
@@ -74,7 +74,7 @@ def noise_equalized(bands, outname):
     avgout = f'{outname}_optavg.fits'
     errout = f'{outname}_opterr.fits'
     neqout = f'{outname}_noise-equal.fits'
-    if '.gz' in fn_sci:
+    if IS_COMPRESSED:
         avgout += '.gz'
         errout += '.gz'
         neqout += '.gz'
@@ -104,7 +104,7 @@ def sumstack(bands, outname):
 
     sciout = f'{outname}_sumstack_sci.fits'
     whtout = f'{outname}_sumstack_wht.fits'
-    if '.gz' in fn_sci:
+    if IS_COMPRESSED:
         sciout += '.gz'
         whtout += '.gz'
     fits.PrimaryHDU(data=img.astype(np.float32), header=head).writeto(sciout, overwrite=True)

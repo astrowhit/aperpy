@@ -58,13 +58,13 @@ def fit_apercurve(stats, plotname=None, pixelscale=0.04, stat_type=['fit_std', '
             continue
         py.append([stats[size][stype] for stype in stat_type])
         psizes.append(size)
-        
+
     psizes = np.array(psizes)
     py = np.array(py)
     N = np.sqrt(np.pi*(psizes/pixelscale/2.)**2)
     px = np.arange(psizes[0], psizes[-1], 0.001)
     pN = np.sqrt(np.pi*(px/pixelscale/2.)**2)
-        
+
     from scipy.optimize import curve_fit
     def func(N, a, b):
         return s * a * N**b
@@ -82,7 +82,7 @@ def fit_apercurve(stats, plotname=None, pixelscale=0.04, stat_type=['fit_std', '
             # print(psizes)
             # print(py[:,i])
             ax.scatter(psizes, py[:,i])
-    
+
 
             label=f'{st}: {s:2.2f}$x${p[st][0]:2.2f}$N^{{{p[st][1]:2.2f}}}$'
 
@@ -125,7 +125,7 @@ def emtpy_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=0.04,
         assert(size == segsize, f'Image size ({size}) != seg size ({segsize})!')
     except:
         return {}
-    
+
     kept = 0
     positions = np.zeros((N, 2))
     with alive_bar(N) as bar:
@@ -171,7 +171,7 @@ def emtpy_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=0.04,
         # ax.set(xlab)
         axes[0].hist(clean_img, bins=bins, color='k', histtype='step', density=True)
         axes[0].plot(px, norm.pdf(px, *p), c='k', label=f'1px @ {p[1]:2.2f}/{aperstats["snmad_1"]:2.2f})')
-        axes[0].legend(loc='upper left') 
+        axes[0].legend(loc='upper left')
         # ax.axvline(-aperstats['sigma_1'], color='k', ls='dashed')
         # ax.axvline(aperstats['sigma_1'], color='k', ls='dashed')
         colors = plt.get_cmap('rainbow', len(aper))
@@ -238,7 +238,7 @@ def emtpy_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=0.04,
 
         fig2.tight_layout()
         fig2.savefig(plotname.replace('emptyaper', 'depth'))
-        
+
 
     return aperstats
 # Star finder
@@ -259,7 +259,7 @@ def new_workingspace(version, path='.'):
 def psf_cog(psfmodel, nearrad=None):
     x = np.arange(-np.shape(psfmodel)[0]/2,  np.shape(psfmodel)[0]/2)
     y = x.copy()
-    px = np.arange(0, np.shape(psfmodel)[0]/2, 0.2) 
+    px = np.arange(0, np.shape(psfmodel)[0]/2, 0.2)
     xv, yv = np.meshgrid(x, y)
     radius = np.sqrt(xv**2 + yv**2)
     cumcurve = np.array([np.sum(psfmodel[radius<i]) for i in px])
@@ -268,7 +268,7 @@ def psf_cog(psfmodel, nearrad=None):
 
     if nearrad is None:
         return px, cumcurve, modcumcurve
-    
+
     return modcumcurve(nearrad)
 
 def get_date():
@@ -305,7 +305,7 @@ def get_psf(filt, field='uncover', angle=None, fov=4, og_fov=10, pixscl=0.04, da
         angle = angles[field]
     nc = webbpsf.NIRCam()
     nc.options['parity'] = 'odd'
-    
+
     outname = os.path.join(output, 'psf_'+field+'_'+filt+'_'+str(fov)+'arcsec') # what to save as?
 
     # make an oversampled webbpsf
@@ -356,14 +356,14 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, row=None, plot=Tru
 
     if include_rgb:
         from astropy.visualization import make_lupton_rgb
-    
+
     if plot:
         fig, axes = plt.subplots(ncols=6, nrows=2, figsize=(3*6, 3*2))
 
     for filt, ax in zip(filters, axes.flatten()):
 
         # print(filt)
-        fn = glob.glob(os.path.join(dir_images, f'*{filt}*_sci_skysubvar.fits.gz'))[0]
+        fn = glob.glob(os.path.join(dir_images, f'*{filt}*_sci_skysubvar.fits'))[0]
         if not os.path.exists(fn):
             print(f'WARNING -- image for {filt} does not exist at {fn}. Skipping!')
             continue
@@ -401,7 +401,7 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, row=None, plot=Tru
                 r = img * 1.4
             if filt == rgb[1]:
                 g = img * 1
-            if filt == rgb[2]: 
+            if filt == rgb[2]:
                 b = img * 0.35
 
             if row is None:
@@ -433,7 +433,7 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, row=None, plot=Tru
             ax.text(0.05, 1.05, f'{filt}\n{mag:2.2f}+/-{magerr:2.2f} AB (S/N:{snr:2.2f})', transform=ax.transAxes)
             ax.axes.xaxis.set_visible(False)
             ax.axes.yaxis.set_visible(False)
-    
+
 
     if plot:
         img = make_lupton_rgb(r, g, b, stretch=0.1, minimum=-0.01)
@@ -466,7 +466,7 @@ def binned_med(X, Y, xrange=None, dbins=1.0, bins=None, use_scott=False):
     else:
         bins = np.arange(xrange[0], xrange[1], dbins)
     # delta = bins[1]-bins[0]
-    
+
     Y = Y[X<bins[-1]]
     X = X[X<bins[-1]]
     idx  = np.digitize(X,bins[:-1])

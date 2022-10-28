@@ -30,6 +30,7 @@ SCI_APER = 0.7 # science aperture
 MAKE_SCIREADY_ALL = True # make aperture corrected catalogs for all apertures
 
 ### DIRECTORIES
+IS_COMPRESSED = True # outputs files as .gz
 WORKING_DIR = '/Volumes/External1/Projects/Current/UNCOVER/data/vTest'
 DIR_IMAGES = os.path.join(WORKING_DIR, 'external/grizli-v5/')
 DIR_OUTPUT = os.path.join(WORKING_DIR, 'output/')
