@@ -13,7 +13,7 @@ sys.path.insert(0, PATH_CONFIG)
 
 from config import DIR_IMAGES, SW_FILTERS, WEBB_FILTERS
 
-SCI_FILENAMES = list(glob.glob(DIR_IMAGES+'/*_sci.fits.gz'))
+SCI_FILENAMES = list(glob.glob(DIR_IMAGES+'/*_sci.fits*'))
 
 
 for filename in SCI_FILENAMES:
@@ -27,7 +27,7 @@ for filename in SCI_FILENAMES:
     #     # get file
     sci, header = fits.getdata(filename), fits.getheader(filename)
     wht = fits.getdata(filename.replace('sci', 'wht'))
-                
+
     wcs = WCS(header)
     # blocked_wht = block_reduce(wht, 2, func=np.sum) / 4**2
     # blocked_sci = block_reduce(sci*wht, 2, func=np.sum) / blocked_wht / 4
@@ -90,4 +90,3 @@ for filename in SCI_FILENAMES:
     #     print(outpath)
     #     print()
     #     hdul.writeto(outpath, overwrite=True)
- 

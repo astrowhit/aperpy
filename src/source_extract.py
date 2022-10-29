@@ -1,5 +1,5 @@
 
-import numpy as np 
+import numpy as np
 from astropy.table import Table
 from astropy.io import fits
 from astropy.wcs import WCS, utils
@@ -15,10 +15,10 @@ PATH_CONFIG = sys.argv[1]
 sys.path.insert(0, PATH_CONFIG)
 
 from config import TARGET_ZP, PHOT_APER, PHOT_AUTOPARAMS, PHOT_FLUXFRAC, DETECTION_PARAMS,\
-         DIR_IMAGES, PHOT_ZP, FILTERS, DIR_OUTPUT, DIR_CATALOGS
+         DIR_IMAGES, PHOT_ZP, FILTERS, DIR_OUTPUT, DIR_CATALOGS, IS_COMPRESSED
 
 # MAIN PARAMETERS
-DET_NICKNAME = sys.argv[2] #'LW_f277w-f356w-f444w' 
+DET_NICKNAME = sys.argv[2] #'LW_f277w-f356w-f444w'
 KERNEL = sys.argv[3] # f444w or f160w or None
 
 DET_TYPE = 'noise-equal'
@@ -27,7 +27,10 @@ if not os.path.exists(FULLDIR_CATALOGS):
     os.mkdir(FULLDIR_CATALOGS)
 
 # SECONDARY PARAMETERS
-PATH_DETSCI = os.path.join(DIR_CATALOGS, f'{DET_NICKNAME}_{DET_TYPE}/{DET_NICKNAME}_{DET_TYPE}.fits.gz')
+DETSCI_NAME = f'{DET_NICKNAME}_{DET_TYPE}/{DET_NICKNAME}_{DET_TYPE}.fits'
+if IS_COMPRESSED:
+     DETSCI_NAME +='.gz'
+PATH_DETSCI = os.path.join(DIR_CATALOGS, DETSCI_NAME)
 PATH_DETWHT = 'None'
 PATH_DETMASK = 'None'
 
@@ -73,8 +76,8 @@ kernel = np.array(Gaussian2DKernel(DETECTION_PARAMS['kernelfwhm']/2.35, factor=1
 sep.set_extract_pixstack(10000000) # big image...
 del DETECTION_PARAMS['kernelfwhm']
 objects, segmap = sep.extract(
-                detsci, 
-                err=deterr, 
+                detsci,
+                err=deterr,
                 filter_type='matched',
                 clean=True, filter_kernel=kernel,
                 segmentation_map=True,
@@ -85,7 +88,10 @@ print(f'Detected {len(objects)} objects.')
 
 hdul = fits.HDUList()
 hdul.append(fits.ImageHDU(name='SEGMAP', data=segmap, header=dethead))
-hdul.writeto(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_SEGMAP.fits.gz'), overwrite=True)
+SEGMAP_NAME = f'{DET_NICKNAME}_SEGMAP.fits'
+if IS_COMPRESSED:
+     SEGMAP_NAME +='.gz'
+hdul.writeto(os.path.join(FULLDIR_CATALOGS, SEGMAP_NAME), overwrite=True)
 
 # CLEAN UP
 catalog = Table(objects)
@@ -113,7 +119,10 @@ del deterr
 if FILTERS == 'None':
     # WRITE OUT
     print(f'DONE. Writing out catalog.')
-    catalog.write(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_DET_CATALOG.fits.gz'), overwrite=True)
+    DETCATALOG_NAME = f'{DET_NICKNAME}_DET_CATALOG.fits'
+    if IS_COMPRESSED:
+        DETCATALOG_NAME += '.gz'
+    catalog.write(os.path.join(FULLDIR_CATALOGS, DETCATALOG_NAME), overwrite=True)
     sys.exit()
 
 areas = {}
@@ -127,10 +136,15 @@ for ind, PHOT_NICKNAME in enumerate(FILTERS):
         ext=f'_{KERNEL}-matched'
         dir_weight = DIR_OUTPUT
     print(DIR_OUTPUT)
-    print(f'*{PHOT_NICKNAME}*_sci_skysubvar{ext}.fits.gz')
-    PATH_PHOTSCI = glob.glob(os.path.join(DIR_OUTPUT, f'*{PHOT_NICKNAME}*_sci_skysubvar{ext}.fits.gz'))[0]
+    PHOTSCI_NAME = f'*{PHOT_NICKNAME}*_sci_skysubvar{ext}.fits'
+    PHOTWHT_NAME = f'*{PHOT_NICKNAME}*_wht{ext}.fits'
+    if IS_COMPRESSED:
+        PHOTSCI_NAME += '.gz'
+        PHOTWHT_NAME += '.gz'
+    print(PHOTSCI_NAME)
+    PATH_PHOTSCI = glob.glob(os.path.join(DIR_OUTPUT, PHOTSCI_NAME))[0]
     PATH_PHOTHEAD = PATH_PHOTSCI
-    PATH_PHOTWHT = glob.glob(os.path.join(dir_weight, f'*{PHOT_NICKNAME}*_wht{ext}.fits.gz'))[0]
+    PATH_PHOTWHT = glob.glob(os.path.join(dir_weight, PHOTWHT_NAME))[0]
     PATH_PHOTMASK = 'None'
 
     PHOT_ZPT = PHOT_ZP[PHOT_NICKNAME.lower()] #calc_zpt(PHOT_NICKNAME)
@@ -178,7 +192,7 @@ for ind, PHOT_NICKNAME in enumerate(FILTERS):
                                             err = photerr, subpix=0,
                                             r=rad, gain=1.0)
 
-        badflux = (flux == 0.) | ~np.isfinite(flux) 
+        badflux = (flux == 0.) | ~np.isfinite(flux)
         badfluxerr = (fluxerr <= 0.) | ~np.isfinite(fluxerr)
         pc_badflux = np.sum(badflux) / len(flux)
         pc_badfluxerr = np.sum(badfluxerr) / len(flux)
@@ -204,13 +218,13 @@ for ind, PHOT_NICKNAME in enumerate(FILTERS):
         flux[bad] = np.nan
         fluxerr[bad] = np.nan
         flag[bad] = 1
-        
+
         sep_fluxes[diam] = (flux, fluxerr, flag)
 
         # show the first 10 objects results:
         for i in range(3):
             print("object {:d}: flux = {:f} +/- {:f}".format(i, flux[i], fluxerr[i]))
-    
+
         catalog[f'FLUX_APER{diam}'] = flux * conv_flux(PHOT_ZPT)
         catalog[f'FLUXERR_APER{diam}'] = fluxerr * conv_flux(PHOT_ZPT)
         # catalog[f'MAG_APER{diam}'] = PHOT_ZPT - 2.5*np.log10(flux)
@@ -229,7 +243,7 @@ for ind, PHOT_NICKNAME in enumerate(FILTERS):
                                         err = photerr,
                                         subpix=1)
 
-    badflux = (flux == 0.) | ~np.isfinite(flux) 
+    badflux = (flux == 0.) | ~np.isfinite(flux)
     badfluxerr = (fluxerr <= 0.) | ~np.isfinite(fluxerr)
     pc_badflux = np.sum(badflux) / len(flux)
     pc_badfluxerr = np.sum(badfluxerr) / len(flux)
@@ -256,7 +270,7 @@ for ind, PHOT_NICKNAME in enumerate(FILTERS):
                                             err = photerr, gain=1.0
                                             )
 
-    badflux = (cflux == 0.) |  np.isnan(cflux) | ~np.isfinite(cflux) 
+    badflux = (cflux == 0.) |  np.isnan(cflux) | ~np.isfinite(cflux)
     badfluxerr = (cfluxerr <= 0.) | np.isnan(cfluxerr) | ~np.isfinite(cfluxerr)
     pc_badflux = np.sum(badflux) / len(cflux)
     pc_badfluxerr = np.sum(badfluxerr) / len(cflux)
@@ -296,7 +310,7 @@ for ind, PHOT_NICKNAME in enumerate(FILTERS):
     catalog['FLUX_RADIUS_FLAG'] = flag
 
 
-    # SOURCE WEIGHT + MEDIAN WEIGHT 
+    # SOURCE WEIGHT + MEDIAN WEIGHT
     srcmedwht = np.nan * np.ones(len(catalog))
     srcmeanwht = np.nan * np.ones(len(catalog))
     for i, (ixphot, iyphot) in enumerate(zip(xphot, yphot)):
