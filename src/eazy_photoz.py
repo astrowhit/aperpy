@@ -40,7 +40,7 @@ params['PRIOR_ABZP'] = TARGET_ZP
 params['MW_EBV'] = 0.0
 params['CAT_HAS_EXTCORR'] = 'y'
 
-params['Z_MAX'] = 20
+params['Z_MAX'] = 30
 params['Z_STEP'] = 0.1
 
 params['TEMPLATES_FILE'] = 'templates/fsps_full/tweak_fsps_QSF_12_v3.param'
@@ -55,6 +55,8 @@ ez = eazy.photoz.PhotoZ(param_file=None,
 
 NITER = 10
 NBIN = np.minimum(ez.NOBJ//100, 180)
+
+ez.cat = ez.cat.filled(-99)
 
 ez.param.params['VERBOSITY'] = 1.
 
@@ -80,7 +82,7 @@ sample = ez.idx # all
 ez.fit_parallel(sample, n_proc=4, prior=False)
 print(ez.lnp)
 
-ez.zphot_zspec(include_errors=False)
+ez.zphot_zspec(include_errors=True)
 fig = plt.gcf()
 fig.savefig(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_photoz-specz.pdf'))
 
@@ -103,210 +105,164 @@ zout.write(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_SCIREADY_{A
 # 1. mod - obs vs. lam; whisker plot
 diff = ez.fnu - ez.fmodel
 rel_diff = diff / ez.fmodel
-
-sanity = ez.cat['use_phot'] == 1
-
-fig, ax = plt.subplots(figsize=(10,5))
-ax.axhline(0, ls='solid', c='grey')
-ax.axhline(0.1, ls=(0, (1, 10)), c='grey')
-ax.axhline(-0.1, ls=(0, (1, 10)), c='grey')
-axt = ax.twiny()
-axt.boxplot(rel_diff[sanity], vert=True, positions=ez.pivot*1e-4, widths=0.1, labels=FILTERS, flierprops={'marker':'.', 'markersize':2, 'alpha':0.1})
-axt.set(xlim=(0.05, 5))
-ax.set(ylim=(-0.5, 0.5), xlim=(0.1, 5), xlabel='Observed Wavelength ($\mu$m)', ylabel='Flux $\\frac{\\rm{observed}-\\rm{model}}{\\rm{model}}$')
-
-fig.tight_layout()
-fig.savefig(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_wavdiffmodel.pdf'))
-
-#
-diff = ez.fnu - ez.fmodel
 ztest = diff / ez.efnu
+dmag = -2.5*np.log10(ez.fnu/ez.fmodel)
 
-sanity = ez.cat['use_phot'] == 1
+for test, ylabel, fname in zip((rel_diff, ztest, dmag), 
+                        ('Relative Flux $\\frac{\\rm{observed}-\\rm{model}}{\\rm{model}}$', '$f$-test $\\frac{\\rm{observed}-\\rm{model}}{\\rm{uncertainty}}$', '$\Delta$Mag observed - model (AB)'),
+                        ('reldiff_wav', 'ztest_wav', 'dmag_wav')
+                        ):
 
-fig, ax = plt.subplots(figsize=(10,5))
-ax.axhline(0, ls='solid', c='grey')
-ax.axhline(1, ls=(0, (1, 10)), c='grey')
-ax.axhline(-1, ls=(0, (1, 10)), c='grey')
-axt = ax.twiny()
-axt.boxplot(ztest[sanity], vert=True, positions=ez.pivot*1e-4, widths=0.1, labels=FILTERS, flierprops={'marker':'.', 'markersize':2, 'alpha':0.1})
-axt.set(xlim=(0.05, 5))
-ax.set(ylim=(-3, 3), xlim=(0.1, 5), xlabel='Observed Wavelength ($\mu$m)', ylabel='Flux $\\frac{\\rm{observed}-\\rm{model}}{\\rm uncertainty}}$')
+    fig, ax = plt.subplots(figsize=(10,5))
+    ax.axhline(0, ls='solid', c='grey')
+    
+    if test is ztest:
+        ax.set_ylim(-3, 3)
+        hline = 1
+        ax.set_yticks((-2, 0, 2), ('$-2\sigma$', '$0\sigma$', '$2\sigma$'))
+    else:
+        ax.set_ylim(-0.35, 0.35)
+        hline = 0.1
+    ax.axhline(hline, ls=(0, (1, 10)), c='grey')
+    ax.axhline(-hline, ls=(0, (1, 10)), c='grey')
+    axt = ax.twiny()
 
-fig.tight_layout()
-fig.savefig(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_wavdiffmodel_ztest.pdf'))
+    test_ls = []
+    for i, filt in enumerate(FILTERS):
+
+        mag = TARGET_ZP - 2.5*np.log10(ez.fnu[:,i])
+        snr = (ez.fnu/ez.efnu)[:,i]
+
+        depth = TARGET_ZP - 2.5*np.log10( np.median(ez.fnu[:,i][(snr > 2.9) & (snr < 3.1)]) )
+
+        sanity = ez.cat['use_phot'] == 1
+        sanity &= mag <= depth
+        sanity &= ~np.isnan(mag)
+
+        test_ls.append(test[sanity, i])
+
+    axt.boxplot(test_ls, vert=True, positions=ez.pivot*1e-4, widths=0.1, labels=FILTERS, flierprops={'marker':'.', 'markersize':2, 'alpha':0.1})
+    axt.set(xlim=(0.05, 5))
+    ax.set(xlim=(0.1, 5), xlabel='Observed Wavelength ($\mu$m)', ylabel=ylabel)
+
+    fig.tight_layout()
+    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_{fname}.pdf'))
 
 
 # 2. mod - obs vs. z, per band
-fig, axes = plt.subplots(nrows=int(ez.NFILT/2.), ncols=2, figsize=(10, 2*int(ez.NFILT/2.+1)), sharey=True, sharex=True)
-[ax.set_xlabel('$z_{\\rm phot}$') for ax in axes[-1]]
-axes = axes.flatten()
-axes[-1].set(xlim=(0, 6), ylim=(-0.3, 0.3))
-fig.suptitle('Flux $\\frac{\\rm{observed}-\\rm{model}}{\\rm{model}}$', y=0.99, fontsize=20)
-
-
 diff = ez.fnu - ez.fmodel
 rel_diff = diff / ez.fmodel
-
-from aperpy.src.webb_tools import histedges_equalN, binned_med
-
-for i, (filt, fname, ax) in enumerate(zip(FILTERS, ez.filters, axes)):
-
-    ax.axhline(0, ls='solid', c='grey')
-    ax.axhline(0.1, ls=(0, (1, 10)), c='grey')
-    ax.axhline(-0.1, ls=(0, (1, 10)), c='grey')
-
-    ax.text(0.05, 0.8, filt, transform=ax.transAxes, fontsize=15)
-
-    mag = TARGET_ZP - 2.5*np.log10(ez.fnu[:,i])
-    snr = (ez.fnu/ez.efnu)[:,i]
-
-    depth = TARGET_ZP - 2.5*np.log10( np.median(ez.fnu[:,i][(snr > 2.9) & (snr < 3.1)]) )
-
-    sanity = ez.cat['use_phot'] == 1
-    sanity &= mag <= depth
-
-    ebins = histedges_equalN(ez.zbest[sanity], 10)
-    nbins, bin_centers, bmed, bstd = binned_med(ez.zbest[sanity], rel_diff[sanity, i], bins=ebins)
-
-    ax.scatter(ez.zbest[sanity], rel_diff[sanity, i], c='grey', s=1, alpha=0.1)
-    ax.plot(bin_centers, bmed, c='royalblue')
-    ax.fill_between(bin_centers, bstd[0], bstd[1], color='royalblue', alpha=0.2)
-
-fig.tight_layout()
-fig.savefig(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_zdiffmodel.pdf'))
-
-
-#
-
-fig, axes = plt.subplots(nrows=int(ez.NFILT/2.), ncols=2, figsize=(10, 2*int(ez.NFILT/2.+1)), sharey=True, sharex=True)
-[ax.set_xlabel('$z_{\\rm phot}$') for ax in axes[-1]]
-axes = axes.flatten()
-axes[-1].set(xlim=(0, 6), ylim=(-3, 3))
-fig.suptitle('Flux $\\frac{\\rm{observed}-\\rm{model}}{\\rm{uncertainty}}$', y=0.99, fontsize=20)
-
-
-diff = ez.fnu - ez.fmodel
 ztest = diff / ez.efnu
+dmag = -2.5*np.log10(ez.fnu/ez.fmodel)
 
-from aperpy.src.webb_tools import histedges_equalN, binned_med
+for test, ylabel, fname in zip((rel_diff, ztest, dmag), 
+                        ('Relative Flux $\\frac{\\rm{observed}-\\rm{model}}{\\rm{model}}$', '$f$-test $\\frac{\\rm{observed}-\\rm{model}}{\\rm{uncertainty}}$', '$\Delta$Mag observed - model (AB)'),
+                        ('reldiff_z', 'ztest_z', 'dmag_z')
+                        ):
 
-for i, (filt, fname, ax) in enumerate(zip(FILTERS, ez.filters, axes)):
+    fig, axes = plt.subplots(nrows=int(ez.NFILT/2.), ncols=2, figsize=(10, 2*int(ez.NFILT/2.+1)), sharey=True, sharex=True)
+    [ax.set_xlabel('$z_{\\rm phot}$') for ax in axes[-1]]
+    axes = axes.flatten()
+    axes[-1].set(xlim=(0, 6.3))
+    fig.suptitle(ylabel, y=0.99, fontsize=20)
 
-    ax.axhline(0, ls='solid', c='grey')
-    ax.axhline(1, ls=(0, (1, 10)), c='grey')
-    ax.axhline(-1, ls=(0, (1, 10)), c='grey')
+    from aperpy.src.webb_tools import histedges_equalN, binned_med
 
-    ax.text(0.05, 0.8, filt, transform=ax.transAxes, fontsize=15)
+    for i, (filt, ax) in enumerate(zip(FILTERS, axes)):
 
-    mag = TARGET_ZP - 2.5*np.log10(ez.fnu[:,i])
-    snr = (ez.fnu/ez.efnu)[:,i]
+        ax.axhline(0, ls='solid', c='grey')
+        if test is ztest:
+            ax.set_ylim(-3, 3)
+            hline = 1
+            ax.set_yticks((-2, 0, 2), ('$-2\sigma$', '$0\sigma$', '$+2\sigma$'))
+        else:
+            ax.set_ylim(-0.35, 0.35)
+            hline = 0.1
+        ax.axhline(hline, ls=(0, (1, 10)), c='grey')
+        ax.axhline(-hline, ls=(0, (1, 10)), c='grey')
 
-    depth = TARGET_ZP - 2.5*np.log10( np.median(ez.fnu[:,i][(snr > 2.9) & (snr < 3.1)]) )
+        ax.text(0.05, 0.8, filt, transform=ax.transAxes, fontsize=15)
 
-    sanity = ez.cat['use_phot'] == 1
-    sanity &= mag <= depth
+        mag = TARGET_ZP - 2.5*np.log10(ez.fnu[:,i])
+        snr = (ez.fnu/ez.efnu)[:,i]
 
-    ebins = histedges_equalN(ez.zbest[sanity], 10)
-    nbins, bin_centers, bmed, bstd = binned_med(ez.zbest[sanity], ztest[sanity, i], bins=ebins)
+        depth = TARGET_ZP - 2.5*np.log10( np.median(ez.fnu[:,i][(snr > 2.9) & (snr < 3.1)]) )
 
-    ax.scatter(ez.zbest[sanity], ztest[sanity, i], c='grey', s=1, alpha=0.1)
-    ax.plot(bin_centers, bmed, c='royalblue')
-    ax.fill_between(bin_centers, bstd[0], bstd[1], color='royalblue', alpha=0.2)
+        sanity = ez.cat['use_phot'] == 1
+        sanity &= mag <= depth
+        sanity &= ~np.isnan(mag)
 
-fig.tight_layout()
-fig.savefig(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_zdiffmodel_ztest.pdf'))
+        ebins = histedges_equalN(ez.zbest[sanity], 15)
+        nbins, bin_centers, bmed, bstd = binned_med(ez.zbest[sanity], test[sanity, i], bins=ebins)
+
+        ax.scatter(ez.zbest[sanity], test[sanity, i], c='grey', s=1, alpha=0.1)
+        ax.plot(bin_centers, bmed, c='royalblue')
+        ax.fill_between(bin_centers, bstd[0], bstd[1], color='royalblue', alpha=0.2)
+
+        delta = np.nanmedian(test[sanity,i])
+        ax.text(0.65, 0.8, f'$\Delta={delta:2.3f}$', transform=ax.transAxes, fontsize=15)
+
+    fig.tight_layout()
+    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_{fname}.pdf'))
 
 
 
 # 3. Same as 2 but with respect to mag
-
-fig, axes = plt.subplots(nrows=int(ez.NFILT/2.), ncols=2, figsize=(10, 2*int(ez.NFILT/2.+1)), sharey=True, sharex=True)
-[ax.set_xlabel('Mag (AB)') for ax in axes[-1]]
-axes = axes.flatten()
-axes[-1].set(xlim=(20, 28.5), ylim=(-0.3, 0.3))
-fig.suptitle('Flux $\\frac{\\rm{observed}-\\rm{model}}{\\rm{model}}$', y=0.99, fontsize=20)
-
-from aperpy.src.webb_tools import histedges_equalN, binned_med
-
 diff = ez.fnu - ez.fmodel
 rel_diff = diff / ez.fmodel
+ztest = diff / ez.efnu
+dmag = -2.5*np.log10(ez.fnu/ez.fmodel)
 
-for i, (filt, fname, ax) in enumerate(zip(FILTERS, ez.filters, axes)):
+for test, ylabel, fname in zip((rel_diff, ztest, dmag), 
+                        ('Relative Flux $\\frac{\\rm{observed}-\\rm{model}}{\\rm{model}}$', '$f$-test $\\frac{\\rm{observed}-\\rm{model}}{\\rm{uncertainty}}$', '$\Delta$Mag observed - model (AB)'),
+                        ('reldiff_mag', 'ztest_mag', 'dmag_mag')
+                        ):
 
-    ax.axhline(0, ls='solid', c='grey')
-    ax.axhline(0.1, ls=(0, (1, 10)), c='grey')
-    ax.axhline(-0.1, ls=(0, (1, 10)), c='grey')
+    fig, axes = plt.subplots(nrows=int(ez.NFILT/2.), ncols=2, figsize=(10, 2*int(ez.NFILT/2.+1)), sharey=True, sharex=True)
+    [ax.set_xlabel('Mag (AB)') for ax in axes[-1]]
+    axes = axes.flatten()
+    axes[-1].set(xlim=(19, 28.25))
+    fig.suptitle(ylabel, y=0.99, fontsize=20)
 
-    ax.text(0.05, 0.8, filt, transform=ax.transAxes, fontsize=15)
-    
+    from aperpy.src.webb_tools import histedges_equalN, binned_med
 
-    mag = TARGET_ZP - 2.5*np.log10(ez.fnu[:,i])
-    snr = (ez.fnu/ez.efnu)[:,i]
+    for i, (filt, ax) in enumerate(zip(FILTERS, axes)):
 
-    depth = TARGET_ZP - 2.5*np.log10( np.median(ez.fnu[:,i][(snr > 2.9) & (snr < 3.1)]) )
-    finite = np.isfinite(mag) & np.isfinite(rel_diff[:,i])
+        ax.axhline(0, ls='solid', c='grey')
+        if test is ztest:
+            ax.set_ylim(-3, 3)
+            hline = 1
+            ax.set_yticks((-2, 0, 2), ('$-2\sigma$', '$0\sigma$', '$+2\sigma$'))
+        else:
+            ax.set_ylim(-0.35, 0.35)
+            hline = 0.1
+        ax.axhline(hline, ls=(0, (1, 10)), c='grey')
+        ax.axhline(-hline, ls=(0, (1, 10)), c='grey')
 
-    sanity = ez.cat['use_phot'] == 1
-    ax.scatter(mag[sanity], rel_diff[sanity, i], c='grey', s=1, alpha=0.1)
-    ax.axvline(depth, c='royalblue',ls='dashed')
+        ax.text(0.05, 0.8, filt, transform=ax.transAxes, fontsize=15)
 
-    sanity &= mag <= depth
-    sanity &= finite
+        mag = TARGET_ZP - 2.5*np.log10(ez.fnu[:,i])
+        snr = (ez.fnu/ez.efnu)[:,i]
 
-    ebins = np.linspace(20, 28, 10)
-    ebins = histedges_equalN(mag[sanity], 10)
-    nbins, bin_centers, bmed, bstd = binned_med(mag[sanity], rel_diff[sanity, i], bins=ebins)
-    
-    
-    ax.plot(bin_centers, bmed, c='royalblue')
-    ax.fill_between(bin_centers, bstd[0], bstd[1], color='royalblue', alpha=0.2)
+        depth = TARGET_ZP - 2.5*np.log10( np.median(ez.fnu[:,i][(snr > 2.9) & (snr < 3.1)]) )
 
-fig.tight_layout()
-fig.savefig(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_magdiffmodel.pdf'))
+        ax.axvline(depth, ls='dashed', c='royalblue')
+
+        sanity = ez.cat['use_phot'] == 1
+        sanity &= mag <= depth
+        sanity &= ~np.isnan(mag)
+
+        ebins = histedges_equalN(mag[sanity], 15)
+        nbins, bin_centers, bmed, bstd = binned_med(mag[sanity], test[sanity, i], bins=ebins)
+
+        ax.scatter(mag[sanity], test[sanity, i], c='grey', s=1, alpha=0.1)
+        ax.plot(bin_centers, bmed, c='royalblue')
+        ax.fill_between(bin_centers, bstd[0], bstd[1], color='royalblue', alpha=0.2)
+
+        delta = np.nanmedian(test[sanity,i])
+        ax.text(0.65, 0.8, f'$\Delta={delta:2.3f}$', transform=ax.transAxes, fontsize=15)
+
+    fig.tight_layout()
+    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_{fname}.pdf'))
 
 #
-
-fig, axes = plt.subplots(nrows=int(ez.NFILT/2.), ncols=2, figsize=(10, 2*int(ez.NFILT/2.+1)), sharey=True, sharex=True)
-[ax.set_xlabel('Mag (AB)') for ax in axes[-1]]
-axes = axes.flatten()
-axes[-1].set(xlim=(20, 28.5), ylim=(-3, 3))
-fig.suptitle('Flux $\\frac{\\rm{observed}-\\rm{model}}{\\rm{uncertainty}}$', y=0.99, fontsize=20)
-
-from aperpy.src.webb_tools import histedges_equalN, binned_med
-
-diff = ez.fnu - ez.fmodel
-ztest = diff / ez.efnu
-
-for i, (filt, fname, ax) in enumerate(zip(FILTERS, ez.filters, axes)):
-
-    ax.axhline(0, ls='solid', c='grey')
-    ax.axhline(1, ls=(0, (1, 10)), c='grey')
-    ax.axhline(-1, ls=(0, (1, 10)), c='grey')
-
-    ax.text(0.05, 0.8, filt, transform=ax.transAxes, fontsize=15)
-    
-
-    mag = TARGET_ZP - 2.5*np.log10(ez.fnu[:,i])
-    snr = (ez.fnu/ez.efnu)[:,i]
-
-    depth = TARGET_ZP - 2.5*np.log10( np.median(ez.fnu[:,i][(snr > 2.9) & (snr < 3.1)]) )
-    finite = np.isfinite(mag) & np.isfinite(ztest[:,i])
-
-    sanity = ez.cat['use_phot'] == 1
-    ax.scatter(mag[sanity], ztest[sanity, i], c='grey', s=1, alpha=0.1)
-    ax.axvline(depth, c='royalblue',ls='dashed')
-
-    sanity &= mag <= depth
-    sanity &= finite
-
-    ebins = np.linspace(20, 28, 10)
-    ebins = histedges_equalN(mag[sanity], 10)
-    nbins, bin_centers, bmed, bstd = binned_med(mag[sanity], ztest[sanity, i], bins=ebins)
-    
-    
-    ax.plot(bin_centers, bmed, c='royalblue')
-    ax.fill_between(bin_centers, bstd[0], bstd[1], color='royalblue', alpha=0.2)
-
-fig.tight_layout()
-fig.savefig(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_magdiffmodel_ztest.pdf'))
