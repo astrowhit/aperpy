@@ -362,8 +362,8 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, row=None, plot=Tru
 
     for filt, ax in zip(filters, axes.flatten()):
 
-        # print(filt)
-        fn = glob.glob(os.path.join(dir_images, f'*{filt}*_sci_skysubvar.fits'))[0]
+        print(filt)
+        fn = glob.glob(os.path.join(dir_images, f'*{filt}*_sci_skysubvar.fits.gz'))[0]
         if not os.path.exists(fn):
             print(f'WARNING -- image for {filt} does not exist at {fn}. Skipping!')
             continue
@@ -435,7 +435,8 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, row=None, plot=Tru
             ax.axes.yaxis.set_visible(False)
 
 
-    if plot:
+    if (plot & include_rgb):
+        from astropy.visualization import make_lupton_rgb
         img = make_lupton_rgb(r, g, b, stretch=0.1, minimum=-0.01)
         fig_rgb, ax_rgb = plt.subplots(figsize=(5,5))
         ax_rgb.imshow(img)
@@ -444,10 +445,10 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, row=None, plot=Tru
         ax_rgb.axes.xaxis.set_visible(False)
         ax_rgb.axes.yaxis.set_visible(False)
         if write:
-            fig.savefig(f'cutouts/{nickname}.pdf', dpi=300)
             fig_rgb.savefig(f'cutouts/{nickname}_RGB.pdf', dpi=300)
 
     if write:
+        fig.savefig(f'cutouts/{nickname}.pdf', dpi=300)
         hdul.writeto(f'cutouts/{nickname}.fits', overwrite=True)
 
 

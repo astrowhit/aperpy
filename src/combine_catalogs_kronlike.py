@@ -130,7 +130,7 @@ for apersize in PHOT_APER:
     str_aper = str(apersize).replace('.', '_')
     f_ref_aper = maincat[f'{REF_BAND}_FLUX_APER{str_aper}']
     tot_corr = f_ref_total / f_ref_aper
-    maincat.add_column(Column(tot_corr, f'TOTAL_CORR_APER{str_aper}'))
+    maincat.add_column(Column(1./tot_corr, f'TOTAL_CORR_APER{str_aper}'))
     sig_ref_aper = sigma_aper(REF_BAND.upper(), wht_ref, medwht_ref, apersize) # sig_aper,REF_BAND
     sig_total_ref = sigma_total(sig_ref_aper, f_ref_total, f_ref_aper) # sig_total,REF_BAND
 
