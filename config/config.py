@@ -7,6 +7,7 @@ from astropy.coordinates import SkyCoord
 KERNELS = {}
 KERNELS['f444w'] = 'regularization'
 # KERNELS['f160w'] = 'shapelets'
+USE_FFT_CONV = True # use FFT convolution
 
 DETECTION_PARAMS = dict(
     thresh =  1.5,
