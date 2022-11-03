@@ -104,6 +104,10 @@ FILTERS = [x for x in list(PHOT_ZP.keys())]
 ### PHOTOZ
 TRANSLATE_FNAME = 'abell2744_uncover.translate'
 
+### AREA CALCULATIONS
+RA_RANGE = (3.487, 3.687)
+DEC_RANGE = (-30.5, -30.2)
+
 # ----------------
 
 HST_FILTERS = ['F105W', 'F125W', 'F140W', 'F160W', 'F435W', 'F606W', 'F814W']
