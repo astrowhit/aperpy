@@ -9,7 +9,7 @@ plt.ioff()
 # DIR_CONFIG = '/Volumes/External1/Projects/Current/UNCOVER/scripts/'
 DIR_CONFIG = sys.argv[1]
 sys.path.insert(0, DIR_CONFIG)
-from config import FILTERS, DET_TYPE, DIR_CATALOGS
+from config import FILTERS, DET_TYPE, DIR_CATALOGS, RA_RANGE, DEC_RANGE
 
 DET_NICKNAME = sys.argv[2]
 KERNEL = sys.argv[3]
