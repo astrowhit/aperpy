@@ -245,7 +245,7 @@ print(f'Added date stamp! ({today})')
 print('Wrote first-pass combined catalog to ', outfilename)
 
 for apersize in PHOT_APER:
-    if apersize==str(SCI_APER) or MAKE_SCIREADY_ALL:
+    if apersize==SCI_APER or MAKE_SCIREADY_ALL:
         str_aper = str(apersize).replace('.', '_')
         # restrict + rename columns to be a bit more informative
         cols = OrderedDict()
