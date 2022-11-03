@@ -71,7 +71,7 @@ for filt in FILTERS:
     plt.colorbar(im, cax=cbaxes, orientation='horizontal')
 
 #     [ax.invert_xaxis() for ax in axes.flatten()]
-    axes[0].set_xlim(3.687, 3.487)
+    axes[0].set_xlim(RA_RANGE[1], RA_RANGE[0])
     fig.subplots_adjust(wspace=0.01, hspace=0.01)
     fig.savefig(os.path.join(DIR_FIGURES, f'field_{filt}_{STR_APER}.pdf'))
 
