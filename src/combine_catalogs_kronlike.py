@@ -258,7 +258,7 @@ for apersize in PHOT_APER:
         cols[f'{REF_BAND}_FLUX_APER{str_aper}_COLOR'] = f'faper_{REF_BAND}'
         cols[f'{REF_BAND}_FLUXERR_APER{str_aper}_COLOR'] = f'eaper_{REF_BAND}'
 
-        for filter in PHOT_NICKNAMES:
+        for filter in FILTERS:
             cols[f'{filter}_FLUX_APER{str_aper}_TOTAL'] = f'f_{filter}'
             cols[f'{filter}_FLUXERR_APER{str_aper}_TOTAL'] = f'e_{filter}'
 
