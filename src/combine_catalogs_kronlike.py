@@ -111,7 +111,7 @@ else:
 
 # use REF_BAND Kron to correct to total fluxes and ferr
 plotname = os.path.join(FULLDIR_CATALOGS, f'aper_{REF_BAND}_nmad.pdf')
-p, pcov, sig1 = fit_apercurve(stats[REF_BAND], plotname=plotname, stat_type=['snmad'])
+p, pcov, sig1 = fit_apercurve(stats[REF_BAND], plotname=plotname, stat_type=['snmad'], pixelscale=PIXEL_SCALE)
 alpha, beta = p['snmad']
 f_ref_auto = maincat[f'{REF_BAND}_FLUX_AUTO']
 kronrad_circ = np.sqrt(maincat['a'] * maincat['b'] * maincat[f'{REF_BAND}_KRON_RADIUS']**2)

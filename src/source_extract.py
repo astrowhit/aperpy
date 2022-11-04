@@ -15,7 +15,7 @@ PATH_CONFIG = sys.argv[1]
 sys.path.insert(0, PATH_CONFIG)
 
 from config import TARGET_ZP, PHOT_APER, PHOT_AUTOPARAMS, PHOT_FLUXFRAC, DETECTION_PARAMS,\
-         DIR_IMAGES, PHOT_ZP, FILTERS, DIR_OUTPUT, DIR_CATALOGS, IS_COMPRESSED
+         DIR_IMAGES, PHOT_ZP, FILTERS, DIR_OUTPUT, DIR_CATALOGS, IS_COMPRESSED, PIXEL_SCALE
 
 # MAIN PARAMETERS
 DET_NICKNAME = sys.argv[2] #'LW_f277w-f356w-f444w'
@@ -333,7 +333,8 @@ for ind, PHOT_NICKNAME in enumerate(FILTERS):
     plotname = os.path.join(FULLDIR_CATALOGS, f'{PHOT_NICKNAME}_K{KERNEL}_emptyaper.pdf')
     zpt_factor = conv_flux(PHOT_ZPT)
     print(np.shape(photsci), np.shape(photwht), np.shape(segmap))
-    stats[PHOT_NICKNAME] = emtpy_apertures(photsci, photwht, segmap, N=int(1e3), aper=empty_aper, plotname=plotname, zpt_factor=zpt_factor)
+    stats[PHOT_NICKNAME] = emtpy_apertures(photsci, photwht, segmap, N=int(1e3), pixscl=PIXEL_SCALE,
+                                           aper=empty_aper, plotname=plotname, zpt_factor=zpt_factor)
 
     # WRITE OUT
     print(f'DONE. Writing out catalog.')

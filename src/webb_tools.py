@@ -9,8 +9,8 @@ import os
 from astropy.io import fits
 
 import sys
-PATH_CONFIG = __file__.replace('src/webb_tools.py', 'config/')
-sys.path.insert(0, PATH_CONFIG)
+
+PIXEL_SCALE=-99
 
 def compute_background(raw_img, mask, BACKTYPE, BACKPARAMS, DIR_OUTPUT=None, NICKNAME=None, HEADER=None):
     if BACKTYPE == 'VAR':
@@ -46,7 +46,7 @@ def compute_background(raw_img, mask, BACKTYPE, BACKPARAMS, DIR_OUTPUT=None, NIC
 
 
 # Compute empty aperture curve
-def fit_apercurve(stats, plotname=None, pixelscale=0.04, stat_type=['fit_std', 'snmad'], init=(1, 5)):
+def fit_apercurve(stats, plotname=None, pixelscale=PIXEL_SCALE, stat_type=['fit_std', 'snmad'], init=(1, 5)):
     py = []
     psizes = []
     for size in stats:
@@ -103,7 +103,7 @@ def fit_apercurve(stats, plotname=None, pixelscale=0.04, stat_type=['fit_std', '
     return p, pcov, s
 
 # Empty Apertures
-def emtpy_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=0.04, plotname=None, zpt_factor=1.):
+def emtpy_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=PIXEL_SCALE, plotname=None, zpt_factor=1.):
     from alive_progress import alive_bar
     import numpy as np
     import scipy.stats as stats
@@ -278,7 +278,7 @@ def get_date():
     return now
 
 # Make and rotate PSF
-def get_psf(filt, field='uncover', angle=None, fov=4, og_fov=10, pixscl=0.04, date=None, output=''):
+def get_psf(filt, field='uncover', angle=None, fov=4, og_fov=10, pixscl=PIXEL_SCALE, date=None, output=''):
     # makes the PSF at og_fov and clips down to fov. Works with 0.04 "/px
     import webbpsf
     from astropy.io import fits

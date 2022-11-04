@@ -9,7 +9,7 @@ plt.ioff()
 # DIR_CONFIG = '/Volumes/External1/Projects/Current/UNCOVER/scripts/'
 DIR_CONFIG = sys.argv[1]
 sys.path.insert(0, DIR_CONFIG)
-from config import FILTERS, DET_TYPE, DIR_CATALOGS, RA_RANGE, DEC_RANGE
+from config import FILTERS, DET_TYPE, DIR_CATALOGS, RA_RANGE, DEC_RANGE, PIXEL_SCALE
 
 DET_NICKNAME = sys.argv[2]
 KERNEL = sys.argv[3]
@@ -131,7 +131,7 @@ for filt in FILTERS:
     axes[0].set_title(CATALOG.split('/')[-1])
     axes[0].set_ylabel(f'magerr({filt})')
     axes[1].set_ylabel(f'mag(e_{filt})')
-    axes[0].text(0.04, 0.9, filt, transform=axes[0].transAxes, fontsize=15)
+    axes[0].text(PIXEL_SCALE, 0.9, filt, transform=axes[0].transAxes, fontsize=15)
 
     ra, dec = cat['ra'], cat['dec']
     flux, fluxerr = cat[f'f_{filt}'], cat[f'e_{filt}']
