@@ -17,7 +17,7 @@ sys.path.insert(0, PATH_CONFIG)
 
 from config import FILTERS, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, \
     REF_BAND, PIXEL_SCALE, PHOT_APER, DIR_KERNELS, DIR_PSFS, FIELD, ZSPEC, \
-    MAX_SEP, SCI_APER, MAKE_SCIREADY_ALL
+    MAX_SEP, SCI_APER, MAKE_SCIREADY_ALL, PHOT_AUTOPARAMS
 
 DET_NICKNAME =  sys.argv[2] #'LW_f277w-f356w-f444w'
 KERNEL = sys.argv[3] #'f444w'
@@ -115,7 +115,8 @@ p, pcov, sig1 = fit_apercurve(stats[REF_BAND], plotname=plotname, stat_type=['sn
 alpha, beta = p['snmad']
 f_ref_auto = maincat[f'{REF_BAND}_FLUX_AUTO']
 kronrad_circ = np.sqrt(maincat['a'] * maincat['b'] * maincat[f'{REF_BAND}_KRON_RADIUS']**2)
-kronrad_circ[kronrad_circ<3.5] = 3.5 # PHOT_AUTOPARAMS[1]
+r_min = PHOT_AUTOPARAMS[1] / 2
+kronrad_circ[kronrad_circ<r_min] = r_min
 psffrac_ref_auto = psf_cog(conv_psfmodel, nearrad = kronrad_circ) # in pixels
 # F160W kernel convolved REF_BAND PSF + missing flux from F160W beyond 2" radius
 f_ref_total = f_ref_auto / psffrac_ref_auto # equation 9
