@@ -115,14 +115,15 @@ p, pcov, sigma1 = fit_apercurve(stats[REF_BAND], plotname=plotname, stat_type=['
 alpha, beta = p['ksnmad']
 sig1 = sigma1['ksnmad']
 f_ref_auto = maincat[f'{REF_BAND}_FLUX_AUTO']
-psffrac_ref_auto = psf_cog(conv_psfmodel, nearrad = maincat[f'{REF_BAND}_KRON_RADIUS_CIRC']) # in pixels
+kronrad_circ = maincat[f'{REF_BAND}_KRON_RADIUS_CIRC']
+psffrac_ref_auto = psf_cog(conv_psfmodel, nearrad = kronrad_circ) # in pixels
 # F160W kernel convolved REF_BAND PSF + missing flux from F160W beyond 2" radius
 f_ref_total = f_ref_auto / psffrac_ref_auto # equation 9
 wht_ref = maincat[f'{REF_BAND}_SRC_MEDWHT']
 medwht_ref = maincat[f'{REF_BAND}_MED_WHT']
-# sig_ref_total = sigma_ref_total(sig1, alpha, beta, kronrad_circ, wht_ref, medwht_ref, f_ref_auto)
-# newcoln =f'{REF_BAND}_FLUXERR_REFTOTAL'
-# maincat.add_column(Column(sig_ref_total, newcoln))
+sig_ref_total = sigma_ref_total(sig1, alpha, beta, kronrad_circ, wht_ref, medwht_ref, f_ref_auto)
+newcoln =f'{REF_BAND}_FLUXERR_REFTOTAL'
+maincat.add_column(Column(sig_ref_total, newcoln))
 
 
 for apersize in PHOT_APER:
@@ -289,7 +290,7 @@ for apersize in PHOT_APER:
             cols[f'{filter}_FLUXERR_APER{str_aper}_TOTAL'] = f'e_{filter}'
 
         cols[f'TOTAL_CORR_APER{str_aper}'] = 'tot_cor'
-        cols[f'{REF_BAND}_FLUXERR_REFTOTAL'] = 'tot_ekron_f444w'
+        # cols[f'{REF_BAND}_FLUXERR_REFTOTAL'] = 'tot_ekron_f444w'
         
         # wmin?
         cols[f'{REF_BAND}_KRON_RADIUS'] = 'kron_radius'
