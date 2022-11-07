@@ -25,6 +25,7 @@ DET_TYPE = 'noise-equal'
 FULLDIR_CATALOGS = os.path.join(DIR_CATALOGS, f'{DET_NICKNAME}_{DET_TYPE}/{KERNEL}/')
 if not os.path.exists(FULLDIR_CATALOGS):
     os.mkdir(FULLDIR_CATALOGS)
+    os.mkdir(os.path.join(FULLDIR_CATALOGS, 'figures/'))
 
 # SECONDARY PARAMETERS
 DETSCI_NAME = f'{DET_NICKNAME}_{DET_TYPE}/{DET_NICKNAME}_{DET_TYPE}.fits'
@@ -111,6 +112,7 @@ regs = np.array(regs)
 bigreg = Regions(regs)
 bigreg.write(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_OBJECTS.reg'), overwrite=True, format='ds9')
 
+segmap[detsci==0.0] = -99
 del detsci
 del detwht
 del detmask
@@ -236,7 +238,7 @@ for ind, PHOT_NICKNAME in enumerate(FILTERS):
     kronrad, krflag = sep.kron_radius(photsci, xphot, yphot, #objects['x'], objects['y'],
                                         objects['a'], objects['b'], objects['theta'], 6.0) # SE uses 6
     kronrad[np.isnan(kronrad)] = 0.
-    print(np.isnan(kronrad).sum(), np.max(kronrad), np.min(kronrad))
+    # print(np.isnan(kronrad).sum(), np.max(kronrad), np.min(kronrad))
     objects['theta'][objects['theta'] > np.pi / 2.] = np.pi / 2. # numerical rounding correction!
     flux, fluxerr, flag = sep.sum_ellipse(photsci, xphot, yphot, #objects['x'], objects['y'],
                                         objects['a'], objects['b'], objects['theta'], PHOT_AUTOPARAMS[0]*kronrad,
@@ -263,7 +265,7 @@ for ind, PHOT_NICKNAME in enumerate(FILTERS):
     flag |= krflag  # combine flags into 'flag'
 
 
-    r_min = PHOT_AUTOPARAMS[1]  # minimum radius = 3.5
+    r_min = PHOT_AUTOPARAMS[1] / 2.  # minimum diameter = 3.5
     use_circle = kronrad * np.sqrt(objects['a'] * objects['b']) < r_min
     cflux, cfluxerr, cflag = sep.sum_circle(photsci, xphot[use_circle], yphot[use_circle],
                                             r=r_min, subpix=1,
@@ -330,9 +332,8 @@ for ind, PHOT_NICKNAME in enumerate(FILTERS):
     # COMPUTE EMPTY APERTURE ERRORS + SAVE TO MASTER FILE
     empty_aper = list(PHOT_APER)+list(np.linspace(PHOT_APER[0], PHOT_APER[-1], 30))
     empty_aper = np.sort(empty_aper)
-    plotname = os.path.join(FULLDIR_CATALOGS, f'{PHOT_NICKNAME}_K{KERNEL}_emptyaper.pdf')
+    plotname = os.path.join(FULLDIR_CATALOGS, f'figures/{PHOT_NICKNAME}_K{KERNEL}_emptyaper.pdf')
     zpt_factor = conv_flux(PHOT_ZPT)
-    print(np.shape(photsci), np.shape(photwht), np.shape(segmap))
     stats[PHOT_NICKNAME] = emtpy_apertures(photsci, photwht, segmap, N=int(1e3), aper=empty_aper, plotname=plotname, zpt_factor=zpt_factor)
 
     # WRITE OUT

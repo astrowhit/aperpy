@@ -15,7 +15,7 @@ PATH_CONFIG = sys.argv[1]
 sys.path.insert(0, PATH_CONFIG)
 
 from config import FILTERS, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, \
-    REF_BAND, PIXEL_SCALE, PHOT_APER, DIR_PSFS, FIELD, ZSPEC, MAX_SEP
+    REF_BAND, PIXEL_SCALE, PHOT_APER, DIR_PSFS, FIELD, ZSPEC, MAX_SEP, ZCONF
 
 DET_NICKNAME =  sys.argv[2] #'LW_f277w-f356w-f444w'  
 KERNEL = sys.argv[3] #'f444w'
@@ -29,7 +29,7 @@ stats = np.load(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_emptya
 def sigma_aper(filter, weight, weight_med, apersize=0.7):
     # Equation 5
     # apersize = str(apersize).replace('.', '_') + 'arcsec'
-    sigma_nmad_filt = stats[filter.lower()][apersize]['snmad']
+    sigma_nmad_filt = stats[filter.lower()][apersize]['ksnmad']
     # sigma_nmad_filt = ERROR_TABLE[f'e{apersize}'][ERROR_TABLE['filter']==filter.lower()][0] 
     # g_i = 1.*2834.508 # here's to hoping.  EFFECTIVE GAIN!
     fluxvar = ( sigma_nmad_filt / np.sqrt(weight / weight_med) )**2  #+ (flux_aper / g_i)
@@ -52,7 +52,6 @@ for filter in FILTERS:
         sys.exit()
 
     cat = Table.read(filename)
-    print(filter)
 
     # rename columns if needed:
     for coln in cat.colnames:
@@ -160,12 +159,14 @@ maincat.add_column(Column(is_star.astype(int), name='star_flag'))
 
 # z-spec
 ztable = Table.read(ZSPEC)
-ztable = ztable[(ztable['DEC'] >= -90.) & (ztable['DEC'] <= 90.)]
+conf_constraint = np.isin(ztable['zconf'], np.array(ZCONF))
+ztable = ztable[conf_constraint & (ztable['DEC'] >= -90.) & (ztable['DEC'] <= 90.)]
 zcoords = SkyCoord(ztable['RA']*u.deg, ztable['DEC']*u.deg)
 catcoords = SkyCoord(maincat['RA'], maincat['DEC'])
 idx, d2d, d3d = catcoords.match_to_catalog_sky(zcoords)
 max_sep = MAX_SEP
 sep_constraint = d2d < max_sep
+
 for colname in ztable.colnames:
     filler = np.zeros(len(maincat), dtype=ztable[colname].dtype)
     try:

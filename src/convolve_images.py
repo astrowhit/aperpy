@@ -16,7 +16,7 @@ SCI_FILENAMES = list(glob.glob(DIR_OUTPUT+'/*_sci_skysubvar.fits*'))
 
 for filename in SCI_FILENAMES:
     if f'sci_skysubvar' not in filename: continue
-    # if not (('f410m' in FILENAME) or ('f444w' in FILENAME)): continue
+    if not ('f115w' in filename): continue
     for band in FILTERS:
         if band in filename:
             break

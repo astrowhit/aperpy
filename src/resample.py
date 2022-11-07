@@ -13,6 +13,7 @@ sys.path.insert(0, PATH_CONFIG)
 
 from config import DIR_IMAGES, SW_FILTERS, WEBB_FILTERS
 
+print(DIR_IMAGES)
 SCI_FILENAMES = list(glob.glob(DIR_IMAGES+'/*_sci.fits*'))
 
 

@@ -39,6 +39,10 @@ params['APPLY_PRIOR'] = 'n'
 params['PRIOR_ABZP'] = TARGET_ZP
 params['MW_EBV'] = 0.0
 params['CAT_HAS_EXTCORR'] = 'y'
+params['N_MIN_COLORS'] = 2
+params['Z_COLUMN'] = 'z_phot'
+params['USE_ZSPEC_FOR_REST'] = 'n'
+
 
 params['Z_MAX'] = 30
 params['Z_STEP'] = 0.1
@@ -50,7 +54,7 @@ params['VERBOSITY'] = 1
 ez = eazy.photoz.PhotoZ(param_file=None,
                               translate_file=translate_file,
                               zeropoint_file=None, params=params,
-                              load_prior=True, load_products=False)
+                              load_prior=False, load_products=False)
 
 
 NITER = 10
@@ -79,12 +83,11 @@ if ITERATE_ZP:
 # Full catalog
 sample = ez.idx # all
 
-ez.fit_parallel(sample, n_proc=4, prior=False)
-print(ez.lnp)
+ez.fit_parallel(sample, n_proc=4, prior=False, beta_prior=False)
 
-ez.zphot_zspec(include_errors=True)
+ez.zphot_zspec(include_errors=True, zmax=6.5)
 fig = plt.gcf()
-fig.savefig(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_photoz-specz.pdf'))
+fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_photoz-specz.pdf'))
 
 
 zout, hdu = ez.standard_output(rf_pad_width=0.5, rf_max_err=2, 
@@ -94,11 +97,33 @@ ez.fit_phoenix_stars()
 star_coln = ['star_chi2', 'star_min_ix', 'star_min_chi2', 'star_min_chinu']
 
 for coln in star_coln:
-    print(coln, len(ez.__dict__[coln]))
     zout[coln] = ez.__dict__[coln]
-#     print(coln)
+    print(coln)
+
+u_v = -2.5*np.log10(zout['restU'] / zout['restV'])
+v_j = -2.5*np.log10(zout['restV'] / zout['restJ'])
+
+def uvj_sel(v_j):
+    ret = 0.72*v_j + 0.75
+    ret[v_j >= 1.6] = 1E20
+    ret[v_j < 0.9] = 1.4
+    return ret
+
+clas = np.nan * np.ones(len(zout), dtype=int)
+out = uvj_sel(v_j)
+clas[u_v >= out] = 1 # QG
+clas[u_v < out] = 0 # SF
+clas[(u_v > 2.4) | (u_v < 0.0) | (v_j < -0.6)  | (v_j > 2.0)] = -1
+clas[np.isnan(u_v) | np.isnan(v_j)] = -1
+
+zout['u_v'] = u_v
+zout['v_j'] = v_j
+zout['uvj_class'] = clas
     
 zout.write(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}.zout.fits'), overwrite=True)
+
+import eazy.hdf5
+eazy.hdf5.write_hdf5(ez, h5file=ez.param['MAIN_OUTPUT_FILE'] + '.h5')
 
 # Diagnostics
 
@@ -136,7 +161,7 @@ for test, ylabel, fname in zip((rel_diff, ztest, dmag),
         depth = TARGET_ZP - 2.5*np.log10( np.median(ez.fnu[:,i][(snr > 2.9) & (snr < 3.1)]) )
 
         sanity = ez.cat['use_phot'] == 1
-        sanity &= mag <= depth
+        sanity &= snr > 3
         sanity &= ~np.isnan(mag)
 
         test_ls.append(test[sanity, i])
@@ -146,7 +171,7 @@ for test, ylabel, fname in zip((rel_diff, ztest, dmag),
     ax.set(xlim=(0.1, 5), xlabel='Observed Wavelength ($\mu$m)', ylabel=ylabel)
 
     fig.tight_layout()
-    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_{fname}.pdf'))
+    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_{fname}.pdf'))
 
 
 # 2. mod - obs vs. z, per band
@@ -183,14 +208,14 @@ for test, ylabel, fname in zip((rel_diff, ztest, dmag),
 
         ax.text(0.05, 0.8, filt, transform=ax.transAxes, fontsize=15)
 
-        mag = TARGET_ZP - 2.5*np.log10(ez.fnu[:,i])
+        # mag = TARGET_ZP - 2.5*np.log10(ez.fnu[:,i])
         snr = (ez.fnu/ez.efnu)[:,i]
 
-        depth = TARGET_ZP - 2.5*np.log10( np.median(ez.fnu[:,i][(snr > 2.9) & (snr < 3.1)]) )
+        # depth = TARGET_ZP - 2.5*np.log10( np.median(ez.fnu[:,i][(snr > 2.9) & (snr < 3.1)]) )
 
         sanity = ez.cat['use_phot'] == 1
-        sanity &= mag <= depth
-        sanity &= ~np.isnan(mag)
+        sanity &= snr > 5
+        # sanity &= ~np.isnan(mag)
 
         ebins = histedges_equalN(ez.zbest[sanity], 15)
         nbins, bin_centers, bmed, bstd = binned_med(ez.zbest[sanity], test[sanity, i], bins=ebins)
@@ -203,7 +228,7 @@ for test, ylabel, fname in zip((rel_diff, ztest, dmag),
         ax.text(0.65, 0.8, f'$\Delta={delta:2.3f}$', transform=ax.transAxes, fontsize=15)
 
     fig.tight_layout()
-    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_{fname}.pdf'))
+    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_{fname}.pdf'))
 
 
 
@@ -244,13 +269,13 @@ for test, ylabel, fname in zip((rel_diff, ztest, dmag),
         mag = TARGET_ZP - 2.5*np.log10(ez.fnu[:,i])
         snr = (ez.fnu/ez.efnu)[:,i]
 
-        depth = TARGET_ZP - 2.5*np.log10( np.median(ez.fnu[:,i][(snr > 2.9) & (snr < 3.1)]) )
+        # depth = TARGET_ZP - 2.5*np.log10( np.median(ez.fnu[:,i][(snr > 2.9) & (snr < 3.1)]) )
 
         ax.axvline(depth, ls='dashed', c='royalblue')
 
         sanity = ez.cat['use_phot'] == 1
-        sanity &= mag <= depth
-        sanity &= ~np.isnan(mag)
+        sanity &= snr > 5
+        # sanity &= ~np.isnan(mag)
 
         ebins = histedges_equalN(mag[sanity], 15)
         nbins, bin_centers, bmed, bstd = binned_med(mag[sanity], test[sanity, i], bins=ebins)
@@ -263,6 +288,38 @@ for test, ylabel, fname in zip((rel_diff, ztest, dmag),
         ax.text(0.65, 0.8, f'$\Delta={delta:2.3f}$', transform=ax.transAxes, fontsize=15)
 
     fig.tight_layout()
-    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_{fname}.pdf'))
+    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_{fname}.pdf'))
 
-#
+# Basic properties
+
+import numpy as np
+
+fig, axes = plt.subplots(ncols=4, nrows=1, figsize=(4*5, 5))
+
+qg = zout['uvj_class'] == 1
+sanity = ez.cat['use_phot'] == 1
+
+# z vs. M
+axes[0].scatter(zout['z_phot'][sanity], np.log10(zout['mass'][sanity]), s=3, c='grey')
+axes[0].scatter(zout['z_phot'][qg & sanity], np.log10(zout['mass'][qg & sanity]), s=3, c='orange')
+axes[0].set(xlabel='$z_{\\rm phot}$', ylabel='Log$_{10}\,\mathcal{M}\,(\mathcal{M}_\odot)$')
+
+# M vs. SFR
+axes[1].scatter(np.log10(zout['mass'][sanity]), np.log10(zout['sfr']/zout['mass'])[sanity], s=3, c='grey')
+axes[1].scatter(np.log10(zout['mass'][qg & sanity]), np.log10(zout['sfr'][qg & sanity]/zout['mass'][qg & sanity]), s=3, c='orange')
+axes[1].set(xlabel='Log$_{10}\,\mathcal{M}\,(\mathcal{M}_\odot)$', ylabel='Log$_{10}\,{\\rm sSFR}}\,(\mathcal{M}_\odot\,{\\rm yr}^{-1})$')
+
+# UVJ
+axes[2].scatter(zout['v_j'][sanity], zout['u_v'][sanity], s=3, c='grey')
+axes[2].scatter(zout['v_j'][qg & sanity], zout['u_v'][qg & sanity], s=3, c='orange')
+axes[2].set(xlabel='$V-J$', ylabel='$U-V$', xlim=(-0.6, 2.0), ylim=(0, 2.4))
+
+# F444W
+bins = np.arange(17, 30, 0.5)
+axes[3].hist(TARGET_ZP - 2.5*np.log10(ez.cat['f_f444w'])[sanity], bins=bins, color='grey')
+axes[3].hist(TARGET_ZP - 2.5*np.log10(ez.cat['f_f444w'])[qg & sanity], bins=bins, color='orange')
+axes[3].set(xlabel='F444W')
+axes[3].semilogy()
+
+fig.tight_layout()
+fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_properties_scatter.pdf'))

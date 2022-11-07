@@ -46,31 +46,34 @@ def compute_background(raw_img, mask, BACKTYPE, BACKPARAMS, DIR_OUTPUT=None, NIC
 
 
 # Compute empty aperture curve
-def fit_apercurve(stats, plotname=None, pixelscale=0.04, stat_type=['fit_std', 'snmad'], init=(1, 5)):
+def fit_apercurve(stats, plotname=None, pixelscale=0.04, stat_type=['ksnmad',], init=(1, 5)):
     py = []
+    py1 = []
     psizes = []
     for size in stats:
-        if size == 'snmad_1':
-            s = stats[size]
-            # print(size, s)
+        if size in ('Naper', 'positions'):
             continue
-        if size in ('Naper', 'sigma_1', 'positions', 'fit_mean', 'fit_std'):
-            continue
-        py.append([stats[size][stype] for stype in stat_type])
-        psizes.append(size)
+        if size == -1:
+            py1.append([stats[size][stype] for stype in stat_type])
+        else:
+            py.append([stats[size][stype] for stype in stat_type])
+            psizes.append(size)
 
     psizes = np.array(psizes)
     py = np.array(py)
+    py1 = np.array(py1)
     N = np.sqrt(np.pi*(psizes/pixelscale/2.)**2)
     px = np.arange(psizes[0], psizes[-1], 0.001)
     pN = np.sqrt(np.pi*(px/pixelscale/2.)**2)
 
     from scipy.optimize import curve_fit
-    def func(N, a, b):
-        return s * a * N**b
 
-    p, pcov = {}, {}
+    p, pcov, s = {}, {}, {}
     for i, st in enumerate(stat_type):
+        def func(N, a, b):
+            s = py[0, i]
+            return s * a * N**b
+        s[st] = py1[0, i]
         p[st], pcov[st] = curve_fit(func, N, py[:,i], p0=init)
 
     if plotname is not None:
@@ -79,12 +82,12 @@ def fit_apercurve(stats, plotname=None, pixelscale=0.04, stat_type=['fit_std', '
         py = np.array(py)
         fig, ax = plt.subplots(figsize=(5, 5))
         for i, st in enumerate(stat_type):
-            # print(psizes)
-            # print(py[:,i])
+            def func(N, a, b):
+                s = py[0, i]
+                return s * a * N**b
             ax.scatter(psizes, py[:,i])
 
-
-            label=f'{st}: {s:2.2f}$x${p[st][0]:2.2f}$N^{{{p[st][1]:2.2f}}}$'
+            label=f'{st}: {py1[0,i]:2.2f}$x${p[st][0]:2.2f}$N^{{{p[st][1]:2.2f}}}$'
 
             plt.plot(px, func(pN, *p[st]), label=label)
     #     print(p)
@@ -109,15 +112,15 @@ def emtpy_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=0.04,
     import scipy.stats as stats
     import astropy.units as u
     from astropy.stats import mad_std
-    from astropy.stats import sigma_clipped_stats
+    from astropy.stats import sigma_clipped_stats, sigma_clip
     from photutils.aperture import CircularAperture, aperture_photometry
 
-    from config import TARGET_ZP
+    from config import TARGET_ZP, SCI_APER
 
 
     aper = np.array(aper)
     aperrad = aper / 2. / pixscl # diam sky to rad pix
-    maxaper = int(np.max(aperrad)) + 1
+    maxaper = int(aperrad[aper==SCI_APER]) + 1
 
     size = np.shape(img)
     try:
@@ -128,16 +131,19 @@ def emtpy_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=0.04,
 
     kept = 0
     positions = np.zeros((N, 2))
+    checkimg = (segmap == 0) & ~np.isnan(img) & (wht>0)
     with alive_bar(N) as bar:
         while kept < N:
             px, py = np.random.uniform(0, 1, 2)
-            x, y = int(px * size[0]), int(py * size[1])
-            box = slice(x-maxaper,x+maxaper), slice(y-maxaper,y+maxaper)
-            subseg, subimg, subwht = segmap[box], img[box], wht[box]
+            x, y = int(px * size[1]), int(py * size[0])
+            xlo, xhi, ylo, yhi = x-maxaper,x+maxaper, y-maxaper,y+maxaper
+            if (xlo < 0) | (xhi > size[1]) | (ylo < 0) | (yhi > size[0]):
+                continue
             # print(x, y)
-            if np.all(subseg==0) & (not np.any((subwht==0.0) | np.isnan(subimg))):
+            if np.all(checkimg[xlo:xhi, ylo:yhi]):
                 positions[kept] = y, x
                 kept += 1
+                # print(kept, (y, x), np.sum(checkimg[xlo:xhi, ylo:yhi]))
                 bar()
 
     # now do it in parallel
@@ -145,21 +151,41 @@ def emtpy_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=0.04,
     output = aperture_photometry(img, apertures)
 
     aperstats = OrderedDict()
-    clean_img = img[(img!=0) & (segmap==0) & (~np.isnan(img))].flatten() * zpt_factor
-    aperstats['sigma_1'] = np.nanstd(clean_img)
-    aperstats['snmad_1'] = mad_std(clean_img)
+    aperstats[-1] = {}
+    clean_img = img[(wht>0) & (segmap==0) & (~np.isnan(img))].flatten() * zpt_factor
+    clean_img_neg = np.array(list(clean_img[clean_img<0]) + list(clean_img[clean_img<0]*-1))
+    kmean, kmed, kstd = sigma_clipped_stats(clean_img, sigma=3.)
+    ksnmad = mad_std(sigma_clip(clean_img))
+    aperstats[-1]['ksnmad'] = ksnmad
+    aperstats[-1]['kmean'] = kmean
+    aperstats[-1]['kmed'] = kmed
+    aperstats[-1]['kstd'] = kstd
+    aperstats[-1]['sigma'] = np.nanstd(clean_img)
+    aperstats[-1]['snmad'] = mad_std(clean_img)
+    aperstats[-1]['sigma_neg'] = np.nanstd(clean_img_neg)
+    aperstats[-1]['snmad_neg'] = mad_std(clean_img_neg)
+
     aperstats['Naper'] = N
+    aperstats['positions'] = positions
 
     # Define the Gaussian function
     from scipy.stats import norm
 
-    pc = np.nanpercentile(clean_img, q=(1, 99))
+    pc = np.nanpercentile(clean_img, q=(5, 95))
     bins = np.linspace(pc[0], pc[1], 20)
     px = np.linspace(pc[0], pc[1], 1000)
-    p = norm.fit(clean_img, loc=np.nanmedian(clean_img), scale=aperstats['snmad_1'])
+    p = norm.fit(clean_img, loc=np.nanmedian(clean_img), scale=aperstats[-1]['kstd'])
 
-    aperstats['fit_mean'] = p[0]
-    aperstats['fit_std'] = p[1]
+    aperstats[-1]['fit_mean'] = p[0]
+    aperstats[-1]['fit_std'] = p[1]
+
+    pc = np.nanpercentile(clean_img_neg, q=(5, 95))
+    bins = np.linspace(pc[0], pc[1], 20)
+    px = np.linspace(pc[0], pc[1], 1000)
+    p = norm.fit(clean_img_neg, loc=np.nanmedian(clean_img_neg), scale=aperstats[-1]['kstd'])
+
+    aperstats[-1]['fit_mean_neg'] = p[0]
+    aperstats[-1]['fit_std_neg'] = p[1]
 
     if plotname is not None:
         import matplotlib.pyplot as plt
@@ -169,32 +195,38 @@ def emtpy_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=0.04,
         fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(5*ncols, 5*nrows))
         axes = axes.flatten()
         # ax.set(xlab)
-        axes[0].hist(clean_img, bins=bins, color='k', histtype='step', density=True)
-        axes[0].plot(px, norm.pdf(px, *p), c='k', label=f'1px @ {p[1]:2.2f}/{aperstats["snmad_1"]:2.2f})')
+        axes[0].hist(clean_img, bins=bins, color='k', histtype='step', density=True, label=f'1px kstd: {aperstats[-1]["kstd"]:2.2f}')
+        # axes[0].hist(clean_img_neg, bins=bins, color='grey', histtype='step', density=True, label=f'1px kstd_neg:{aperstats[-1]["kstd_neg"]:2.2f}')
+        # axes[0].plot(px, norm.pdf(px, *p), c='k')
         axes[0].legend(loc='upper left')
-        # ax.axvline(-aperstats['sigma_1'], color='k', ls='dashed')
-        # ax.axvline(aperstats['sigma_1'], color='k', ls='dashed')
+        # ax.axvline(-aperstats['sigma'], color='k', ls='dashed')
+        # ax.axvline(aperstats['sigma'], color='k', ls='dashed')
         colors = plt.get_cmap('rainbow', len(aper))
 
         fig2, axes2 = plt.subplots(ncols=2, figsize=(10,5))
         axes2[0].set(xlabel='aperture diameter (arcsec)', ylabel='Depth (AB; $\sigma_{\\rm NMAD}$)')
         axes2[1].set(xlabel='aperture diameter (arcsec)', ylabel='Sky (Flux; median)')
 
+        fig3, ax3 = plt.subplots()
+        ax3.scatter(positions.T[0], positions.T[1], s=2, alpha=0.3, c='grey')
+
+
     # measure moments + percentiles; AD test
     for i, diam in enumerate(aper):
         phot = output[f'aperture_sum_{i}'] * zpt_factor
-        phot = phot[phot!=0.]
-        # print(phot)
+        phot_neg = np.array(list(phot[phot<0]) + list(phot[phot<0]*-1))
         aperstats[diam] = {}
+
+
         aperstats[diam]['phot'] = phot
         ax = axes[i+1]
 
         snmad = mad_std(phot)
         med = np.nanmedian(phot)
 
-        pc = np.nanpercentile(phot, q=(1, 99))
-        bins = np.linspace(pc[0], pc[1], 20)
+        pc = np.nanpercentile(phot, q=(5, 95))
         px = np.linspace(pc[0], pc[1], 1000)
+
         from scipy.optimize import curve_fit
         p = norm.fit(phot, loc=med, scale=snmad)
         aperstats[diam]['fit_mean'] = p[0]
@@ -205,7 +237,9 @@ def emtpy_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=0.04,
         aperstats[diam]['snmad'] = snmad
         aperstats[diam]['norm'] = stats.normaltest(phot)
         aperstats[diam]['median'] = med
-        kmean, kmed, kstd = sigma_clipped_stats(phot)
+        kmean, kmed, kstd = sigma_clipped_stats(phot, sigma=3.)
+        ksnmad = mad_std(sigma_clip(phot))
+        aperstats[diam]['ksnmad'] = ksnmad
         aperstats[diam]['kmean'] = kmean
         aperstats[diam]['kmed'] = kmed
         aperstats[diam]['kstd'] = kstd
@@ -213,9 +247,40 @@ def emtpy_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=0.04,
         aperstats[diam]['pc'] = pc
         aperstats[diam]['interquart_68'] = pc[2] - pc[1] # 68pc
 
+
+        aperstats[diam]['phot_neg'] = phot_neg
+
+        snmad_neg = mad_std(phot_neg)
+        med_neg = np.nanmedian(phot_neg)
+
+        pc = np.nanpercentile(phot_neg, q=(5, 95))
+        # print(phot_neg)
+        # print(pc)
+        bins = np.linspace(pc[0], pc[1], 20)
+        px = np.linspace(pc[0], pc[1], 1000)
+        from scipy.optimize import curve_fit
+        p = norm.fit(phot_neg, loc=med_neg, scale=snmad_neg)
+        aperstats[diam]['fit_mean_neg'] = p[0]
+        aperstats[diam]['fit_std_neg'] = p[1]
+
+        aperstats[diam]['mean_neg'] = np.mean(phot_neg)
+        aperstats[diam]['std_neg'] = np.std(phot_neg)
+        aperstats[diam]['snmad_neg'] = snmad_neg
+        aperstats[diam]['norm_neg'] = stats.normaltest(phot_neg)
+        aperstats[diam]['median_neg'] = med_neg
+        kmean_neg, kmed_neg, kstd_neg = sigma_clipped_stats(phot_neg)
+        aperstats[diam]['kmean_neg'] = kmean_neg
+        aperstats[diam]['kmed_neg'] = kmed_neg
+        aperstats[diam]['kstd_neg'] = kstd_neg
+        pc = np.percentile(phot_neg, q=(5, 16, 84, 95))
+        aperstats[diam]['pc_neg'] = pc
+        aperstats[diam]['interquart_68_neg'] = pc[2] - pc[1] # 68pc
+
         if plotname is not None:
-            ax.hist(phot, bins=bins, color=colors(i) , histtype='step', density=True)
-            ax.plot(px, norm.pdf(px, *p), c=colors(i), label=f'{diam:2.2f}\" @ {p[1]:2.2f}/{snmad:2.2f})')
+            ax.hist(phot, bins=bins, color='k' , histtype='step', density=True, label=f'{diam:2.2f}\" kstd: {kstd:2.2f}')
+            # ax.hist(phot_neg, bins=bins, color=colors(i) , histtype='step', density=True, label=f'{diam:2.2f}\" snmad_neg: {snmad_neg:2.2f}')
+
+            ax.plot(px, norm.pdf(px, *p), c=colors(i), )
             ax.legend(loc='upper left')
 
             # ax.axvline(-p[1], color=colors(i), ls='dashed')
@@ -231,13 +296,19 @@ def emtpy_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=0.04,
         fig.tight_layout()
         fig.savefig(plotname)
 
-        aper_snmad = [aperstats[diam]['snmad'] for diam in aper]
+        aper_snmad = [aperstats[diam]['kstd'] for diam in aper]
         aper_median = [aperstats[diam]['median'] for diam in aper]
-        axes2[0].plot(aper, TARGET_ZP - 2.5*np.log10(aper_snmad), marker='o')
-        axes2[1].plot(aper, aper_median, marker='o')
+
+        # aper_snmad_neg = [aperstats[diam]['snmad_neg'] for diam in aper]
+        # aper_median_neg = [aperstats[diam]['median_neg'] for diam in aper]
+        axes2[0].plot(aper, TARGET_ZP - 2.5*np.log10(aper_snmad), marker='o', c='k')
+        axes2[1].plot(aper, aper_median, marker='o', c='k')
+        # axes2[0].plot(aper, TARGET_ZP - 2.5*np.log10(aper_snmad_neg), marker='o')
+        # axes2[1].plot(aper, aper_median_neg, marker='o')
 
         fig2.tight_layout()
         fig2.savefig(plotname.replace('emptyaper', 'depth'))
+        fig3.savefig(plotname.replace('emptyaper', 'aperpos'))
 
 
     return aperstats
@@ -352,13 +423,15 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, row=None, plot=Tru
     coord = SkyCoord(ra=ra*u.deg, dec=dec*u.deg)
     print(coord)
 
+    from config import TARGET_ZP
+
     hdul = fits.HDUList()
 
     if include_rgb:
         from astropy.visualization import make_lupton_rgb
 
     if plot:
-        fig, axes = plt.subplots(ncols=6, nrows=2, figsize=(3*6, 3*2))
+        fig, axes = plt.subplots(ncols=7, nrows=2, figsize=(3*7, 3*2))
 
     for filt, ax in zip(filters, axes.flatten()):
 
@@ -414,7 +487,7 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, row=None, plot=Tru
                 flux, fluxerr = row[f'f_{filt}'], row[f'e_{filt}']
                 snr = flux / fluxerr
 
-                mag = 25 - 2.5*np.log10(flux)
+                mag = TARGET_ZP - 2.5*np.log10(flux)
                 magerr = 2.5 / np.log(10) / (flux/fluxerr)
 
                 if flux <=0:
@@ -428,9 +501,9 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, row=None, plot=Tru
                 scale = 0.02
             elif np.isnan(scale):
                 scale = 1
-            # print(rms, scale)
+            print(filt, rms, scale, np.nanmedian(img), np.nanmin(img), np.nanmax(img), np.sum(img))
             ax.imshow(img, cmap='RdGy', norm=SymLogNorm(3*rms, 1, -scale, scale))
-            ax.text(0.05, 1.05, f'{filt}\n{mag:2.2f}+/-{magerr:2.2f} AB (S/N:{snr:2.2f})', transform=ax.transAxes)
+            ax.text(0.05, 1.05, f'{filt}\n{flux:2.2f}+/-{fluxerr:2.2f} 10*nJy (S/N:{snr:2.2f})', transform=ax.transAxes)
             ax.axes.xaxis.set_visible(False)
             ax.axes.yaxis.set_visible(False)
 

@@ -15,9 +15,9 @@ import sys
 PATH_CONFIG = sys.argv[1]
 sys.path.insert(0, PATH_CONFIG)
 
-from config import PHOT_NICKNAMES, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, \
+from config import FILTERS, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, \
     REF_BAND, PIXEL_SCALE, PHOT_APER, DIR_KERNELS, DIR_PSFS, FIELD, ZSPEC, \
-    MAX_SEP, SCI_APER, MAKE_SCIREADY_ALL
+    MAX_SEP, SCI_APER, MAKE_SCIREADY_ALL, TARGET_ZP, PHOT_AUTOPARAMS, ZCONF
 
 DET_NICKNAME =  sys.argv[2] #'LW_f277w-f356w-f444w'
 KERNEL = sys.argv[3] #'f444w'
@@ -34,7 +34,7 @@ FNAME_REF_PSF = f'{DIR_PSFS}/psf_{FIELD}_{REF_BAND.upper()}_4arcsec.fits'
 def sigma_aper(filter, weight, weight_med, apersize=0.7):
     # Equation 5
     # apersize = str(apersize).replace('.', '_') + 'arcsec'
-    sigma_nmad_filt = stats[filter.lower()][apersize]['snmad']
+    sigma_nmad_filt = stats[filter.lower()][apersize]['ksnmad']
     # sigma_nmad_filt = ERROR_TABLE[f'e{apersize}'][ERROR_TABLE['filter']==filter.lower()][0]
     # g_i = 1.*2834.508 # here's to hoping.  EFFECTIVE GAIN!
     fluxvar = ( sigma_nmad_filt / np.sqrt(weight / weight_med) )**2  #+ (flux_aper / g_i)
@@ -110,20 +110,21 @@ else:
     conv_psfmodel = convolve(psfmodel, kernel)
 
 # use REF_BAND Kron to correct to total fluxes and ferr
-plotname = os.path.join(FULLDIR_CATALOGS, f'aper_{REF_BAND}_nmad.pdf')
-p, pcov, sig1 = fit_apercurve(stats[REF_BAND], plotname=plotname, stat_type=['snmad'])
-alpha, beta = p['snmad']
+plotname = os.path.join(FULLDIR_CATALOGS, f'figures/aper_{REF_BAND}_nmad.pdf')
+# p, pcov, sigma1 = fit_apercurve(stats[REF_BAND], plotname=plotname, stat_type=['kstd'])
+# alpha, beta = p['kstd']
+# sig1 = sigma1['kstd']
 f_ref_auto = maincat[f'{REF_BAND}_FLUX_AUTO']
-kronrad_circ = np.sqrt(maincat['a'] * maincat['b'] * maincat[f'{REF_BAND}_KRON_RADIUS']**2)
-kronrad_circ[kronrad_circ<3.5] = 3.5 # PHOT_AUTOPARAMS[1]
+kronrad = maincat[f'{REF_BAND}_KRON_RADIUS']
+kronrad_circ = np.where(kronrad==PHOT_AUTOPARAMS[1], PHOT_AUTOPARAMS[1], np.sqrt(maincat['a'] * maincat['b'] * kronrad**2))
 psffrac_ref_auto = psf_cog(conv_psfmodel, nearrad = kronrad_circ) # in pixels
 # F160W kernel convolved REF_BAND PSF + missing flux from F160W beyond 2" radius
 f_ref_total = f_ref_auto / psffrac_ref_auto # equation 9
 wht_ref = maincat[f'{REF_BAND}_SRC_MEDWHT']
 medwht_ref = maincat[f'{REF_BAND}_MED_WHT']
-sig_ref_total = sigma_ref_total(sig1, alpha, beta, kronrad_circ, wht_ref, medwht_ref, f_ref_auto)
-newcoln =f'{REF_BAND}_FLUXERR_REFTOTAL'
-maincat.add_column(Column(sig_ref_total, newcoln))
+# sig_ref_total = sigma_ref_total(sig1, alpha, beta, kronrad_circ, wht_ref, medwht_ref, f_ref_auto)
+# newcoln =f'{REF_BAND}_FLUXERR_REFTOTAL'
+# maincat.add_column(Column(sig_ref_total, newcoln))
 
 
 for apersize in PHOT_APER:
@@ -208,12 +209,14 @@ maincat.add_column(Column(is_star.astype(int), name='star_flag'))
 
 # z-spec
 ztable = Table.read(ZSPEC)
-ztable = ztable[(ztable['DEC'] >= -90.) & (ztable['DEC'] <= 90.)]
+conf_constraint = np.isin(ztable['zconf'], np.array(ZCONF))
+ztable = ztable[conf_constraint & (ztable['DEC'] >= -90.) & (ztable['DEC'] <= 90.)]
 zcoords = SkyCoord(ztable['RA']*u.deg, ztable['DEC']*u.deg)
 catcoords = SkyCoord(maincat['RA'], maincat['DEC'])
 idx, d2d, d3d = catcoords.match_to_catalog_sky(zcoords)
 max_sep = MAX_SEP
 sep_constraint = d2d < max_sep
+
 for colname in ztable.colnames:
     filler = np.zeros(len(maincat), dtype=ztable[colname].dtype)
     try:
@@ -235,11 +238,17 @@ use_phot[is_star] = 0
 maincat.add_column(Column(use_phot, name='use_phot'))
 # use 1 only
 
+# Add units!
+
+
 # Spit it out!
 from datetime import date
 today = date.today().strftime("%d/%m/%Y")
 maincat.meta['CREATED'] = today
 maincat.meta['MW_CORR'] = str(APPLY_MWDUST)
+maincat.meta['KERNEL'] = KERNEL
+maincat.meta['PHOT_ZP'] = TARGET_ZP
+maincat.meta['PHOT_UNIT'] = '10*nJy'
 maincat.write(outfilename, overwrite=True)
 print(f'Added date stamp! ({today})')
 print('Wrote first-pass combined catalog to ', outfilename)
@@ -258,23 +267,25 @@ for apersize in PHOT_APER:
         cols[f'{REF_BAND}_FLUX_APER{str_aper}_COLOR'] = f'faper_{REF_BAND}'
         cols[f'{REF_BAND}_FLUXERR_APER{str_aper}_COLOR'] = f'eaper_{REF_BAND}'
 
-        for filter in PHOT_NICKNAMES:
+        for filter in FILTERS:
             cols[f'{filter}_FLUX_APER{str_aper}_TOTAL'] = f'f_{filter}'
             cols[f'{filter}_FLUXERR_APER{str_aper}_TOTAL'] = f'e_{filter}'
 
-        cols[f'{REF_BAND}_FLUXERR_REFTOTAL'] = 'tot_ekron_F444w'
         cols[f'TOTAL_CORR_APER{str_aper}'] = 'tot_cor'
+        cols[f'{REF_BAND}_FLUXERR_REFTOTAL'] = 'tot_ekron_f444w'
+        
         # wmin?
-        cols['z_spec'] = 'z_spec'
-        cols['star_flag'] = 'star_flag'
         cols[f'{REF_BAND}_KRON_RADIUS'] = 'kron_radius'
         cols['a'] = 'a_image'
         cols['b'] = 'b_image'
         cols['theta'] = 'theta_J2000' # double check this!
         cols[f'{REF_BAND}_FLUX_RADIUS_0_5'] = 'flux_radius' # arcsec
         cols['use_phot'] = 'use_phot'
+        cols['z_spec'] = 'z_spec'
+        cols['star_flag'] = 'star_flag'
 
         subcat = maincat[list(cols.keys())].copy()
+        subcat.meta['APER_DIAM'] = apersize
 
         for coln in subcat.colnames:
             newcol = cols[coln]
