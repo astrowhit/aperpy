@@ -15,6 +15,7 @@ DETECTION_PARAMS = dict(
     kernelfwhm = 1.00170,
     deblend_nthresh = 16,
     deblend_cont = 0.00315,
+    clean = True,
     clean_param = 1.66776,
     )
 

@@ -80,7 +80,7 @@ objects, segmap = sep.extract(
                 detsci,
                 err=deterr,
                 filter_type='matched',
-                clean=True, filter_kernel=kernel,
+                filter_kernel=kernel,
                 segmentation_map=True,
                 **DETECTION_PARAMS
                 )
