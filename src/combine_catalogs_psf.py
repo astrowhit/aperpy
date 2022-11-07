@@ -15,7 +15,7 @@ PATH_CONFIG = sys.argv[1]
 sys.path.insert(0, PATH_CONFIG)
 
 from config import FILTERS, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, \
-    REF_BAND, PIXEL_SCALE, PHOT_APER, DIR_PSFS, FIELD, ZSPEC, MAX_SEP, ZCONF
+    REF_BAND, PIXEL_SCALE, PHOT_APER, DIR_PSFS, FIELD, ZSPEC, MAX_SEP, ZCONF, ZRA, ZDEC, ZCOL, FLUX_UNIT
 
 DET_NICKNAME =  sys.argv[2] #'LW_f277w-f356w-f444w'  
 KERNEL = sys.argv[3] #'f444w'
@@ -117,10 +117,16 @@ for apersize in PHOT_APER:
 m = sfdmap.SFDMap(DIR_SFD)
 ebmv = m.ebv(maincat['RA'], maincat['DEC'])
 maincat.add_column(Column(ebmv, name='EBV'), 1+np.where(np.array(maincat.colnames) == 'DEC')[0][0])
-Av_mean = np.mean(ebmv)*3.1
+print(ebmv)
 
-# Perform a MW correction (add new columns to the master) 
-if APPLY_MWDUST:
+
+if APPLY_MWDUST == 'MEDIAN':
+    Av = np.median(ebmv)*3.1
+elif APPLY_MWDUST == 'VAR':
+    Av = 3.1 * ebmv
+
+# Perform a MW correction (add new columns to the master)
+if APPLY_MWDUST is not None:
     filter_table = vstack([SvoFps.get_filter_list('JWST'),\
                         SvoFps.get_filter_list('HST')])
     filter_pwav = OrderedDict()
@@ -137,7 +143,7 @@ if APPLY_MWDUST:
                         filter_pwav[filter] = filter_table[i]['WavelengthPivot'] # angstrom
                         # print(filter, filter_table[i]['filterID'], filter_pwav[filter])
 
-    atten_mag = extinction.fm07(np.array(list(filter_pwav.values())), Av_mean) # atten_mag in magnitudes from Fitzpatrick + Massa 2007
+    atten_mag = extinction.fm07(np.array(list(filter_pwav.values())), Av) # atten_mag in magnitudes from Fitzpatrick + Massa 2007
     atten_factor = 10** (-0.4 * atten_mag) # corresponds in order to FILTERS
     for i, filter in enumerate(FILTERS):
         print(f'{filter} ::  {atten_factor[i]:2.5f}x or {atten_mag[i]:2.5f} AB')
@@ -162,9 +168,9 @@ ztable = Table.read(ZSPEC)
 conf_constraint = np.ones(len(ztable), dtype=bool)
 if ZCONF is not None:
     conf_constraint = np.isin(ztable[ZCONF[0]], np.array(ZCONF[1]))
-ztable = ztable[conf_constraint & (ztable['DEC'] >= -90.) & (ztable['DEC'] <= 90.)]
-zcoords = SkyCoord(ztable['RA']*u.deg, ztable['DEC']*u.deg)
-catcoords = SkyCoord(maincat['RA'], maincat['DEC'])
+ztable = ztable[conf_constraint & (ztable[ZDEC] >= -90.) & (ztable[ZDEC] <= 90.)]
+zcoords = SkyCoord(ztable[ZRA]*u.deg, ztable[ZDEC]*u.deg)
+catcoords = SkyCoord(maincat[ZRA], maincat[ZDEC])
 idx, d2d, d3d = catcoords.match_to_catalog_sky(zcoords)
 max_sep = MAX_SEP
 sep_constraint = d2d < max_sep
@@ -176,7 +182,7 @@ for colname in ztable.colnames:
     except:
         pass
     filler[sep_constraint] = ztable[idx[sep_constraint]][colname]
-    if colname == 'z':
+    if colname == ZCOL:
         colname = 'z_spec'
     else:
         colname = f'z_spec_{colname}'
@@ -196,6 +202,18 @@ from datetime import date
 today = date.today().strftime("%d/%m/%Y")
 maincat.meta['CREATED'] = today
 maincat.meta['MW_CORR'] = str(APPLY_MWDUST)
+maincat.write(outfilename, overwrite=True)
+
+for colname in maincat.colnames:
+    if ('RADIUS') in colname:
+        if ('KRON_RADIUS_CIRC' in colname) | ('FLUX_RADIUS' in colname):
+            maincat[colname].unit = u.arcsec
+            maincat[colname] *= PIXEL_SCALE
+    elif 'FLUX' in colname:
+        maincat[colname].unit = FLUX_UNIT
+    elif colname in ('a', 'b', 'x', 'y'):
+        maincat[colname].unit = u.pixel
+
 maincat.write(outfilename, overwrite=True)
 print(f'Added date stamp! ({today})')
 print('Wrote first-pass combined catalog to ', outfilename)
@@ -222,6 +240,7 @@ for apersize in PHOT_APER:
     cols['z_spec'] = 'z_spec'
     cols['star_flag'] = 'star_flag'
     cols[f'{REF_BAND}_KRON_RADIUS'] = 'kron_radius'
+    cols[f'{REF_BAND}_KRON_RADIUS_CIRC'] = 'kron_radius_circ'
     cols['a'] = 'a_image'
     cols['b'] = 'b_image'
     cols['theta'] = 'theta_J2000' # double check this!
