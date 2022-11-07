@@ -159,7 +159,9 @@ maincat.add_column(Column(is_star.astype(int), name='star_flag'))
 
 # z-spec
 ztable = Table.read(ZSPEC)
-conf_constraint = np.isin(ztable['zconf'], np.array(ZCONF))
+conf_constraint = np.ones(len(ztable), dtype=bool)
+if ZCONF is not None:
+    conf_constraint = np.isin(ztable[ZCONF[0]], np.array(ZCONF[1]))
 ztable = ztable[conf_constraint & (ztable['DEC'] >= -90.) & (ztable['DEC'] <= 90.)]
 zcoords = SkyCoord(ztable['RA']*u.deg, ztable['DEC']*u.deg)
 catcoords = SkyCoord(maincat['RA'], maincat['DEC'])

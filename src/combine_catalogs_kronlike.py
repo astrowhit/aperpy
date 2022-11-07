@@ -17,7 +17,7 @@ sys.path.insert(0, PATH_CONFIG)
 
 from config import FILTERS, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, \
     REF_BAND, PIXEL_SCALE, PHOT_APER, DIR_KERNELS, DIR_PSFS, FIELD, ZSPEC, \
-    MAX_SEP, SCI_APER, MAKE_SCIREADY_ALL, TARGET_ZP, PHOT_AUTOPARAMS, ZCONF
+    MAX_SEP, SCI_APER, MAKE_SCIREADY_ALL, TARGET_ZP, ZCONF
 
 DET_NICKNAME =  sys.argv[2] #'LW_f277w-f356w-f444w'
 KERNEL = sys.argv[3] #'f444w'
@@ -207,7 +207,9 @@ maincat.add_column(Column(is_star.astype(int), name='star_flag'))
 
 # z-spec
 ztable = Table.read(ZSPEC)
-conf_constraint = np.isin(ztable['zconf'], np.array(ZCONF))
+conf_constraint = np.ones(len(ztable), dtype=bool)
+if ZCONF is not None:
+    conf_constraint = np.isin(ztable[ZCONF[0]], np.array(ZCONF[1]))
 ztable = ztable[conf_constraint & (ztable['DEC'] >= -90.) & (ztable['DEC'] <= 90.)]
 zcoords = SkyCoord(ztable['RA']*u.deg, ztable['DEC']*u.deg)
 catcoords = SkyCoord(maincat['RA'], maincat['DEC'])
