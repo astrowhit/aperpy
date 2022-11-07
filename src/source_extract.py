@@ -112,7 +112,7 @@ regs = np.array(regs)
 bigreg = Regions(regs)
 bigreg.write(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_OBJECTS.reg'), overwrite=True, format='ds9')
 
-segmap[detsci==0.0] = -99
+segmap[np.isnan(detsci)] = -99
 del detsci
 del detwht
 del detmask
