@@ -213,6 +213,8 @@ for colname in maincat.colnames:
         maincat[colname].unit = FLUX_UNIT
     elif colname in ('a', 'b', 'x', 'y'):
         maincat[colname].unit = u.pixel
+    elif colname == 'theta':
+        maincat[colname].unit = u.deg
 
 maincat.write(outfilename, overwrite=True)
 print(f'Added date stamp! ({today})')
