@@ -43,8 +43,10 @@ DIR_CATALOGS = os.path.join(WORKING_DIR, 'catalogs/')
 DIRWHT_REPLACE = (DIR_OUTPUT, DIR_IMAGES)
 DIR_SFD = '~/Projects/Common/py_tools/sfddata-master'
 ZSPEC = '/Volumes/External1/Projects/Current/UNCOVER/data/vTest/external/zspec_abell2744_all.fits'
+ZCOL = 'z'
 ZRA = 'RA'
 ZDEC = 'DEC'
+ZCONF = 'zconf', (3, 4)
 MAX_SEP = 0.3 * u.arcsec
 
 ### MEDIAN FILTERING
