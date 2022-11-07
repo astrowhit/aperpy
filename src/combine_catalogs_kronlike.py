@@ -257,7 +257,9 @@ maincat.meta['PHOT_ZP'] = TARGET_ZP
 maincat.meta['PHOT_UNIT'] = FLUX_UNIT
 
 for colname in maincat.colnames:
-    if ('RADIUS') in colname:
+    if 'FLAG' in colname:
+        continue
+    elif ('RADIUS') in colname:
         if ('KRON_RADIUS_CIRC' in colname) | ('FLUX_RADIUS' in colname):
             maincat[colname].unit = u.arcsec
             maincat[colname] *= PIXEL_SCALE
