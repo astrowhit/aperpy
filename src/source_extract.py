@@ -263,7 +263,7 @@ for ind, PHOT_NICKNAME in enumerate(FILTERS):
     flag |= krflag  # combine flags into 'flag'
 
 
-    r_min = PHOT_AUTOPARAMS[1]  # minimum radius = 3.5
+    r_min = PHOT_AUTOPARAMS[1] / 2.  # minimum diameter = 3.5
     use_circle = kronrad * np.sqrt(objects['a'] * objects['b']) < r_min
     cflux, cfluxerr, cflag = sep.sum_circle(photsci, xphot[use_circle], yphot[use_circle],
                                             r=r_min, subpix=1,
@@ -290,7 +290,7 @@ for ind, PHOT_NICKNAME in enumerate(FILTERS):
     flux[use_circle] = cflux
     fluxerr[use_circle] = cfluxerr
     flag[use_circle] = cflag
-    kronrad[use_circle] = r_min
+    # kronrad[use_circle] = r_min
 
     catalog[f'FLUX_AUTO'] = flux * conv_flux(PHOT_ZPT)
     catalog[f'FLUXERR_AUTO'] = fluxerr * conv_flux(PHOT_ZPT)
