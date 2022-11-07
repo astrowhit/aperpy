@@ -244,9 +244,6 @@ use_phot[is_star] = 0
 maincat.add_column(Column(use_phot, name='use_phot'))
 # use 1 only
 
-# Add units!
-
-
 # Spit it out!
 from datetime import date
 today = date.today().strftime("%d/%m/%Y")
@@ -259,7 +256,7 @@ maincat.meta['PHOT_UNIT'] = FLUX_UNIT
 for colname in maincat.colnames:
     if 'FLAG' in colname:
         continue
-    elif ('RADIUS') in colname:
+    elif 'RADIUS' in colname:
         if ('KRON_RADIUS_CIRC' in colname) | ('FLUX_RADIUS' in colname):
             maincat[colname].unit = u.arcsec
             maincat[colname] *= PIXEL_SCALE
@@ -271,7 +268,7 @@ for colname in maincat.colnames:
 maincat.write(outfilename, overwrite=True)
 print(f'Added date stamp! ({today})')
 print('Wrote first-pass combined catalog to ', outfilename)
-    
+
 
 for apersize in PHOT_APER:
     if apersize==SCI_APER or MAKE_SCIREADY_ALL:
@@ -293,7 +290,7 @@ for apersize in PHOT_APER:
 
         cols[f'TOTAL_CORR_APER{str_aper}'] = 'tot_cor'
         # cols[f'{REF_BAND}_FLUXERR_REFTOTAL'] = 'tot_ekron_f444w'
-        
+
         # wmin?
         cols[f'{REF_BAND}_KRON_RADIUS'] = 'kron_radius'
         cols[f'{REF_BAND}_KRON_RADIUS_CIRC'] = 'kron_radius_circ'
