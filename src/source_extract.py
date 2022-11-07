@@ -15,7 +15,7 @@ PATH_CONFIG = sys.argv[1]
 sys.path.insert(0, PATH_CONFIG)
 
 from config import TARGET_ZP, PHOT_APER, PHOT_AUTOPARAMS, PHOT_FLUXFRAC, DETECTION_PARAMS,\
-         DIR_IMAGES, PHOT_ZP, FILTERS, DIR_OUTPUT, DIR_CATALOGS, IS_COMPRESSED
+         DIR_IMAGES, PHOT_ZP, FILTERS, DIR_OUTPUT, DIR_CATALOGS, IS_COMPRESSED, PIXEL_SCALE
 
 # MAIN PARAMETERS
 DET_NICKNAME = sys.argv[2] #'LW_f277w-f356w-f444w'
@@ -266,7 +266,9 @@ for ind, PHOT_NICKNAME in enumerate(FILTERS):
 
 
     r_min = PHOT_AUTOPARAMS[1] / 2.  # minimum diameter = 3.5
-    use_circle = kronrad * np.sqrt(objects['a'] * objects['b']) < r_min
+    kronrad_circ = kronrad * np.sqrt(objects['a'] * objects['b'])
+    use_circle = kronrad_circ < r_min
+    kronrad_circ[use_circle] = r_min
     cflux, cfluxerr, cflag = sep.sum_circle(photsci, xphot[use_circle], yphot[use_circle],
                                             r=r_min, subpix=1,
                                             err = photerr, gain=1.0
@@ -292,13 +294,13 @@ for ind, PHOT_NICKNAME in enumerate(FILTERS):
     flux[use_circle] = cflux
     fluxerr[use_circle] = cfluxerr
     flag[use_circle] = cflag
-    kronrad[use_circle] = r_min
 
     catalog[f'FLUX_AUTO'] = flux * conv_flux(PHOT_ZPT)
     catalog[f'FLUXERR_AUTO'] = fluxerr * conv_flux(PHOT_ZPT)
     catalog[f'MAG_AUTO'] = PHOT_ZPT - 2.5*np.log10(flux)
     catalog[f'MAGERR_AUTO'] = 2.5 / np.log(10) / ( flux / fluxerr )
     catalog[f'KRON_RADIUS'] = kronrad
+    catalog[f'KRON_RADIUS_CIRC'] = kronrad_circ
     catalog[f'FLAG_AUTO'] = flag
 
     # FLUX RADIUS
@@ -334,7 +336,8 @@ for ind, PHOT_NICKNAME in enumerate(FILTERS):
     empty_aper = np.sort(empty_aper)
     plotname = os.path.join(FULLDIR_CATALOGS, f'figures/{PHOT_NICKNAME}_K{KERNEL}_emptyaper.pdf')
     zpt_factor = conv_flux(PHOT_ZPT)
-    stats[PHOT_NICKNAME] = emtpy_apertures(photsci, photwht, segmap, N=int(1e3), aper=empty_aper, plotname=plotname, zpt_factor=zpt_factor)
+    stats[PHOT_NICKNAME] = emtpy_apertures(photsci, photwht, segmap, N=int(1e3), pixscl=PIXEL_SCALE,
+                                           aper=empty_aper, plotname=plotname, zpt_factor=zpt_factor)
 
     # WRITE OUT
     print(f'DONE. Writing out catalog.')

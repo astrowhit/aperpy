@@ -111,13 +111,11 @@ else:
 
 # use REF_BAND Kron to correct to total fluxes and ferr
 plotname = os.path.join(FULLDIR_CATALOGS, f'figures/aper_{REF_BAND}_nmad.pdf')
-# p, pcov, sigma1 = fit_apercurve(stats[REF_BAND], plotname=plotname, stat_type=['kstd'])
-# alpha, beta = p['kstd']
-# sig1 = sigma1['kstd']
+p, pcov, sigma1 = fit_apercurve(stats[REF_BAND], plotname=plotname, stat_type=['ksnmad'], pixelscale=PIXEL_SCALE)
+alpha, beta = p['ksnmad']
+sig1 = sigma1['ksnmad']
 f_ref_auto = maincat[f'{REF_BAND}_FLUX_AUTO']
-kronrad = maincat[f'{REF_BAND}_KRON_RADIUS']
-kronrad_circ = np.where(kronrad==PHOT_AUTOPARAMS[1], PHOT_AUTOPARAMS[1], np.sqrt(maincat['a'] * maincat['b'] * kronrad**2))
-psffrac_ref_auto = psf_cog(conv_psfmodel, nearrad = kronrad_circ) # in pixels
+psffrac_ref_auto = psf_cog(conv_psfmodel, nearrad = maincat[f'{REF_BAND}_KRON_RADIUS_CIRC']) # in pixels
 # F160W kernel convolved REF_BAND PSF + missing flux from F160W beyond 2" radius
 f_ref_total = f_ref_auto / psffrac_ref_auto # equation 9
 wht_ref = maincat[f'{REF_BAND}_SRC_MEDWHT']
@@ -254,7 +252,7 @@ print(f'Added date stamp! ({today})')
 print('Wrote first-pass combined catalog to ', outfilename)
 
 for apersize in PHOT_APER:
-    if apersize==str(SCI_APER) or MAKE_SCIREADY_ALL:
+    if apersize==SCI_APER or MAKE_SCIREADY_ALL:
         str_aper = str(apersize).replace('.', '_')
         # restrict + rename columns to be a bit more informative
         cols = OrderedDict()

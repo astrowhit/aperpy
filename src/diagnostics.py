@@ -9,7 +9,7 @@ plt.ioff()
 # DIR_CONFIG = '/Volumes/External1/Projects/Current/UNCOVER/scripts/'
 DIR_CONFIG = sys.argv[1]
 sys.path.insert(0, DIR_CONFIG)
-from config import FILTERS, DET_TYPE, DIR_CATALOGS, TARGET_ZP, REF_BAND
+from config import FILTERS, DET_TYPE, DIR_CATALOGS, TARGET_ZP, REF_BAND, RA_RANGE, DEC_RANGE, PIXEL_SCALE
 
 DET_NICKNAME = sys.argv[2]
 KERNEL = sys.argv[3]
@@ -34,7 +34,7 @@ areas = {}
 for filt in FILTERS:
     filt = filt.lower()
     fig, axes = plt.subplots(ncols=4, nrows=1, sharex=True, sharey=True, figsize=(5*4, 5*1))
-    
+
     axes[0].set_ylabel(CATALOG.split('/')[-1])
     axes[0].set_title(f'{filt}')
     axes[1].set_title(f'f_{filt}')
@@ -47,30 +47,31 @@ for filt in FILTERS:
     gridsize = (50, 50)
     cut = (flux / ferr > 0)
     ra, dec, flux, ferr = ra[cut], dec[cut], flux[cut], ferr[cut]
-    
-    H, xe, ye = np.histogram2d(ra, dec, bins=(50, 50), range=((3.487, 3.687), (-30.5, -30.2)))
-    area = np.sum(H>5) * 2.3999999999999967e-05 # ~deg2 per cell at this grid
+
+    H, xe, ye = np.histogram2d(ra, dec, bins=gridsize, range=(RA_RANGE, DEC_RANGE))
+    cell_area = (RA_RANGE[1]-RA_RANGE[0])/gridsize[0]*(DEC_RANGE[1]-DEC_RANGE[0])/gridsize[1]
+    area = np.sum(H>5) * cell_area # ~deg2 per cell at this grid
     areas[filt] = area
     print(filt, area, area*3600.)
-    
+
     im = axes[0].hexbin(ra, dec, extent=extent, gridsize=gridsize, **opt_d)
-    cbaxes = inset_axes(axes[0], width="40%", height="3%", loc='upper right') 
+    cbaxes = inset_axes(axes[0], width="40%", height="3%", loc='upper right')
     plt.colorbar(im, cax=cbaxes, orientation='horizontal')
-    
+
     im = axes[1].hexbin(ra, dec, C=flux, extent=extent, gridsize=gridsize, **opt_f)
-    cbaxes = inset_axes(axes[1], width="40%", height="3%", loc='upper right') 
+    cbaxes = inset_axes(axes[1], width="40%", height="3%", loc='upper right')
     plt.colorbar(im, cax=cbaxes, orientation='horizontal')
-    
+
     im = axes[2].hexbin(ra, dec, C=ferr, extent=extent, gridsize=gridsize, **opt_e)
-    cbaxes = inset_axes(axes[2], width="40%", height="3%", loc='upper right') 
+    cbaxes = inset_axes(axes[2], width="40%", height="3%", loc='upper right')
     plt.colorbar(im, cax=cbaxes, orientation='horizontal')
-    
+
     im = axes[3].hexbin(ra, dec, C=flux/ferr, extent=extent, gridsize=gridsize, **opt_fe)
-    cbaxes = inset_axes(axes[3], width="40%", height="3%", loc='upper right') 
+    cbaxes = inset_axes(axes[3], width="40%", height="3%", loc='upper right')
     plt.colorbar(im, cax=cbaxes, orientation='horizontal')
-        
+
 #     [ax.invert_xaxis() for ax in axes.flatten()]
-    axes[0].set_xlim(3.687, 3.487)
+    axes[0].set_xlim(RA_RANGE[1], RA_RANGE[0])
     fig.subplots_adjust(wspace=0.01, hspace=0.01)
     fig.savefig(os.path.join(DIR_FIGURES, f'field_{filt}_{STR_APER}.pdf'))
 
@@ -87,18 +88,18 @@ for i, filt in enumerate(FILTERS):
 
     area = areas[filt]
     print(filt, area, areas[filt])
-    
+
     ra, dec = cat['ra'], cat['dec']
     flux, ferr = cat[f'f_{filt}'], cat[f'e_{filt}']
-    
+
     color = colors(i)
-    
+
     cut = (flux / ferr > 0)
     ra, dec, flux, ferr = ra[cut], dec[cut], flux[cut], ferr[cut]
     mag = np.where(flux > 0, TARGET_ZP - 2.5*np.log10(flux), np.nan)
     
     bins = np.arange(20, 29.5, db)
-    
+
     bin_count, bin_edges = np.histogram(mag, bins=bins) #, weights=weights)
     bin_centers = bins[:-1] + np.ediff1d(bins)[0]
     bin_width = db / 2.
@@ -108,7 +109,7 @@ for i, filt in enumerate(FILTERS):
     yerr = bin_err / area / db
 
     # All else
-    ax.errorbar(bin_centers, bin_density, xerr=bin_width, yerr=yerr, 
+    ax.errorbar(bin_centers, bin_density, xerr=bin_width, yerr=yerr,
                 c=color, fmt='o', label=f'{filt}') # (N={bin_count.sum()}, A
 
 
@@ -126,11 +127,11 @@ for i, filt in enumerate(FILTERS):
 
 for filt in FILTERS:
     fig, axes = plt.subplots(ncols=2, nrows=1, sharex=True, figsize=(7*2, 5*1))
-    
+
     axes[0].set_title(CATALOG.split('/')[-1])
     axes[0].set_ylabel(f'magerr({filt})')
     axes[1].set_ylabel(f'mag(e_{filt})')
-    axes[0].text(0.04, 0.9, filt, transform=axes[0].transAxes, fontsize=15)
+    axes[0].text(PIXEL_SCALE, 0.9, filt, transform=axes[0].transAxes, fontsize=15)
 
     ra, dec = cat['ra'], cat['dec']
     flux, fluxerr = cat[f'f_{filt}'], cat[f'e_{filt}']

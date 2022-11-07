@@ -7,6 +7,7 @@ from astropy.coordinates import SkyCoord
 KERNELS = {}
 KERNELS['f444w'] = 'regularization'
 # KERNELS['f160w'] = 'shapelets'
+USE_FFT_CONV = True # use FFT convolution
 
 DETECTION_PARAMS = dict(
     thresh =  1.5,
@@ -102,6 +103,10 @@ FILTERS = [x for x in list(PHOT_ZP.keys())]
 
 ### PHOTOZ
 TRANSLATE_FNAME = 'abell2744_uncover.translate'
+
+### AREA CALCULATIONS
+RA_RANGE = (3.487, 3.687)
+DEC_RANGE = (-30.5, -30.2)
 
 # ----------------
 
