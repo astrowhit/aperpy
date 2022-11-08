@@ -105,6 +105,22 @@ def fit_apercurve(stats, plotname=None, pixelscale=PIXEL_SCALE, stat_type=['ksnm
 
     return p, pcov, s
 
+def hist_points(x, bins=None, weights=None):
+    if bins is not None:
+        counts, bin_edges = np.histogram(x, bins, weights=weights)
+    else:
+        counts, bin_edges = np.histogram(x, weights=weights)
+    bin_centers = bin_edges[:-1] + np.diff(bin_edges)/2.
+    bin_widths = np.diff(bin_edges)
+    if weights is not None:
+        idx = np.digitize(x, bin_edges[:-1])
+        count_unc = np.array([np.sqrt(np.sum(weights[idx==i]**2)) for i in 1+np.arange(len(bin_edges[:-1]))])
+    else:
+        count_unc = np.sqrt(counts)
+
+    assert(len(counts)==len(count_unc))
+    return bin_centers, bin_widths, counts, count_unc
+
 # Empty Apertures
 def emtpy_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=PIXEL_SCALE, plotname=None, zpt_factor=1.):
     from alive_progress import alive_bar
@@ -114,6 +130,7 @@ def emtpy_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=PIXEL
     from astropy.stats import mad_std
     from astropy.stats import sigma_clipped_stats, sigma_clip
     from photutils.aperture import CircularAperture, aperture_photometry
+    from astropy.modeling import models, fitting
 
     from config import TARGET_ZP, SCI_APER
 
@@ -153,7 +170,6 @@ def emtpy_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=PIXEL
     aperstats = OrderedDict()
     aperstats[-1] = {}
     clean_img = img[(wht>0) & (segmap==0) & (~np.isnan(img))].flatten() * zpt_factor
-    clean_img_neg = np.array(list(clean_img[clean_img<0]) + list(clean_img[clean_img<0]*-1))
     kmean, kmed, kstd = sigma_clipped_stats(clean_img, sigma=3.)
     ksnmad = mad_std(sigma_clip(clean_img))
     aperstats[-1]['ksnmad'] = ksnmad
@@ -162,8 +178,6 @@ def emtpy_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=PIXEL
     aperstats[-1]['kstd'] = kstd
     aperstats[-1]['sigma'] = np.nanstd(clean_img)
     aperstats[-1]['snmad'] = mad_std(clean_img)
-    aperstats[-1]['sigma_neg'] = np.nanstd(clean_img_neg)
-    aperstats[-1]['snmad_neg'] = mad_std(clean_img_neg)
 
     aperstats['Naper'] = N
     aperstats['positions'] = positions
@@ -171,21 +185,16 @@ def emtpy_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=PIXEL
     # Define the Gaussian function
     from scipy.stats import norm
 
-    pc = np.nanpercentile(clean_img, q=(5, 95))
+    pc = np.nanpercentile(sigma_clip(clean_img), q=(5, 95))
     bins = np.linspace(pc[0], pc[1], 20)
     px = np.linspace(pc[0], pc[1], 1000)
-    p = norm.fit(clean_img, loc=np.nanmedian(clean_img), scale=aperstats[-1]['kstd'])
+    bin_centers, bin_widths, counts, count_unc = hist_points(sigma_clip(clean_img), bins=bins)
+    g_init = models.Gaussian1D(amplitude=np.max(counts), mean=kmean, stddev=kstd)
+    fit_g = fitting.LevMarLSQFitter()
+    gmodel = fit_g(g_init, bin_centers, counts)
 
-    aperstats[-1]['fit_mean'] = p[0]
-    aperstats[-1]['fit_std'] = p[1]
-
-    pc = np.nanpercentile(clean_img_neg, q=(5, 95))
-    bins = np.linspace(pc[0], pc[1], 20)
-    px = np.linspace(pc[0], pc[1], 1000)
-    p = norm.fit(clean_img_neg, loc=np.nanmedian(clean_img_neg), scale=aperstats[-1]['kstd'])
-
-    aperstats[-1]['fit_mean_neg'] = p[0]
-    aperstats[-1]['fit_std_neg'] = p[1]
+    aperstats[-1]['fit_mean'] = gmodel.mean.value
+    aperstats[-1]['fit_std'] = gmodel.stddev.value
 
     if plotname is not None:
         import matplotlib.pyplot as plt
@@ -195,9 +204,11 @@ def emtpy_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=PIXEL
         fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(5*ncols, 5*nrows))
         axes = axes.flatten()
         # ax.set(xlab)
-        axes[0].hist(clean_img, bins=bins, color='k', histtype='step', density=True, label=f'1px kstd: {aperstats[-1]["kstd"]:2.2f}')
-        # axes[0].hist(clean_img_neg, bins=bins, color='grey', histtype='step', density=True, label=f'1px kstd_neg:{aperstats[-1]["kstd_neg"]:2.2f}')
-        # axes[0].plot(px, norm.pdf(px, *p), c='k')
+        axes[0].errorbar(bin_centers, counts, xerr=bin_widths/2., yerr=count_unc, fmt='o', c='grey')
+        # # axes[0].hist(clean_img_neg, bins=bins, color='grey', histtype='step', density=True, label=f'1px kstd_neg:{aperstats[-1]["kstd_neg"]:2.2f}')
+        # print(gmodel.stddev.value, type(gmodel.stddev.value))
+        axes[0].plot(px, gmodel(px), c='k', label=f'1px std: {gmodel.stddev.value:2.2f}')
+
         axes[0].legend(loc='upper left')
         # ax.axvline(-aperstats['sigma'], color='k', ls='dashed')
         # ax.axvline(aperstats['sigma'], color='k', ls='dashed')
@@ -224,21 +235,26 @@ def emtpy_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=PIXEL
         snmad = mad_std(phot)
         med = np.nanmedian(phot)
 
-        pc = np.nanpercentile(phot, q=(5, 95))
+        pc = np.nanpercentile(sigma_clip(phot), q=(5, 95))
+        bins = np.linspace(pc[0], pc[1], 20)
         px = np.linspace(pc[0], pc[1], 1000)
 
         from scipy.optimize import curve_fit
-        p = norm.fit(phot, loc=med, scale=snmad)
-        aperstats[diam]['fit_mean'] = p[0]
-        aperstats[diam]['fit_std'] = p[1]
+        kmean, kmed, kstd = sigma_clipped_stats(phot, sigma=3.)
+        ksnmad = mad_std(sigma_clip(phot))
+        bin_centers, bin_widths, counts, count_unc = hist_points(sigma_clip(phot), bins=bins)
+        g_init = models.Gaussian1D(amplitude=np.max(counts), mean=kmean, stddev=kstd)
+        fit_g = fitting.LevMarLSQFitter()
+        gmodel = fit_g(g_init, bin_centers, counts)
+        aperstats[diam]['fit_mean'] = gmodel.mean.value
+        aperstats[diam]['fit_std'] = gmodel.stddev.value
 
         aperstats[diam]['mean'] = np.mean(phot)
         aperstats[diam]['std'] = np.std(phot)
         aperstats[diam]['snmad'] = snmad
         aperstats[diam]['norm'] = stats.normaltest(phot)
         aperstats[diam]['median'] = med
-        kmean, kmed, kstd = sigma_clipped_stats(phot, sigma=3.)
-        ksnmad = mad_std(sigma_clip(phot))
+        
         aperstats[diam]['ksnmad'] = ksnmad
         aperstats[diam]['kmean'] = kmean
         aperstats[diam]['kmed'] = kmed
@@ -247,40 +263,13 @@ def emtpy_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=PIXEL
         aperstats[diam]['pc'] = pc
         aperstats[diam]['interquart_68'] = pc[2] - pc[1] # 68pc
 
-
-        aperstats[diam]['phot_neg'] = phot_neg
-
-        snmad_neg = mad_std(phot_neg)
-        med_neg = np.nanmedian(phot_neg)
-
-        pc = np.nanpercentile(phot_neg, q=(5, 95))
-        # print(phot_neg)
-        # print(pc)
-        bins = np.linspace(pc[0], pc[1], 20)
-        px = np.linspace(pc[0], pc[1], 1000)
-        from scipy.optimize import curve_fit
-        p = norm.fit(phot_neg, loc=med_neg, scale=snmad_neg)
-        aperstats[diam]['fit_mean_neg'] = p[0]
-        aperstats[diam]['fit_std_neg'] = p[1]
-
-        aperstats[diam]['mean_neg'] = np.mean(phot_neg)
-        aperstats[diam]['std_neg'] = np.std(phot_neg)
-        aperstats[diam]['snmad_neg'] = snmad_neg
-        aperstats[diam]['norm_neg'] = stats.normaltest(phot_neg)
-        aperstats[diam]['median_neg'] = med_neg
-        kmean_neg, kmed_neg, kstd_neg = sigma_clipped_stats(phot_neg)
-        aperstats[diam]['kmean_neg'] = kmean_neg
-        aperstats[diam]['kmed_neg'] = kmed_neg
-        aperstats[diam]['kstd_neg'] = kstd_neg
-        pc = np.percentile(phot_neg, q=(5, 16, 84, 95))
-        aperstats[diam]['pc_neg'] = pc
-        aperstats[diam]['interquart_68_neg'] = pc[2] - pc[1] # 68pc
-
         if plotname is not None:
-            ax.hist(phot, bins=bins, color='k' , histtype='step', density=True, label=f'{diam:2.2f}\" kstd: {kstd:2.2f}')
-            # ax.hist(phot_neg, bins=bins, color=colors(i) , histtype='step', density=True, label=f'{diam:2.2f}\" snmad_neg: {snmad_neg:2.2f}')
+            ax.errorbar(bin_centers, counts, xerr=bin_widths/2., yerr=count_unc, fmt='o', c='grey')
+            # # ax.hist(clean_img_neg, bins=bins, color='grey', histtype='step', density=True, label=f'1px kstd_neg:{aperstats[-1]["kstd_neg"]:2.2f}')
+            ax.plot(px, gmodel(px), c=colors(i), label=f'{diam:2.2f}\" std: {gmodel.stddev.value:2.2f}')
+            # ax.hist(sigma_clip(phot), bins=bins, color='k' , histtype='step', density=True, )
 
-            ax.plot(px, norm.pdf(px, *p), c=colors(i), )
+            # ax.plot(px, norm.pdf(px, *p), c=colors(i), )
             ax.legend(loc='upper left')
 
             # ax.axvline(-p[1], color=colors(i), ls='dashed')
@@ -296,15 +285,15 @@ def emtpy_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=PIXEL
         fig.tight_layout()
         fig.savefig(plotname)
 
-        aper_snmad = [aperstats[diam]['kstd'] for diam in aper]
-        aper_median = [aperstats[diam]['median'] for diam in aper]
+        aper_fitstd = [aperstats[diam]['fit_std'] for diam in aper]
+        aper_mean = [aperstats[diam]['fit_mean'] for diam in aper]
 
-        # aper_snmad_neg = [aperstats[diam]['snmad_neg'] for diam in aper]
-        # aper_median_neg = [aperstats[diam]['median_neg'] for diam in aper]
-        axes2[0].plot(aper, TARGET_ZP - 2.5*np.log10(aper_snmad), marker='o', c='k')
-        axes2[1].plot(aper, aper_median, marker='o', c='k')
-        # axes2[0].plot(aper, TARGET_ZP - 2.5*np.log10(aper_snmad_neg), marker='o')
-        # axes2[1].plot(aper, aper_median_neg, marker='o')
+        # aper_fitstd_neg = [aperstats[diam]['snmad_neg'] for diam in aper]
+        # aper_mean_neg = [aperstats[diam]['median_neg'] for diam in aper]
+        axes2[0].plot(aper, TARGET_ZP - 2.5*np.log10(aper_fitstd), marker='o', c='k')
+        axes2[1].plot(aper, aper_mean, marker='o', c='k')
+        # axes2[0].plot(aper, TARGET_ZP - 2.5*np.log10(aper_fitstd_neg), marker='o')
+        # axes2[1].plot(aper, aper_mean_neg, marker='o')
 
         fig2.tight_layout()
         fig2.savefig(plotname.replace('emptyaper', 'depth'))
