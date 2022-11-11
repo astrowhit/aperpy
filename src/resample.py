@@ -18,6 +18,7 @@ SCI_FILENAMES = list(glob.glob(DIR_IMAGES+'/*_sci.fits*'))
 
 
 for filename in SCI_FILENAMES:
+
     for band in WEBB_FILTERS:
         if band.lower() in filename:
             break

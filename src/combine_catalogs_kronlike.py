@@ -8,6 +8,7 @@ import astropy.units as u
 from astropy.coordinates import SkyCoord
 from astroquery.svo_fps import SvoFps
 import extinction
+import matplotlib.pyplot as plt
 from webb_tools import psf_cog, fit_apercurve
 from astropy.convolution import convolve
 
@@ -15,9 +16,12 @@ import sys
 PATH_CONFIG = sys.argv[1]
 sys.path.insert(0, PATH_CONFIG)
 
-from config import FILTERS, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, \
+from config import FILTERS, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS,\
     REF_BAND, PIXEL_SCALE, PHOT_APER, DIR_KERNELS, DIR_PSFS, FIELD, ZSPEC, \
-    MAX_SEP, SCI_APER, MAKE_SCIREADY_ALL, TARGET_ZP, ZCONF, ZRA, ZDEC, ZCOL, FLUX_UNIT
+    MAX_SEP, SCI_APER, MAKE_SCIREADY_ALL, TARGET_ZP, ZCONF, ZRA, ZDEC, ZCOL, FLUX_UNIT, \
+    PS_FLUXRATIO, PS_FLUXRATIO_RANGE, PS_FILT, PS_MAGLIMIT, PS_APERSIZE, \
+        BP_FLUXRATIO, BP_FLUXRATIO_RANGE, BP_FILT, BP_MAGLIMIT, BP_APERSIZE
+
 
 DET_NICKNAME =  sys.argv[2] #'LW_f277w-f356w-f444w'
 KERNEL = sys.argv[3] #'f444w'
@@ -109,26 +113,33 @@ else:
     kernel = fits.getdata(DIR_KERNEL(REF_BAND))
     conv_psfmodel = convolve(psfmodel, kernel)
 
-# use REF_BAND Kron to correct to total fluxes and ferr
+# Get some static refband stuff 
 plotname = os.path.join(FULLDIR_CATALOGS, f'figures/aper_{REF_BAND}_nmad.pdf')
 p, pcov, sigma1 = fit_apercurve(stats[REF_BAND], plotname=plotname, stat_type=['ksnmad'], pixelscale=PIXEL_SCALE)
 alpha, beta = p['ksnmad']
 sig1 = sigma1['ksnmad']
-f_ref_auto = maincat[f'{REF_BAND}_FLUX_AUTO']
-kronrad_circ = maincat[f'{REF_BAND}_KRON_RADIUS_CIRC']
-psffrac_ref_auto = psf_cog(conv_psfmodel, nearrad = kronrad_circ) # in pixels
-# F160W kernel convolved REF_BAND PSF + missing flux from F160W beyond 2" radius
-f_ref_total = f_ref_auto / psffrac_ref_auto # equation 9
 wht_ref = maincat[f'{REF_BAND}_SRC_MEDWHT']
 medwht_ref = maincat[f'{REF_BAND}_MED_WHT']
-sig_ref_total = sigma_ref_total(sig1, alpha, beta, kronrad_circ, wht_ref, medwht_ref, f_ref_auto)
-newcoln =f'{REF_BAND}_FLUXERR_REFTOTAL'
-maincat.add_column(Column(sig_ref_total, newcoln))
-
 
 for apersize in PHOT_APER:
     str_aper = str(apersize).replace('.', '_')
+
+    # use REF_BAND Kron to correct to total fluxes and ferr
+    f_ref_auto = maincat[f'{REF_BAND}_FLUX_AUTO'].copy()
+    kronrad_circ = maincat[f'{REF_BAND}_KRON_RADIUS_CIRC'].copy()
     f_ref_aper = maincat[f'{REF_BAND}_FLUX_APER{str_aper}']
+
+    use_circle = kronrad_circ < apersize / 2.
+    kronrad_circ[use_circle] = apersize / 2.
+    f_ref_auto[use_circle] = f_ref_aper[use_circle]
+
+    psffrac_ref_auto = psf_cog(conv_psfmodel, nearrad = kronrad_circ) # in pixels
+    # F160W kernel convolved REF_BAND PSF + missing flux from F160W beyond 2" radius
+    f_ref_total = f_ref_auto / psffrac_ref_auto # equation 9
+    sig_ref_total = sigma_ref_total(sig1, alpha, beta, kronrad_circ, wht_ref, medwht_ref, f_ref_auto)
+    newcoln =f'{REF_BAND}_FLUXERR_REFTOTAL_MINDIAM{str_aper}'
+    maincat.add_column(Column(sig_ref_total, newcoln))
+    
     tot_corr = f_ref_total / f_ref_aper
     maincat.add_column(Column(1./tot_corr, f'TOTAL_CORR_APER{str_aper}'))
     sig_ref_aper = sigma_aper(REF_BAND.upper(), wht_ref, medwht_ref, apersize) # sig_aper,REF_BAND
@@ -207,9 +218,42 @@ if APPLY_MWDUST is not None:
         elif 'MAG' in coln:
             maincat[coln] -= atten_mag[np.array(FILTERS) == filtname][0]
 
-# star-galaxy flag # TODO LATER
-is_star = np.zeros(len(maincat), dtype=bool)
+# star-galaxy flag
+str_aper = str(PS_APERSIZE).replace('.', '_')
+mag = TARGET_ZP - 2.5*np.log10(maincat[f'{PS_FILT}_FLUX_APER{str_aper}_TOTAL'])
+size = maincat[f'{PS_FILT}_FLUX_APER{str(PS_FLUXRATIO[0]).replace(".", "_")}_COLOR']  \
+                / maincat[f'{PS_FILT}_FLUX_APER{str(PS_FLUXRATIO[1]).replace(".", "_")}_COLOR']
+is_star = (size > PS_FLUXRATIO_RANGE[0]) & (size < PS_FLUXRATIO_RANGE[1])
+is_star &= (mag < PS_MAGLIMIT)
+
+fig, ax = plt.subplots(ncols=1, figsize=(5, 5))
+ax.scatter(mag, size, s=3, alpha=0.2, c='grey')
+ax.scatter(mag[is_star], size[is_star], s=5, alpha=0.5)
+# ax.invert_xaxis()
+ax.set(ylim=(0,6), xlim=(18 ,31), ylabel=('$\mathcal{F}\,'+f'({PS_FLUXRATIO[0]}/{PS_FLUXRATIO[1]})$'), xlabel=f'${PS_FILT.upper()}$ Mag (AB)')
+plotname = os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_K{KERNEL}_pointlikeflag.pdf')
+fig.savefig(plotname)
+
 maincat.add_column(Column(is_star.astype(int), name='star_flag'))
+
+# bad pixel flag
+str_aper = str(BP_APERSIZE).replace('.', '_')
+BP_FILT_SEL = BP_FILT[DET_NICKNAME[:2]]
+mag = TARGET_ZP - 2.5*np.log10(maincat[f'{BP_FILT_SEL}_FLUX_APER{str_aper}_TOTAL'])
+size = maincat[f'{BP_FILT_SEL}_FLUX_APER{str(BP_FLUXRATIO[0]).replace(".", "_")}_COLOR']  \
+                / maincat[f'{BP_FILT_SEL}_FLUX_APER{str(BP_FLUXRATIO[1]).replace(".", "_")}_COLOR']
+is_badpixel = (size > BP_FLUXRATIO_RANGE[0]) & (size < BP_FLUXRATIO_RANGE[1])
+is_badpixel &= (mag < BP_MAGLIMIT)
+
+fig, ax = plt.subplots(ncols=1, figsize=(5, 5))
+ax.scatter(mag, size, s=3, alpha=0.2, c='grey')
+ax.scatter(mag[is_badpixel], size[is_badpixel], s=5, alpha=0.5)
+# ax.invert_xaxis()
+ax.set(ylim=(0,2), xlim=(18 ,31), ylabel=('$\mathcal{F}\,'+f'({BP_FLUXRATIO[0]}/{BP_FLUXRATIO[1]})$'), xlabel=f'${BP_FILT_SEL.upper()}$ Mag (AB)')
+plotname = os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_K{KERNEL}_badpixelflag.pdf')
+fig.savefig(plotname)
+
+maincat.add_column(Column(is_badpixel.astype(int), name='bad_pixel_flag'))
 
 # z-spec
 ztable = Table.read(ZSPEC)
@@ -240,7 +284,7 @@ for colname in ztable.colnames:
 snr_ref = maincat[f'{REF_BAND}_FLUX_APER0_7_COLOR'] / maincat[f'{REF_BAND}_FLUXERR_APER0_7_COLOR']
 use_phot = np.zeros(len(maincat))
 use_phot[snr_ref >= 3] = 1
-use_phot[is_star] = 0
+use_phot[is_star | is_badpixel] = 0
 maincat.add_column(Column(use_phot, name='use_phot'))
 # use 1 only
 
@@ -253,7 +297,7 @@ maincat.meta['KERNEL'] = KERNEL
 maincat.meta['PHOT_ZP'] = TARGET_ZP
 maincat.meta['PHOT_UNIT'] = FLUX_UNIT
 
-for colname in maincat.colnames:
+for i, colname in enumerate(maincat.colnames):
     if 'FLAG' in colname:
         continue
     elif 'RADIUS' in colname:
@@ -266,6 +310,8 @@ for colname in maincat.colnames:
         maincat[colname].unit = u.pixel
     elif colname == 'theta':
         maincat[colname].unit = u.deg
+
+    print(i, colname)
 
 maincat.write(outfilename, overwrite=True)
 print(f'Added date stamp! ({today})')
@@ -316,7 +362,7 @@ for apersize in PHOT_APER:
         snr_ref = subcat[f'faper_{REF_BAND}'] / subcat[f'eaper_{REF_BAND}']
         use_phot = np.zeros(len(subcat))
         use_phot[snr_ref >= 3] = 1
-        use_phot[is_star] = 0
+        use_phot[is_star | is_badpixel] = 0
         subcat['use_phot'] = use_phot
 
         sub_outfilename = outfilename.replace('COMBINED', f'SCIREADY_{str_aper}')

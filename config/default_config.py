@@ -19,16 +19,18 @@ DETECTION_PARAMS = dict(
     clean_param = 1.66776,
     )
 
-PHOT_APER = [0.32, 0.48, 0.7 , 1.  , 2.  , 3.] # diameter in arcsec
-PHOT_AUTOPARAMS = 2.5, 3.5 # for MAG_AUTO
+PHOT_APER = [0.16, 0.32, 0.48, 0.7 , 1.  , 2.] # diameter in arcsec
+PHOT_AUTOPARAMS = 1.5, 2.5 # Kron-scaling radius, mimumum circular diameter (not used!)
 PHOT_FLUXFRAC = 0.5, 0.6 # FLUX_RADIUS at 50% and 60% of flux
+PHOT_KRONPARAM = 6.0 # SE hardcodes this as 6.0
 
 PIXEL_SCALE = 0.04 # arcsec / px
 
 REF_BAND = 'f444w'
-APPLY_MWDUST = True
+APPLY_MWDUST = 'MEDIAN'
+USE_FFT_CONV = True
 
-SCI_APER = 0.7 # science aperture
+SCI_APER = 0.7 # science aperture for maximum empty aperture size
 MAKE_SCIREADY_ALL = True # make aperture corrected catalogs for all apertures
 
 ### DIRECTORIES

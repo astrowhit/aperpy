@@ -15,7 +15,7 @@ PATH_CONFIG = sys.argv[1]
 sys.path.insert(0, PATH_CONFIG)
 
 from config import TARGET_ZP, PHOT_APER, PHOT_AUTOPARAMS, PHOT_FLUXFRAC, DETECTION_PARAMS,\
-         DIR_IMAGES, PHOT_ZP, FILTERS, DIR_OUTPUT, DIR_CATALOGS, IS_COMPRESSED, PIXEL_SCALE
+         DIR_IMAGES, PHOT_ZP, FILTERS, DIR_OUTPUT, DIR_CATALOGS, IS_COMPRESSED, PIXEL_SCALE, PHOT_KRONPARAM
 
 # MAIN PARAMETERS
 DET_NICKNAME = sys.argv[2] #'LW_f277w-f356w-f444w'
@@ -236,7 +236,7 @@ for ind, PHOT_NICKNAME in enumerate(FILTERS):
     # KRON RADII AND MAG_AUTO
     print(f"{PHOT_NICKNAME} :: MEASURING PHOTOMETRY in kron-corrected AUTO apertures...")
     kronrad, krflag = sep.kron_radius(photsci, xphot, yphot, #objects['x'], objects['y'],
-                                        objects['a'], objects['b'], objects['theta'], 6.0) # SE uses 6
+                                        objects['a'], objects['b'], objects['theta'], PHOT_KRONPARAM) # SE uses 6
     kronrad[np.isnan(kronrad)] = 0.
     # print(np.isnan(kronrad).sum(), np.max(kronrad), np.min(kronrad))
     objects['theta'][objects['theta'] > np.pi / 2.] = np.pi / 2. # numerical rounding correction!
@@ -265,40 +265,40 @@ for ind, PHOT_NICKNAME in enumerate(FILTERS):
     flag |= krflag  # combine flags into 'flag'
 
 
-    r_min = PHOT_AUTOPARAMS[1] / 2.  # minimum diameter = 3.5
+    # r_min = PHOT_AUTOPARAMS[1] / 2.  # minimum diameter = 3.5
     kronrad_circ = kronrad * np.sqrt(objects['a'] * objects['b'])
-    use_circle = kronrad_circ < r_min
-    kronrad_circ[use_circle] = r_min
-    cflux, cfluxerr, cflag = sep.sum_circle(photsci, xphot[use_circle], yphot[use_circle],
-                                            r=r_min, subpix=1,
-                                            err = photerr, gain=1.0
-                                            )
+    # use_circle = kronrad_circ < r_min
+    # kronrad_circ[use_circle] = r_min
+    # cflux, cfluxerr, cflag = sep.sum_circle(photsci, xphot[use_circle], yphot[use_circle],
+    #                                         r=r_min, subpix=1,
+    #                                         err = photerr, gain=1.0
+    #                                         )
 
-    badflux = (cflux == 0.) |  np.isnan(cflux) | ~np.isfinite(cflux)
-    badfluxerr = (cfluxerr <= 0.) | np.isnan(cfluxerr) | ~np.isfinite(cfluxerr)
-    pc_badflux = np.sum(badflux) / len(cflux)
-    pc_badfluxerr = np.sum(badfluxerr) / len(cflux)
-    pc_ORbad = np.sum(badflux | badfluxerr) / len(cflux)
-    pc_ANDbad = np.sum(badflux & badfluxerr) / len(cflux)
-    print(f'{pc_badflux*100:2.5f}% have BAD fluxes')
-    print(f'{pc_badfluxerr*100:2.5f}% have BAD fluxerrs')
-    print(f'{pc_ORbad*100:2.5f}% have BAD fluxes OR fluxerrs')
-    print(f'{pc_ANDbad*100:2.5f}% have BAD fluxes AND fluxerrs')
+    # badflux = (cflux == 0.) |  np.isnan(cflux) | ~np.isfinite(cflux)
+    # badfluxerr = (cfluxerr <= 0.) | np.isnan(cfluxerr) | ~np.isfinite(cfluxerr)
+    # pc_badflux = np.sum(badflux) / len(cflux)
+    # pc_badfluxerr = np.sum(badfluxerr) / len(cflux)
+    # pc_ORbad = np.sum(badflux | badfluxerr) / len(cflux)
+    # pc_ANDbad = np.sum(badflux & badfluxerr) / len(cflux)
+    # print(f'{pc_badflux*100:2.5f}% have BAD fluxes')
+    # print(f'{pc_badfluxerr*100:2.5f}% have BAD fluxerrs')
+    # print(f'{pc_ORbad*100:2.5f}% have BAD fluxes OR fluxerrs')
+    # print(f'{pc_ANDbad*100:2.5f}% have BAD fluxes AND fluxerrs')
 
-    bad = badflux | badfluxerr
+    # bad = badflux | badfluxerr
 
-    cflux[bad] = np.nan
-    cfluxerr[bad] = np.nan
-    cflag[bad] = 1
+    # cflux[bad] = np.nan
+    # cfluxerr[bad] = np.nan
+    # cflag[bad] = 1
 
-    flux[use_circle] = cflux
-    fluxerr[use_circle] = cfluxerr
-    flag[use_circle] = cflag
+    # flux[use_circle] = cflux
+    # fluxerr[use_circle] = cfluxerr
+    # flag[use_circle] = cflag
 
     catalog[f'FLUX_AUTO'] = flux * conv_flux(PHOT_ZPT)
     catalog[f'FLUXERR_AUTO'] = fluxerr * conv_flux(PHOT_ZPT)
-    catalog[f'MAG_AUTO'] = PHOT_ZPT - 2.5*np.log10(flux)
-    catalog[f'MAGERR_AUTO'] = 2.5 / np.log(10) / ( flux / fluxerr )
+    # catalog[f'MAG_AUTO'] = PHOT_ZPT - 2.5*np.log10(flux)
+    # catalog[f'MAGERR_AUTO'] = 2.5 / np.log(10) / ( flux / fluxerr )
     catalog[f'KRON_RADIUS'] = kronrad
     catalog[f'KRON_RADIUS_CIRC'] = kronrad_circ
     catalog[f'FLAG_AUTO'] = flag

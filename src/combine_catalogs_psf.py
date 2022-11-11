@@ -8,14 +8,17 @@ import astropy.units as u
 from astropy.coordinates import SkyCoord
 from astroquery.svo_fps import SvoFps
 import extinction
+import matplotlib.pyplot as plt
 from webb_tools import psf_cog
 
 import sys
 PATH_CONFIG = sys.argv[1]
 sys.path.insert(0, PATH_CONFIG)
 
-from config import FILTERS, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, \
-    REF_BAND, PIXEL_SCALE, PHOT_APER, DIR_PSFS, FIELD, ZSPEC, MAX_SEP, ZCONF, ZRA, ZDEC, ZCOL, FLUX_UNIT
+from config import FILTERS, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, TARGET_ZP, \
+    REF_BAND, PIXEL_SCALE, PHOT_APER, DIR_PSFS, FIELD, ZSPEC, MAX_SEP, ZCONF, ZRA, ZDEC, ZCOL, FLUX_UNIT, \
+    PS_FLUXRATIO, PS_FLUXRATIO_RANGE, PS_FILT, PS_MAGLIMIT, PS_APERSIZE, \
+        BP_FLUXRATIO, BP_FLUXRATIO_RANGE, BP_FILT, BP_MAGLIMIT, BP_APERSIZE
 
 DET_NICKNAME =  sys.argv[2] #'LW_f277w-f356w-f444w'  
 KERNEL = sys.argv[3] #'f444w'
@@ -159,9 +162,43 @@ if APPLY_MWDUST is not None:
         elif 'MAG' in coln:
             maincat[coln] -= atten_mag[np.array(FILTERS) == filtname][0]
 
-# star-galaxy flag # TODO LATER
-is_star = np.zeros(len(maincat), dtype=bool)
+
+# star-galaxy flag
+str_aper = str(PS_APERSIZE).replace('.', '_')
+mag = TARGET_ZP - 2.5*np.log10(maincat[f'{PS_FILT}_FLUX_APER{str_aper}_COLOR'])
+size = maincat[f'{PS_FILT}_FLUX_APER{str(PS_FLUXRATIO[0]).replace(".", "_")}_COLOR']  \
+                / maincat[f'{PS_FILT}_FLUX_APER{str(PS_FLUXRATIO[1]).replace(".", "_")}_COLOR']
+is_star = (size > PS_FLUXRATIO_RANGE[0]) & (size < PS_FLUXRATIO_RANGE[1])
+is_star &= (mag < PS_MAGLIMIT)
+
+fig, ax = plt.subplots(ncols=1, figsize=(5, 5))
+ax.scatter(mag, size, s=3, alpha=0.2, c='grey')
+ax.scatter(mag[is_star], size[is_star], s=5, alpha=0.5)
+# ax.invert_xaxis()
+ax.set(ylim=(0,6), xlim=(18, 31), ylabel=('$\mathcal{F}\,'+f'({PS_FLUXRATIO[0]}/{PS_FLUXRATIO[1]})$'), xlabel=f'${PS_FILT.upper()}$ Mag (AB)')
+plotname = os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_K{KERNEL}_pointlikeflag.pdf')
+fig.savefig(plotname)
+
 maincat.add_column(Column(is_star.astype(int), name='star_flag'))
+
+# bad pixel flag
+str_aper = str(BP_APERSIZE).replace('.', '_')
+BP_FILT_SEL = BP_FILT[DET_NICKNAME[:2]]
+mag = TARGET_ZP - 2.5*np.log10(maincat[f'{BP_FILT_SEL}_FLUX_APER{str_aper}_COLOR'])
+size = maincat[f'{BP_FILT_SEL}_FLUX_APER{str(BP_FLUXRATIO[0]).replace(".", "_")}_COLOR']  \
+                / maincat[f'{BP_FILT_SEL}_FLUX_APER{str(BP_FLUXRATIO[1]).replace(".", "_")}_COLOR']
+is_badpixel = (size > BP_FLUXRATIO_RANGE[0]) & (size < BP_FLUXRATIO_RANGE[1])
+is_badpixel &= (mag < BP_MAGLIMIT)
+
+fig, ax = plt.subplots(ncols=1, figsize=(5, 5))
+ax.scatter(mag, size, s=3, alpha=0.2, c='grey')
+ax.scatter(mag[is_badpixel], size[is_badpixel], s=5, alpha=0.5)
+# ax.invert_xaxis()
+ax.set(ylim=(0,2), xlim=(18, 31), ylabel=('$\mathcal{F}\,'+f'({BP_FLUXRATIO[0]}/{BP_FLUXRATIO[1]})$'), xlabel=f'${BP_FILT_SEL.upper()}$ Mag (AB)')
+plotname = os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_K{KERNEL}_badpixelflag.pdf')
+fig.savefig(plotname)
+
+maincat.add_column(Column(is_badpixel.astype(int), name='bad_pixel_flag'))
 
 # z-spec
 ztable = Table.read(ZSPEC)
@@ -193,7 +230,7 @@ for colname in ztable.colnames:
 snr_ref = maincat[f'{REF_BAND}_FLUX_APER0_7_COLOR'] / maincat[f'{REF_BAND}_FLUXERR_APER0_7_COLOR']
 use_phot = np.zeros(len(maincat))
 use_phot[snr_ref >= 3] = 1
-use_phot[is_star] = 0
+use_phot[is_star | is_badpixel] = 0
 maincat.add_column(Column(use_phot, name='use_phot'))
 # use 1 only
 
@@ -202,10 +239,11 @@ from datetime import date
 today = date.today().strftime("%d/%m/%Y")
 maincat.meta['CREATED'] = today
 maincat.meta['MW_CORR'] = str(APPLY_MWDUST)
-maincat.write(outfilename, overwrite=True)
 
-for colname in maincat.colnames:
-    if ('RADIUS') in colname:
+for i, colname in enumerate(maincat.colnames):
+    if 'FLAG' in colname:
+        continue
+    elif 'RADIUS' in colname:
         if ('KRON_RADIUS_CIRC' in colname) | ('FLUX_RADIUS' in colname):
             maincat[colname].unit = u.arcsec
             maincat[colname] *= PIXEL_SCALE
@@ -216,6 +254,7 @@ for colname in maincat.colnames:
     elif colname == 'theta':
         maincat[colname].unit = u.deg
 
+    print(i, colname)
 maincat.write(outfilename, overwrite=True)
 print(f'Added date stamp! ({today})')
 print('Wrote first-pass combined catalog to ', outfilename)
@@ -260,12 +299,8 @@ for apersize in PHOT_APER:
     snr_ref = subcat[f'faper_{REF_BAND}'] / subcat[f'eaper_{REF_BAND}']
     use_phot = np.zeros(len(subcat))
     use_phot[snr_ref >= 3] = 1
-    use_phot[is_star] = 0
+    use_phot[is_star | is_badpixel] = 0
     subcat['use_phot'] = use_phot
-
-
-    subcat['flux_radius'] *= PIXEL_SCALE # from pixel to arcsec
-    # subcat['theta_J2000'] = np.rad2deg(subcat['theta_J2000'])  # radians to degrees
 
     sub_outfilename = outfilename.replace('COMBINED', f'SCIREADY_{str_aper}')
     subcat.write(sub_outfilename, overwrite=True)

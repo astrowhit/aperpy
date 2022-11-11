@@ -300,17 +300,17 @@ qg = zout['uvj_class'] == 1
 sanity = ez.cat['use_phot'] == 1
 
 # z vs. M
-axes[0].scatter(zout['z_phot'][sanity], np.log10(zout['mass'][sanity]), s=3, c='grey')
+axes[0].scatter(zout['z_phot'][sanity], np.log10(zout['mass'][sanity]), s=3, c='grey', alpha=0.3)
 axes[0].scatter(zout['z_phot'][qg & sanity], np.log10(zout['mass'][qg & sanity]), s=3, c='orange')
 axes[0].set(xlabel='$z_{\\rm phot}$', ylabel='Log$_{10}\,\mathcal{M}\,(\mathcal{M}_\odot)$')
 
 # M vs. SFR
-axes[1].scatter(np.log10(zout['mass'][sanity]), np.log10(zout['sfr']/zout['mass'])[sanity], s=3, c='grey')
+axes[1].scatter(np.log10(zout['mass'][sanity]), np.log10(zout['sfr']/zout['mass'])[sanity], s=3, c='grey', alpha=0.3)
 axes[1].scatter(np.log10(zout['mass'][qg & sanity]), np.log10(zout['sfr'][qg & sanity]/zout['mass'][qg & sanity]), s=3, c='orange')
 axes[1].set(xlabel='Log$_{10}\,\mathcal{M}\,(\mathcal{M}_\odot)$', ylabel='Log$_{10}\,{\\rm sSFR}}\,(\mathcal{M}_\odot\,{\\rm yr}^{-1})$')
 
 # UVJ
-axes[2].scatter(zout['v_j'][sanity], zout['u_v'][sanity], s=3, c='grey')
+axes[2].scatter(zout['v_j'][sanity], zout['u_v'][sanity], s=3, c='grey', alpha=0.3)
 axes[2].scatter(zout['v_j'][qg & sanity], zout['u_v'][qg & sanity], s=3, c='orange')
 axes[2].set(xlabel='$V-J$', ylabel='$U-V$', xlim=(-0.6, 2.0), ylim=(0, 2.4))
 

@@ -137,7 +137,7 @@ def emtpy_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=PIXEL
 
     aper = np.array(aper)
     aperrad = aper / 2. / pixscl # diam sky to rad pix
-    maxaper = int(aperrad[aper==SCI_APER]) + 1
+    maxaper = int(aperrad[aper==SCI_APER][0]) + 1
 
     size = np.shape(img)
     try:
@@ -400,7 +400,7 @@ def get_psf(filt, field='uncover', angle=None, fov=4, og_fov=10, pixscl=PIXEL_SC
 
 
 
-def make_cutout(ra, dec, size, nickname, filters, dir_images, row=None, plot=True, write=True, include_rgb=False, rgb=['f444w', 'f356w', 'f150w'], redshift=-99):
+def make_cutout(ra, dec, size, nickname, filters, dir_images, row=None, plot=True, write=True, include_rgb=False, rgb=['f444w', 'f277w', 'f115w'], redshift=-99, matched_pattern='', dir='.'):
     import astropy.units as u
     from astropy.coordinates import SkyCoord
     from astropy.wcs import WCS
@@ -420,12 +420,15 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, row=None, plot=Tru
         from astropy.visualization import make_lupton_rgb
 
     if plot:
-        fig, axes = plt.subplots(ncols=7, nrows=2, figsize=(3*7, 3*2))
+        if len(filters) > 7:
+            fig, axes = plt.subplots(ncols=8, nrows=2, figsize=(3*8, 3*2))
+        else:
+            fig, axes = plt.subplots(ncols=len(filters), figsize=(3*len(filters), 3))
 
     for filt, ax in zip(filters, axes.flatten()):
 
         print(filt)
-        fn = glob.glob(os.path.join(dir_images, f'*{filt}*_sci_skysubvar.fits.gz'))[0]
+        fn = glob.glob(os.path.join(dir_images, f'*{filt}*_sci_skysubvar{matched_pattern}.fits.gz'))[0]
         if not os.path.exists(fn):
             print(f'WARNING -- image for {filt} does not exist at {fn}. Skipping!')
             continue
@@ -467,10 +470,12 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, row=None, plot=Tru
                 b = img * 0.35
 
             if row is None:
+                flux, fluxerr = -99, -99
                 mag, magerr = -99, -99
                 snr = -99
             if f'f_{filt}' not in row.colnames:
                 mag, magerr = -99, -99
+                flux, fluxerr = -99, -99
                 snr = -99
             else:
                 flux, fluxerr = row[f'f_{filt}'], row[f'e_{filt}']
@@ -507,11 +512,11 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, row=None, plot=Tru
         ax_rgb.axes.xaxis.set_visible(False)
         ax_rgb.axes.yaxis.set_visible(False)
         if write:
-            fig_rgb.savefig(f'cutouts/{nickname}_RGB.pdf', dpi=300)
+            fig_rgb.savefig(os.path.join(dir, f'cutouts/{nickname}_z{redshift:2.1f}_RGB.pdf'), dpi=300)
 
     if write:
-        fig.savefig(f'cutouts/{nickname}.pdf', dpi=300)
-        hdul.writeto(f'cutouts/{nickname}.fits', overwrite=True)
+        fig.savefig(os.path.join(dir, f'cutouts/{nickname}_z{redshift:2.1f}.pdf'), dpi=300)
+        hdul.writeto(os.path.join(dir, f'cutouts/{nickname}_z{redshift:2.1f}.fits'), overwrite=True)
 
 
 def histedges_equalN(x, nbin):

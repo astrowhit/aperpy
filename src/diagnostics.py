@@ -124,7 +124,6 @@ for i, filt in enumerate(FILTERS):
     fig.savefig(os.path.join(DIR_FIGURES, f'number_counts_{filt}_{STR_APER}.pdf'))
 
 # Growth of flux error
-
 for filt in FILTERS:
     fig, axes = plt.subplots(ncols=2, nrows=1, sharex=True, figsize=(7*2, 5*1))
 
@@ -161,7 +160,7 @@ if 'tot_cor' in cat.colnames:
     sanity = cat['use_phot'] == 1
     sanity &= (mag > 20) & (mag < 30)
 
-    im = axes[0].scatter(mag[sanity], cat['tot_cor'][sanity], c=cat['kron_radius'][sanity], s=2, cmap='viridis')
+    im = axes[0].scatter(mag[sanity], cat['tot_cor'][sanity], c=cat['kron_radius_circ'][sanity], s=2, cmap='viridis')
     axes[0].semilogy()
     axes[0].axhline(1, ls='dashed', c='grey')
     axes[0].set(xlabel=f'{REF_BAND} Mag (AB)', ylabel='tot_cor', ylim=(1e-2, 5))
@@ -175,10 +174,10 @@ if 'tot_cor' in cat.colnames:
     cbar.ax.xaxis.set_ticks_position("top")
     cbar.set_label('Kron radius (px)', labelpad=-50)
 
-    im = axes[1].scatter(cat['kron_radius'][sanity], cat['tot_cor'][sanity], c=mag[sanity], s=2, cmap='viridis')
+    im = axes[1].scatter(cat['kron_radius_circ'][sanity], cat['tot_cor'][sanity], c=mag[sanity], s=2, cmap='viridis')
     axes[1].semilogy()
     axes[1].axhline(1, ls='dashed', c='grey')
-    axes[1].set(xlabel=f'Kron radius (px)')
+    axes[1].set(xlabel=f'Circularized Kron radius (px)')
     axins = inset_axes(axes[1],
                         width="100%",  
                         height="5%",
