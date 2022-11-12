@@ -109,6 +109,7 @@ FILTERS = [x for x in list(PHOT_ZP.keys())]
 ### PHOTOZ
 TRANSLATE_FNAME = 'abell2744_uncover.translate'
 ITERATE_ZP = False
+TEMPLATE_SETS = ('fsps_full', 'sfhz')
 
 ### AREA CALCULATIONS
 RA_RANGE = (3.487, 3.687)

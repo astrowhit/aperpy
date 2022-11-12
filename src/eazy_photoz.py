@@ -23,6 +23,7 @@ sys.path.insert(0, DIR_CONFIG)
 DET_NICKNAME =  sys.argv[2] #'LW_f277w-f356w-f444w'  
 KERNEL = sys.argv[3] #'f444w'
 APERSIZE = str(sys.argv[4]).replace('.', '_')
+TEMPLATES = sys.argv[5]
 
 from config import DIR_CATALOGS, DET_TYPE, TRANSLATE_FNAME, TARGET_ZP, ITERATE_ZP, FILTERS
 
@@ -33,7 +34,7 @@ translate_file = os.path.join(DIR_CONFIG, TRANSLATE_FNAME)
 params = {}
 
 params['CATALOG_FILE'] = os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_CATALOG.fits')
-params['MAIN_OUTPUT_FILE'] = os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_CATALOG.eazypy')
+params['MAIN_OUTPUT_FILE'] = os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_CATALOG.{TEMPLATES}.eazypy')
 
 params['APPLY_PRIOR'] = 'n'
 params['PRIOR_ABZP'] = TARGET_ZP
@@ -47,7 +48,10 @@ params['USE_ZSPEC_FOR_REST'] = 'n'
 params['Z_MAX'] = 30
 params['Z_STEP'] = 0.1
 
-params['TEMPLATES_FILE'] = 'templates/fsps_full/tweak_fsps_QSF_12_v3.param'
+if TEMPLATES == 'fsps_full':
+    params['TEMPLATES_FILE'] = 'templates/fsps_full/tweak_fsps_QSF_12_v3.param'
+elif TEMPLATES == 'SFHZ':
+    params['TEMPLATES_FILE'] = 'templates/sfhz/carnall_sfhz_13.param'
 
 params['VERBOSITY'] = 1
 
@@ -87,7 +91,7 @@ ez.fit_parallel(sample, n_proc=4, prior=False, beta_prior=False)
 
 ez.zphot_zspec(include_errors=True, zmax=6.5)
 fig = plt.gcf()
-fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_photoz-specz.pdf'))
+fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_{TEMPLATES}.photoz-specz.pdf'))
 
 
 zout, hdu = ez.standard_output(rf_pad_width=0.5, rf_max_err=2, 
@@ -120,7 +124,7 @@ zout['u_v'] = u_v
 zout['v_j'] = v_j
 zout['uvj_class'] = clas
     
-zout.write(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}.zout.fits'), overwrite=True)
+zout.write(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_{TEMPLATES}.zout.fits'), overwrite=True)
 
 import eazy.hdf5
 eazy.hdf5.write_hdf5(ez, h5file=ez.param['MAIN_OUTPUT_FILE'] + '.h5')
@@ -171,7 +175,7 @@ for test, ylabel, fname in zip((rel_diff, ztest, dmag),
     ax.set(xlim=(0.1, 5), xlabel='Observed Wavelength ($\mu$m)', ylabel=ylabel)
 
     fig.tight_layout()
-    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_{fname}.pdf'))
+    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_{TEMPLATES}_{fname}.pdf'))
 
 
 # 2. mod - obs vs. z, per band
@@ -228,7 +232,7 @@ for test, ylabel, fname in zip((rel_diff, ztest, dmag),
         ax.text(0.65, 0.8, f'$\Delta={delta:2.3f}$', transform=ax.transAxes, fontsize=15)
 
     fig.tight_layout()
-    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_{fname}.pdf'))
+    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_{TEMPLATES}_{fname}.pdf'))
 
 
 
@@ -288,7 +292,7 @@ for test, ylabel, fname in zip((rel_diff, ztest, dmag),
         ax.text(0.65, 0.8, f'$\Delta={delta:2.3f}$', transform=ax.transAxes, fontsize=15)
 
     fig.tight_layout()
-    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_{fname}.pdf'))
+    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_{TEMPLATES}_{fname}.pdf'))
 
 # Basic properties
 
@@ -322,4 +326,4 @@ axes[3].set(xlabel='F444W')
 axes[3].semilogy()
 
 fig.tight_layout()
-fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_properties_scatter.pdf'))
+fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_{TEMPLATES}_properties_scatter.pdf'))
