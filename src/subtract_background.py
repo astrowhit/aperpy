@@ -19,7 +19,7 @@ PATH_CONFIG = sys.argv[1]
 sys.path.insert(0, PATH_CONFIG)
 
 from config import DIR_IMAGES, DIR_OUTPUT, BACKTYPE, BACKPARAMS, \
-            FILTERS, MED_CENTER, MED_SIZE, FILTER_SIZE, PIXEL_SCALE, IS_CLUSTER, BLOCK_SIZE
+            FILTERS, MED_CENTERS, MED_SIZE, FILTER_SIZE, PIXEL_SCALE, IS_CLUSTER, BLOCK_SIZE
 
 SCI_FILENAMES = list(glob.glob(DIR_IMAGES+'/*_sci.fits*'))
 WHT_FILENAMES = list(glob.glob(DIR_IMAGES+'/*_wht.fits*'))
@@ -44,23 +44,25 @@ for filename in SCI_FILENAMES:
 
     if IS_CLUSTER:
         # replace with median filter on central window
-        print(f'    Cutting out cluster region ({MED_CENTER}, {MED_SIZE})')
-        subimg = Cutout2D(img, MED_CENTER, MED_SIZE, wcs=WCS(head))
-        subwht = Cutout2D(wht, MED_CENTER, MED_SIZE, wcs=WCS(head))
-        print(f'    Block averaging cluster cutout ({BLOCK_SIZE} x {BLOCK_SIZE})')
-        subwht_blocked = block_reduce(subwht.data, BLOCK_SIZE, func=np.sum) / (BLOCK_SIZE**2)**2
-        subimg_blocked = block_reduce(subimg.data*subwht.data, BLOCK_SIZE, func=np.sum) / subwht_blocked / (BLOCK_SIZE**2)
-        print(f'    Building median filtered cluster image ({FILTER_SIZE}\"; {round_up_to_odd(FILTER_SIZE / (PIXEL_SCALE * BLOCK_SIZE))}px)')
-        start = time.time()
-        subimg_filt = signal.medfilt2d(subimg_blocked, kernel_size=round_up_to_odd(FILTER_SIZE / (PIXEL_SCALE * BLOCK_SIZE)))
-        subimg_filt[subwht_blocked<=0.] = 0.
-        print('    Upsampling back to native pixel scale')
-        # subimg_upscl = block_replicate(subimg_filt, BLOCK_SIZE, conserve_sum=True)
-        subimg_upscl = zoom(subimg_filt, BLOCK_SIZE, order=1) / (BLOCK_SIZE**2)
-        subimg_upscl[subwht.data<=0.] = 0.
-        subimg_upscl[np.isnan(subimg_upscl)] = 0.
-        back[subimg.slices_original[0], subimg.slices_original[1]] = subimg_upscl
-        print(f'    Subtracted median filter over cluster window ({time.time() - start:2.1f}s)')
+        for MED_CENTER in MED_CENTERS:
+            print(f'    Cutting out cluster region ({MED_CENTER}, {MED_SIZE})')
+            subimg = Cutout2D(img, MED_CENTER, MED_SIZE, wcs=WCS(head))
+            subwht = Cutout2D(wht, MED_CENTER, MED_SIZE, wcs=WCS(head))
+            print(f'    Block summing cluster cutout ({BLOCK_SIZE} x {BLOCK_SIZE})')
+            subwht_blocked = block_reduce(subwht.data, BLOCK_SIZE, func=np.sum) / (BLOCK_SIZE**2)**2
+            subimg_blocked = block_reduce(subimg.data*subwht.data, BLOCK_SIZE, func=np.sum) / subwht_blocked / (BLOCK_SIZE**2)
+            print(f'    Building median filtered cluster image ({FILTER_SIZE}\"; {round_up_to_odd(FILTER_SIZE / (PIXEL_SCALE * BLOCK_SIZE))}px)')
+            start = time.time()
+            subimg_filt = signal.medfilt2d(subimg_blocked, kernel_size=round_up_to_odd(FILTER_SIZE / (PIXEL_SCALE * BLOCK_SIZE)))
+            subimg_filt[subwht_blocked<=0.] = 0.
+            print('    Upsampling back to native pixel scale')
+            # subimg_upscl = block_replicate(subimg_filt, BLOCK_SIZE, conserve_sum=True)
+            subimg_upscl = zoom(subimg_filt, BLOCK_SIZE, order=1) / (BLOCK_SIZE**2)
+            print(np.shape(subimg_upscl), np.shape(subimg_filt), np.shape(subwht.data))
+            subimg_upscl[subwht.data<=0.] = 0.
+            subimg_upscl[np.isnan(subimg_upscl)] = 0.
+            back[subimg.slices_original[0], subimg.slices_original[1]] = subimg_upscl
+            print(f'    Subtracted median filter over cluster window ({time.time() - start:2.1f}s)')
 
     if BACKTYPE == 'var':
         for key in BACKPARAMS:

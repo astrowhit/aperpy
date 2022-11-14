@@ -53,9 +53,10 @@ MAX_SEP = 0.3 * u.arcsec
 
 ### MEDIAN FILTERING
 IS_CLUSTER = True
-FILTER_SIZE = 5 # arcsec
-MED_CENTER = SkyCoord(3.587*u.deg, -30.40*u.deg)
+FILTER_SIZE = 8.3 # arcsec
+MED_CENTERS = [SkyCoord(3.587*u.deg, -30.40*u.deg),]
 MED_SIZE = 1.3*u.arcmin
+BLOCK_SIZE = 4 # pixels
 
 ### WEBBPSF GENERATION
 PSF_FOV = 4 # arcsec

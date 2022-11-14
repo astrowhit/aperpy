@@ -50,7 +50,7 @@ params['Z_STEP'] = 0.1
 
 if TEMPLATES == 'fsps_full':
     params['TEMPLATES_FILE'] = 'templates/fsps_full/tweak_fsps_QSF_12_v3.param'
-elif TEMPLATES == 'SFHZ':
+elif TEMPLATES == 'sfhz':
     params['TEMPLATES_FILE'] = 'templates/sfhz/carnall_sfhz_13.param'
 
 params['VERBOSITY'] = 1
