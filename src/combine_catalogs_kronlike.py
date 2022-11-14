@@ -262,7 +262,7 @@ if ZCONF is not None:
     conf_constraint = np.isin(ztable[ZCONF[0]], np.array(ZCONF[1]))
 ztable = ztable[conf_constraint & (ztable[ZDEC] >= -90.) & (ztable[ZDEC] <= 90.)]
 zcoords = SkyCoord(ztable[ZRA]*u.deg, ztable[ZDEC]*u.deg)
-catcoords = SkyCoord(maincat[ZRA], maincat[ZDEC])
+catcoords = SkyCoord(maincat['RA'], maincat['DEC'])
 idx, d2d, d3d = catcoords.match_to_catalog_sky(zcoords)
 max_sep = MAX_SEP
 sep_constraint = d2d < max_sep

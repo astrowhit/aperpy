@@ -22,7 +22,8 @@ else:
     convolve_kwargs = {}
 
 for filename in SCI_FILENAMES:
-    if os.path.exists(filename.replace('.fits.gz', '_f444w-matched.fits.gz')): continue
+    print(filename)
+    # if os.path.exists(filename.replace('.fits.gz', '_f444w-matched.fits.gz')): continue
     if f'sci_skysubvar' not in filename: continue
     for band in FILTERS:
         if band in filename:
