@@ -20,7 +20,7 @@ DETECTION_PARAMS = dict(
     )
 
 PHOT_APER = [0.16, 0.32, 0.48, 0.7 , 1.  , 2.] # diameter in arcsec
-PHOT_AUTOPARAMS = 1.5, 2.5 # Kron-scaling radius, mimumum circular diameter (not used!)
+PHOT_AUTOPARAMS = 1.5, 2.5 # Kron-scaling radius, mimumum circular diameter
 PHOT_FLUXFRAC = 0.5, 0.6 # FLUX_RADIUS at 50% and 60% of flux
 PHOT_KRONPARAM = 6.0 # SE hardcodes this as 6.0
 

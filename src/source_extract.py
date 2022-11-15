@@ -238,12 +238,14 @@ for ind, PHOT_NICKNAME in enumerate(FILTERS):
     kronrad, krflag = sep.kron_radius(photsci, xphot, yphot, #objects['x'], objects['y'],
                                         objects['a'], objects['b'], objects['theta'], PHOT_KRONPARAM) # SE uses 6
     kronrad[np.isnan(kronrad)] = 0.
+    kronrad *= PHOT_AUTOPARAMS[0]
+    kronrad = np.maximum(kronrad, PHOT_AUTOPARAMS[1])
     # print(np.isnan(kronrad).sum(), np.max(kronrad), np.min(kronrad))
     objects['theta'][objects['theta'] > np.pi / 2.] = np.pi / 2. # numerical rounding correction!
     flux, fluxerr, flag = sep.sum_ellipse(photsci, xphot, yphot, #objects['x'], objects['y'],
-                                        objects['a'], objects['b'], objects['theta'], PHOT_AUTOPARAMS[0]*kronrad,
+                                        objects['a'], objects['b'], objects['theta'], kronrad,
                                         err = photerr,
-                                        subpix=1)
+                                        subpix=0)
 
     badflux = (flux == 0.) | ~np.isfinite(flux)
     badfluxerr = (fluxerr <= 0.) | ~np.isfinite(fluxerr)
@@ -268,9 +270,8 @@ for ind, PHOT_NICKNAME in enumerate(FILTERS):
     # r_min = PHOT_AUTOPARAMS[1] / 2.  # minimum diameter = 3.5
     kronrad_circ = kronrad * np.sqrt(objects['a'] * objects['b'])
     # use_circle = kronrad_circ < r_min
-    # kronrad_circ[use_circle] = r_min
     # cflux, cfluxerr, cflag = sep.sum_circle(photsci, xphot[use_circle], yphot[use_circle],
-    #                                         r=r_min, subpix=1,
+    #                                         r=r_min, subpix=0,
     #                                         err = photerr, gain=1.0
     #                                         )
 
