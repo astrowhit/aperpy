@@ -122,7 +122,7 @@ def hist_points(x, bins=None, weights=None):
     return bin_centers, bin_widths, counts, count_unc
 
 # Empty Apertures
-def emtpy_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=PIXEL_SCALE, plotname=None, zpt_factor=1.):
+def empty_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=PIXEL_SCALE, plotname=None, zpt_factor=1.):
     from alive_progress import alive_bar
     import numpy as np
     import scipy.stats as stats
@@ -148,30 +148,41 @@ def emtpy_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=PIXEL
 
     kept = 0
     positions = np.zeros((N, 2))
-    checkimg = (segmap == 0) & ~np.isnan(img) & (wht>0)
+    checkimg = (segmap == 0) & (~np.isnan(img)) & (wht>0)
     with alive_bar(N) as bar:
         while kept < N:
             px, py = np.random.uniform(0, 1, 2)
-            x, y = int(px * size[1]), int(py * size[0])
+            x, y = int(px * size[0]), int(py * size[1])
             xlo, xhi, ylo, yhi = x-maxaper,x+maxaper, y-maxaper,y+maxaper
-            if (xlo < 0) | (xhi > size[1]) | (ylo < 0) | (yhi > size[0]):
+            if (xlo < 0) | (xhi > size[0]) | (ylo < 0) | (yhi > size[1]):
                 continue
             # print(x, y)
             if np.all(checkimg[xlo:xhi, ylo:yhi]):
+                # print(x, y)
+                # print(xlo, xhi, ylo, yhi) 
+                # print(img[xlo:xhi, ylo:yhi])
+                # print()
                 positions[kept] = y, x
                 kept += 1
                 # print(kept, (y, x), np.sum(checkimg[xlo:xhi, ylo:yhi]))
                 bar()
 
     # now do it in parallel
+    print(f'Computing photometry in {len(aperrad)} empty apertures...')
     apertures = [CircularAperture(positions, r=r) for r in aperrad]
     output = aperture_photometry(img, apertures)
+    print(f'Done!')
+
 
     aperstats = OrderedDict()
     aperstats[-1] = {}
     clean_img = img[(wht>0) & (segmap==0) & (~np.isnan(img))].flatten() * zpt_factor
-    kmean, kmed, kstd = sigma_clipped_stats(clean_img, sigma=3.)
-    ksnmad = mad_std(sigma_clip(clean_img))
+
+    print('Sigma clipping...')
+    klip_clean_img = sigma_clip(clean_img)
+    print('Done. Saving statistics...')
+    kmean, kmed, kstd = np.mean(klip_clean_img), np.median(klip_clean_img), np.std(klip_clean_img)
+    ksnmad = mad_std(klip_clean_img)
     aperstats[-1]['ksnmad'] = ksnmad
     aperstats[-1]['kmean'] = kmean
     aperstats[-1]['kmed'] = kmed
@@ -185,10 +196,11 @@ def emtpy_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=PIXEL
     # Define the Gaussian function
     from scipy.stats import norm
 
-    pc = np.nanpercentile(sigma_clip(clean_img), q=(5, 95))
+    print('Fitting Gaussians...')
+    pc = np.nanpercentile(klip_clean_img, q=(5, 95))
     bins = np.linspace(pc[0], pc[1], 20)
     px = np.linspace(pc[0], pc[1], 1000)
-    bin_centers, bin_widths, counts, count_unc = hist_points(sigma_clip(clean_img), bins=bins)
+    bin_centers, bin_widths, counts, count_unc = hist_points(klip_clean_img, bins=bins)
     g_init = models.Gaussian1D(amplitude=np.max(counts), mean=kmean, stddev=kstd)
     fit_g = fitting.LevMarLSQFitter()
     gmodel = fit_g(g_init, bin_centers, counts)
@@ -225,24 +237,29 @@ def emtpy_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=PIXEL
     # measure moments + percentiles; AD test
     for i, diam in enumerate(aper):
         phot = output[f'aperture_sum_{i}'] * zpt_factor
-        phot_neg = np.array(list(phot[phot<0]) + list(phot[phot<0]*-1))
         aperstats[diam] = {}
-
 
         aperstats[diam]['phot'] = phot
         ax = axes[i+1]
 
+        phot = phot[~(np.isnan(phot) | (phot==0))]
+        print(f'Running statistics on {len(phot)} good measurements')
+
         snmad = mad_std(phot)
         med = np.nanmedian(phot)
 
-        pc = np.nanpercentile(sigma_clip(phot), q=(5, 95))
+        print('Sigma clipping...')
+        klip_phot = sigma_clip(phot)
+
+        pc = np.nanpercentile(klip_phot, q=(5, 95))
         bins = np.linspace(pc[0], pc[1], 20)
         px = np.linspace(pc[0], pc[1], 1000)
 
+        print('Fitting Gaussians...')
         from scipy.optimize import curve_fit
         kmean, kmed, kstd = sigma_clipped_stats(phot, sigma=3.)
-        ksnmad = mad_std(sigma_clip(phot))
-        bin_centers, bin_widths, counts, count_unc = hist_points(sigma_clip(phot), bins=bins)
+        ksnmad = mad_std(klip_phot)
+        bin_centers, bin_widths, counts, count_unc = hist_points(klip_phot, bins=bins)
         g_init = models.Gaussian1D(amplitude=np.max(counts), mean=kmean, stddev=kstd)
         fit_g = fitting.LevMarLSQFitter()
         gmodel = fit_g(g_init, bin_centers, counts)

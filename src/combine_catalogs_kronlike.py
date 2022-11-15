@@ -101,8 +101,6 @@ for filter in FILTERS:
         newcols = [coln for coln in cat.colnames if coln not in maincat.colnames]
         maincat = hstack([maincat, cat[newcols]])
 
-# add ID at the end
-maincat.add_column(Column(1+np.arange(len(maincat)), name='ID'), 0)
 outfilename = os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_COMBINED_CATALOG.fits')
 
 # grab REF_BAND PSF convolved to kernel
@@ -225,6 +223,7 @@ size = maincat[f'{PS_FILT}_FLUX_APER{str(PS_FLUXRATIO[0]).replace(".", "_")}_COL
                 / maincat[f'{PS_FILT}_FLUX_APER{str(PS_FLUXRATIO[1]).replace(".", "_")}_COLOR']
 is_star = (size > PS_FLUXRATIO_RANGE[0]) & (size < PS_FLUXRATIO_RANGE[1])
 is_star &= (mag < PS_MAGLIMIT)
+print(f'Flagged {np.sum(is_star)} objects as point-like (stars)')
 
 fig, ax = plt.subplots(ncols=1, figsize=(5, 5))
 ax.scatter(mag, size, s=3, alpha=0.2, c='grey')
@@ -238,12 +237,13 @@ maincat.add_column(Column(is_star.astype(int), name='star_flag'))
 
 # bad pixel flag
 str_aper = str(BP_APERSIZE).replace('.', '_')
-BP_FILT_SEL = BP_FILT[DET_NICKNAME[:2]]
+BP_FILT_SEL = BP_FILT[DET_NICKNAME.split('_')[0]]
 mag = TARGET_ZP - 2.5*np.log10(maincat[f'{BP_FILT_SEL}_FLUX_APER{str_aper}_TOTAL'])
 size = maincat[f'{BP_FILT_SEL}_FLUX_APER{str(BP_FLUXRATIO[0]).replace(".", "_")}_COLOR']  \
                 / maincat[f'{BP_FILT_SEL}_FLUX_APER{str(BP_FLUXRATIO[1]).replace(".", "_")}_COLOR']
 is_badpixel = (size > BP_FLUXRATIO_RANGE[0]) & (size < BP_FLUXRATIO_RANGE[1])
 is_badpixel &= (mag < BP_MAGLIMIT)
+print(f'Flagged {np.sum(is_badpixel)} objects as bad pixels')
 
 fig, ax = plt.subplots(ncols=1, figsize=(5, 5))
 ax.scatter(mag, size, s=3, alpha=0.2, c='grey')
@@ -266,6 +266,7 @@ catcoords = SkyCoord(maincat['RA'], maincat['DEC'])
 idx, d2d, d3d = catcoords.match_to_catalog_sky(zcoords)
 max_sep = MAX_SEP
 sep_constraint = d2d < max_sep
+print(f'Matched to {np.sum(sep_constraint)} objects with spec-z')
 
 for colname in ztable.colnames:
     filler = np.zeros(len(maincat), dtype=ztable[colname].dtype)
@@ -281,10 +282,12 @@ for colname in ztable.colnames:
     maincat.add_column(Column(filler, name=colname))
 
 # use flag (minimum SNR cut + not a star)
-snr_ref = maincat[f'{REF_BAND}_FLUX_APER0_7_COLOR'] / maincat[f'{REF_BAND}_FLUXERR_APER0_7_COLOR']
+str_aper = str(SCI_APER).replace('.', '_')
+snr_ref = maincat[f'{REF_BAND}_FLUX_APER{str_aper}_COLOR'] / maincat[f'{REF_BAND}_FLUXERR_APER{str_aper}_COLOR']
 use_phot = np.zeros(len(maincat))
 use_phot[snr_ref >= 3] = 1
 use_phot[is_star | is_badpixel] = 0
+print(f'Flagged {np.sum(use_phot)} objects as reliable ({np.sum(use_phot)/len(use_phot)*100:2.1f}%)')
 maincat.add_column(Column(use_phot, name='use_phot'))
 # use 1 only
 

@@ -1,6 +1,6 @@
 
 import numpy as np
-from astropy.table import Table
+from astropy.table import Table, Column
 from astropy.io import fits
 from astropy.wcs import WCS, utils
 import astropy.units as u
@@ -8,7 +8,7 @@ import sep
 import os, sys, glob
 from astropy.convolution import Gaussian2DKernel
 from regions import EllipseSkyRegion, Regions, CircleSkyRegion
-from webb_tools import emtpy_apertures
+from webb_tools import empty_apertures
 
 import sys
 PATH_CONFIG = sys.argv[1]
@@ -96,6 +96,7 @@ hdul.writeto(os.path.join(FULLDIR_CATALOGS, SEGMAP_NAME), overwrite=True)
 
 # CLEAN UP
 catalog = Table(objects)
+catalog.add_column(Column(1+np.arange(len(catalog)), name='ID'), 0)
 detcoords = detwcs.pixel_to_world(catalog['x'], catalog['y'])
 catalog['RA'] = [c.ra for c in detcoords]
 catalog['DEC'] = [c.dec for c in detcoords]
@@ -106,7 +107,8 @@ for coord, obj in zip(detcoords, catalog):
     width = 2*obj['a'] * pixel_scale / 3600. * u.deg
     height = 2*obj['b'] * pixel_scale / 3600. * u.deg
     angle = np.rad2deg(obj['theta']) * u.deg
-    regs.append(EllipseSkyRegion(coord, width, height, angle))
+    objid = str(obj['ID'])
+    regs.append(EllipseSkyRegion(coord, width, height, angle, meta={'label':objid}))
     # regs.append(PointSkyRegion(coord))
 regs = np.array(regs)
 bigreg = Regions(regs)
@@ -337,7 +339,7 @@ for ind, PHOT_NICKNAME in enumerate(FILTERS):
     empty_aper = np.sort(empty_aper)
     plotname = os.path.join(FULLDIR_CATALOGS, f'figures/{PHOT_NICKNAME}_K{KERNEL}_emptyaper.pdf')
     zpt_factor = conv_flux(PHOT_ZPT)
-    stats[PHOT_NICKNAME] = emtpy_apertures(photsci, photwht, segmap, N=int(1e3), pixscl=PIXEL_SCALE,
+    stats[PHOT_NICKNAME] = empty_apertures(photsci, photwht, segmap, N=int(1e3), pixscl=PIXEL_SCALE,
                                            aper=empty_aper, plotname=plotname, zpt_factor=zpt_factor)
 
     # WRITE OUT
