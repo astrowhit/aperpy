@@ -89,7 +89,7 @@ sample = ez.idx # all
 
 ez.fit_parallel(sample, n_proc=4, prior=False, beta_prior=False)
 
-ez.zphot_zspec(include_errors=True, zmax=6.5)
+ez.zphot_zspec(include_errors=True, zmax=6.5, selection=ez.cat['use_phot']==1)
 fig = plt.gcf()
 fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_{TEMPLATES}.photoz-specz.pdf'))
 

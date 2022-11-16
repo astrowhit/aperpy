@@ -219,7 +219,7 @@ def empty_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=PIXEL
         axes[0].errorbar(bin_centers, counts, xerr=bin_widths/2., yerr=count_unc, fmt='o', c='grey')
         # # axes[0].hist(clean_img_neg, bins=bins, color='grey', histtype='step', density=True, label=f'1px kstd_neg:{aperstats[-1]["kstd_neg"]:2.2f}')
         # print(gmodel.stddev.value, type(gmodel.stddev.value))
-        axes[0].plot(px, gmodel(px), c='k', label=f'1px std: {gmodel.stddev.value:2.2f}')
+        axes[0].plot(px, gmodel(px), c='k', label=f'1px std: {gmodel.stddev.value:2.2f}  ksnmad: {ksnmad:2.2f}')
 
         axes[0].legend(loc='upper left')
         # ax.axvline(-aperstats['sigma'], color='k', ls='dashed')
@@ -283,7 +283,7 @@ def empty_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=PIXEL
         if plotname is not None:
             ax.errorbar(bin_centers, counts, xerr=bin_widths/2., yerr=count_unc, fmt='o', c='grey')
             # # ax.hist(clean_img_neg, bins=bins, color='grey', histtype='step', density=True, label=f'1px kstd_neg:{aperstats[-1]["kstd_neg"]:2.2f}')
-            ax.plot(px, gmodel(px), c=colors(i), label=f'{diam:2.2f}\" std: {gmodel.stddev.value:2.2f}')
+            ax.plot(px, gmodel(px), c=colors(i), label=f'{diam:2.2f}\" std: {gmodel.stddev.value:2.2f} ksnmad: {ksnmad:2.2f}')
             # ax.hist(sigma_clip(phot), bins=bins, color='k' , histtype='step', density=True, )
 
             # ax.plot(px, norm.pdf(px, *p), c=colors(i), )
@@ -364,14 +364,18 @@ def get_psf(filt, field='uncover', angle=None, fov=4, og_fov=10, pixscl=PIXEL_SC
     import os
     from astropy.io import ascii
 
-    from config import SW_FILTERS, LW_FILTERS
+    from config import SW_FILTERS, LW_FILTERS, PATH_SW_ENERGY, PATH_LW_ENERGY
 
     # Check if filter is valid and get correction term
     if filt in SW_FILTERS:
+        if fov != 4:
+            print('WARNING! I will not fetch the correct encircled energy for your requested FOV!')
         # 17 corresponds with 2" radius (i.e. 4" FOV)
-        encircled = ascii.read(os.path.join(PATH_CONFIG, 'Encircled_Energy_SW.txt'))[17][filt]
+        encircled = ascii.read(PATH_SW_ENERGY)[17][filt]
     elif filt in LW_FILTERS:
-        encircled = ascii.read(os.path.join(PATH_CONFIG, 'Encircled_Energy_LW.txt'))[17][filt]
+        if fov != 4:
+            print('WARNING! I will not fetch the correct encircled energy for your requested FOV!')
+        encircled = ascii.read(PATH_LW_ENERGY)[17][filt]
     else:
         print(f'{filt} is NOT a valid NIRCam filter!')
         return

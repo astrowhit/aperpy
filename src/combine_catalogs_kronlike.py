@@ -38,7 +38,7 @@ FNAME_REF_PSF = f'{DIR_PSFS}/psf_{FIELD}_{REF_BAND.upper()}_4arcsec.fits'
 def sigma_aper(filter, weight, weight_med, apersize=0.7):
     # Equation 5
     # apersize = str(apersize).replace('.', '_') + 'arcsec'
-    sigma_nmad_filt = stats[filter.lower()][apersize]['ksnmad']
+    sigma_nmad_filt = stats[filter.lower()][apersize]['fit_std']
     # sigma_nmad_filt = ERROR_TABLE[f'e{apersize}'][ERROR_TABLE['filter']==filter.lower()][0]
     # g_i = 1.*2834.508 # here's to hoping.  EFFECTIVE GAIN!
     fluxvar = ( sigma_nmad_filt / np.sqrt(weight / weight_med) )**2  #+ (flux_aper / g_i)
@@ -268,6 +268,7 @@ max_sep = MAX_SEP
 sep_constraint = d2d < max_sep
 print(f'Matched to {np.sum(sep_constraint)} objects with spec-z')
 
+maincat.add_column(Column(d2d.to(u.arcsec), name='z_spec_radius'))
 for colname in ztable.colnames:
     filler = np.zeros(len(maincat), dtype=ztable[colname].dtype)
     try:
@@ -277,6 +278,7 @@ for colname in ztable.colnames:
     filler[sep_constraint] = ztable[idx[sep_constraint]][colname]
     if colname == ZCOL:
         colname = 'z_spec'
+        filler[filler<=0] = -1
     else:
         colname = f'z_spec_{colname}'
     maincat.add_column(Column(filler, name=colname))

@@ -42,6 +42,9 @@ DIR_PSFS = os.path.join(WORKING_DIR, 'intermediate/PSF/')
 DIR_KERNELS = os.path.join(WORKING_DIR, 'intermediate/kernels/') # Generally
 DIR_CATALOGS = os.path.join(WORKING_DIR, 'catalogs/')
 
+PATH_SW_ENERGY = '/Users/jweaver/Projects/Software/aperpy/config/Encircled_Energy_SW.txt'
+PATH_LW_ENERGY = '/Users/jweaver/Projects/Software/aperpy/config/Encircled_Energy_LW.txt'
+
 DIRWHT_REPLACE = (DIR_OUTPUT, DIR_IMAGES)
 DIR_SFD = '~/Projects/Common/py_tools/sfddata-master'
 ZSPEC = '/Volumes/External1/Projects/Current/UNCOVER/data/vTest/external/zspec_abell2744_all.fits'
