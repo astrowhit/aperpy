@@ -250,7 +250,7 @@ for test, ylabel, fname in zip((rel_diff, ztest, dmag),
     fig, axes = plt.subplots(nrows=int(ez.NFILT/2.), ncols=2, figsize=(10, 2*int(ez.NFILT/2.+1)), sharey=True, sharex=True)
     [ax.set_xlabel('Mag (AB)') for ax in axes[-1]]
     axes = axes.flatten()
-    axes[-1].set(xlim=(19, 28.25))
+    axes[-1].set(xlim=(19, 31))
     fig.suptitle(ylabel, y=0.99, fontsize=20)
 
     from aperpy.src.webb_tools import histedges_equalN, binned_med

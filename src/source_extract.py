@@ -150,6 +150,8 @@ for ind, PHOT_NICKNAME in enumerate(FILTERS):
     PATH_PHOTHEAD = PATH_PHOTSCI
     PATH_PHOTWHT = glob.glob(os.path.join(dir_weight, PHOTWHT_NAME))[0]
     PATH_PHOTMASK = 'None'
+    print(PATH_PHOTSCI)
+    print(PATH_PHOTWHT)
 
     PHOT_ZPT = PHOT_ZP[PHOT_NICKNAME.lower()] #calc_zpt(PHOT_NICKNAME)
     print(f'Zeropoint for {PHOT_NICKNAME}: {PHOT_ZPT}')
@@ -331,15 +333,17 @@ for ind, PHOT_NICKNAME in enumerate(FILTERS):
 
     catalog['SRC_MEDWHT'] = srcmedwht
     catalog['SRC_MEANWHT'] = srcmeanwht
-    medwht = np.nanmedian(photwht[photwht>0])
-    catalog['MED_WHT'] = medwht
+    catalog['MED_WHT'] = np.nanmedian(photwht[photwht>0])
+    catalog['MAX_WHT'] = np.nanmax(photwht[photwht>0])
 
     # COMPUTE EMPTY APERTURE ERRORS + SAVE TO MASTER FILE
     empty_aper = list(PHOT_APER)+list(np.linspace(PHOT_APER[0], PHOT_APER[-1], 30))
     empty_aper = np.sort(empty_aper)
     plotname = os.path.join(FULLDIR_CATALOGS, f'figures/{PHOT_NICKNAME}_K{KERNEL}_emptyaper.pdf')
     zpt_factor = conv_flux(PHOT_ZPT)
-    stats[PHOT_NICKNAME] = empty_apertures(photsci, photwht, segmap, N=int(1e3), pixscl=PIXEL_SCALE,
+    noise_equal = photsci * np.sqrt(photwht)
+    noise_equal[photwht<=0] = 0.
+    stats[PHOT_NICKNAME] = empty_apertures(noise_equal, photwht, segmap, N=int(1e4), pixscl=PIXEL_SCALE,
                                            aper=empty_aper, plotname=plotname, zpt_factor=zpt_factor)
 
     # WRITE OUT

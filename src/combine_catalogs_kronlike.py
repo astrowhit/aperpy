@@ -35,26 +35,27 @@ stats = np.load(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_emptya
 
 FNAME_REF_PSF = f'{DIR_PSFS}/psf_{FIELD}_{REF_BAND.upper()}_4arcsec.fits'
 
-def sigma_aper(filter, weight, weight_med, apersize=0.7):
+def sigma_aper(filter, weight, apersize=0.7):
     # Equation 5
     # apersize = str(apersize).replace('.', '_') + 'arcsec'
     sigma_nmad_filt = stats[filter.lower()][apersize]['fit_std']
     # sigma_nmad_filt = ERROR_TABLE[f'e{apersize}'][ERROR_TABLE['filter']==filter.lower()][0]
     # g_i = 1.*2834.508 # here's to hoping.  EFFECTIVE GAIN!
-    fluxvar = ( sigma_nmad_filt / np.sqrt(weight / weight_med) )**2  #+ (flux_aper / g_i)
-    fluxvar[weight<=0] = np.inf
-    return np.sqrt(fluxvar)
+    fluxerr = sigma_nmad_filt / np.sqrt(weight)  #+ (flux_aper / g_i)
+    fluxerr[weight<=0] = np.inf
+    return fluxerr
 
 def sigma_total(sigma_aper, flux_ref_total, flux_ref_aper):
     # equation 6
     return sigma_aper * (flux_ref_total / flux_ref_aper)
 
-def sigma_ref_total(sigma1, alpha, beta, kronrad_circ, wht_ref, medwht_ref, flux_refauto):
+def sigma_ref_total(sigma1, alpha, beta, kronrad_circ, wht_ref):
     # equation 7
-    term1 = ((sigma1 * alpha * (np.pi * kronrad_circ**2)**(beta/2.)) / np.sqrt(wht_ref / medwht_ref) )**2
+    term1 = (sigma1 * alpha * (np.pi * kronrad_circ**2)**(beta/2.)) / np.sqrt(wht_ref)
+    term1[wht_ref<=0] = np.inf
     # g_ref = 1.
     # term2 = flux_refauto / g_ref
-    return np.sqrt(term1) # + term2)
+    return term1 # + term2)
 
 # def sigma_full(sigma_total, sigma_ref_total, sigma_total_ref):
 #     # equation 8
@@ -113,11 +114,16 @@ else:
 
 # Get some static refband stuff 
 plotname = os.path.join(FULLDIR_CATALOGS, f'figures/aper_{REF_BAND}_nmad.pdf')
-p, pcov, sigma1 = fit_apercurve(stats[REF_BAND], plotname=plotname, stat_type=['ksnmad'], pixelscale=PIXEL_SCALE)
-alpha, beta = p['ksnmad']
-sig1 = sigma1['ksnmad']
+p, pcov, sigma1 = fit_apercurve(stats[REF_BAND], plotname=plotname, stat_type=['fit_std'], pixelscale=PIXEL_SCALE)
+alpha, beta = p['fit_std']
+sig1 = sigma1['fit_std']
 wht_ref = maincat[f'{REF_BAND}_SRC_MEDWHT']
-medwht_ref = maincat[f'{REF_BAND}_MED_WHT']
+# medwht_ref = maincat[f'{REF_BAND}_MED_WHT']
+
+for filter in FILTERS:
+    relwht = maincat[f'{filter}_SRC_MEDWHT'] / maincat[f'{filter}_MAX_WHT']
+    newcoln = f'{filter}_RELWHT'
+    maincat.add_column(Column(relwht, newcoln))
 
 for apersize in PHOT_APER:
     str_aper = str(apersize).replace('.', '_')
@@ -134,23 +140,23 @@ for apersize in PHOT_APER:
     psffrac_ref_auto = psf_cog(conv_psfmodel, nearrad = kronrad_circ) # in pixels
     # F160W kernel convolved REF_BAND PSF + missing flux from F160W beyond 2" radius
     f_ref_total = f_ref_auto / psffrac_ref_auto # equation 9
-    sig_ref_total = sigma_ref_total(sig1, alpha, beta, kronrad_circ, wht_ref, medwht_ref, f_ref_auto)
+    sig_ref_total = sigma_ref_total(sig1, alpha, beta, kronrad_circ, wht_ref)
     newcoln =f'{REF_BAND}_FLUXERR_REFTOTAL_MINDIAM{str_aper}'
     maincat.add_column(Column(sig_ref_total, newcoln))
     
     tot_corr = f_ref_total / f_ref_aper
     maincat.add_column(Column(1./tot_corr, f'TOTAL_CORR_APER{str_aper}'))
-    sig_ref_aper = sigma_aper(REF_BAND.upper(), wht_ref, medwht_ref, apersize) # sig_aper,REF_BAND
+    sig_ref_aper = sigma_aper(REF_BAND.upper(), wht_ref, apersize) # sig_aper,REF_BAND
     sig_total_ref = sigma_total(sig_ref_aper, f_ref_total, f_ref_aper) # sig_total,REF_BAND
 
     for filter in FILTERS:
         f_aper =maincat[f'{filter}_FLUX_APER{str_aper}']
         f_total = flux_total(f_aper, f_ref_total, f_ref_aper)
         wht = maincat[f'{filter}_SRC_MEDWHT']
-        medwht = maincat[f'{filter}_MED_WHT']
+        # medwht = maincat[f'{filter}_MED_WHT']
 
         # get the flux uncertainty in the aperture for this band
-        sig_aper = sigma_aper(filter, wht, medwht, apersize)
+        sig_aper = sigma_aper(filter, wht, apersize)
         # do again for each aperture
         sig_total = sigma_total(sig_aper, f_ref_total, f_ref_aper)
         # sig_full = sigma_full(sig_total, sig_ref_total, sig_total_ref)
@@ -340,6 +346,7 @@ for apersize in PHOT_APER:
         for filter in FILTERS:
             cols[f'{filter}_FLUX_APER{str_aper}_TOTAL'] = f'f_{filter}'
             cols[f'{filter}_FLUXERR_APER{str_aper}_TOTAL'] = f'e_{filter}'
+            cols[f'{filter}_RELWHT'] = f'w_{filter}'
 
         cols[f'TOTAL_CORR_APER{str_aper}'] = 'tot_cor'
         # cols[f'{REF_BAND}_FLUXERR_REFTOTAL'] = 'tot_ekron_f444w'

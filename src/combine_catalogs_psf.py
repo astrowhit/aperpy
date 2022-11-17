@@ -29,15 +29,15 @@ FULLDIR_CATALOGS = os.path.join(DIR_CATALOGS, f'{DET_NICKNAME}_{DET_TYPE}/{KERNE
 stats = np.load(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_emptyaper_stats.npy'), allow_pickle=True).item()
 
 
-def sigma_aper(filter, weight, weight_med, apersize=0.7):
+def sigma_aper(filter, weight, apersize=0.7):
     # Equation 5
     # apersize = str(apersize).replace('.', '_') + 'arcsec'
     sigma_nmad_filt = stats[filter.lower()][apersize]['fit_std']
-    # sigma_nmad_filt = ERROR_TABLE[f'e{apersize}'][ERROR_TABLE['filter']==filter.lower()][0] 
+    # sigma_nmad_filt = ERROR_TABLE[f'e{apersize}'][ERROR_TABLE['filter']==filter.lower()][0]
     # g_i = 1.*2834.508 # here's to hoping.  EFFECTIVE GAIN!
-    fluxvar = ( sigma_nmad_filt / np.sqrt(weight / weight_med) )**2  #+ (flux_aper / g_i)
-    fluxvar[weight<=0] = np.inf
-    return np.sqrt(fluxvar)
+    fluxerr = sigma_nmad_filt / np.sqrt(weight)  #+ (flux_aper / g_i)
+    fluxerr[weight<=0] = np.inf
+    return fluxerr
 
 def sigma_total(sigma_aper, frac_aper):
     # equation 6
@@ -78,39 +78,43 @@ for filter in FILTERS:
 
 outfilename = os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_COMBINED_CATALOG.fits')
     
+for filter in FILTERS:
+    relwht = maincat[f'{filter}_SRC_MEDWHT'] / maincat[f'{filter}_MAX_WHT']
+    newcoln = f'{filter}_RELWHT'
+    maincat.add_column(Column(relwht, newcoln))
+
 for apersize in PHOT_APER:
     str_aper = str(apersize).replace('.', '_')
 
-    for filt in FILTERS:
-        psfmodel = fits.getdata(f'{DIR_PSFS}/psf_{FIELD}_{filt.upper()}_4arcsec.fits')
+    for filter in FILTERS:
+        psfmodel = fits.getdata(f'{DIR_PSFS}/psf_{FIELD}_{filter.upper()}_4arcsec.fits')
 
         frac_aper = psf_cog(psfmodel, nearrad=apersize / 2. / PIXEL_SCALE)
-        f_aper = maincat[f'{filt}_FLUX_APER{str_aper}']
+        f_aper = maincat[f'{filter}_FLUX_APER{str_aper}']
         f_total = flux_total(f_aper, frac_aper)
-        wht = maincat[f'{filt}_SRC_MEDWHT']
-        medwht = maincat[f'{filt}_MED_WHT']
+        wht = maincat[f'{filter}_SRC_MEDWHT']
+        # medwht = maincat[f'{filter}_MED_WHT']
         
         # get the flux uncertainty in the aperture for this band
-        sig_aper = sigma_aper(filt, wht, medwht, apersize)
+        sig_aper = sigma_aper(filter, wht, apersize)
         # do again for each aperture
         sig_total = sigma_total(sig_aper, frac_aper) 
         # sig_full = sigma_full(sig_total, sig_ref_total, sig_total_ref)
 
-        # add new columns
-        newcoln = f'{filt}_FLUX_APER{str_aper}_COLOR'
+        newcoln = f'{filter}_FLUX_APER{str_aper}_COLOR'
         maincat.add_column(Column(f_aper, newcoln))
-        newcoln =f'{filt}_FLUXERR_APER{str_aper}_COLOR'
+        newcoln =f'{filter}_FLUXERR_APER{str_aper}_COLOR'
         maincat.add_column(Column(sig_aper, newcoln))
 
-        newcoln = f'{filt}_FLUX_APER{str_aper}_PSF'
+        newcoln = f'{filter}_FLUX_APER{str_aper}_PSF'
         maincat.add_column(Column(f_total, newcoln))
-        newcoln = f'{filt}_FLUXERR_APER{str_aper}_PSF'
+        newcoln = f'{filter}_FLUXERR_APER{str_aper}_PSF'
         maincat.add_column(Column(sig_total, newcoln))
 
-        newcoln = f'{filt}_PSF_CORR_APER{str_aper}'
+        newcoln = f'{filter}_PSF_CORR_APER{str_aper}'
         maincat.add_column(Column(1./frac_aper, newcoln))
 
-        # newcoln =f'{filt}_FLUXERR_APER{str_aper}_FULL'
+        # newcoln =f'{filter}_FLUXERR_APER{str_aper}_FULL'
         # maincat.add_column(Column(sig_full, newcoln))
         
     
@@ -226,7 +230,6 @@ for colname in ztable.colnames:
         filler[filler<=0] = -1
     else:
         colname = f'z_spec_{colname}'
-        filler -= 1
     maincat.add_column(Column(filler, name=colname))
     
 
@@ -281,6 +284,7 @@ for apersize in PHOT_APER:
         cols[f'{filter}_FLUX_APER{str_aper}_PSF'] = f'f_{filter}'
         cols[f'{filter}_FLUXERR_APER{str_aper}_PSF'] = f'e_{filter}'
         cols[f'{filter}_PSF_CORR_APER{str_aper}'] = f'psf_cor_{filter}'
+        cols[f'{filter}_RELWHT'] = f'w_{filter}'
 
     # wmin?
     cols['z_spec'] = 'z_spec'

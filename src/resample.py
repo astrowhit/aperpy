@@ -39,8 +39,9 @@ for filename in SCI_FILENAMES:
     block_wht = block_reduce(wht, 2, func=np.sum) / 4**2
     block_sci = block_reduce(sci*wht, 2, func=np.sum) / block_wht / 4
 
+
     # update CD matrix for 40 mas + CRPIX
-    header['CRPIX1']  =               5233.0 # / Pixel coordinate of reference point
+    header['CRPIX1']  =               6529.0 # / Pixel coordinate of reference point
     header['CRPIX2']  =               4570.0 # / Pixel coordinate of reference point
     header['CD1_1']   = -1.1111111111111E-05 # / Coordinate transformation matrix element
     header['CD2_2']   =  1.1111111111111E-05 # / Coordinate transformation matrix element
@@ -55,6 +56,7 @@ for filename in SCI_FILENAMES:
     header['LONPOLE'] =                180.0 # / [deg] Native longitude of celestial pole
     header['LATPOLE'] =          -30.3966667 # / [deg] Native latitude of celestial pole
 
+    print(filename.replace('_sci', '_block40_sci'))
     fits.PrimaryHDU(block_sci, header=header).writeto(filename.replace('_sci', '_block40_sci'))
     fits.PrimaryHDU(block_wht, header=header).writeto(filename.replace('_sci', '_block40_wht'))
 

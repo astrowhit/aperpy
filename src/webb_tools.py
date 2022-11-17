@@ -149,6 +149,7 @@ def empty_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=PIXEL
     kept = 0
     positions = np.zeros((N, 2))
     checkimg = (segmap == 0) & (~np.isnan(img)) & (wht>0)
+    print(f'{np.sum(checkimg)/np.sum(checkimg!=-1)*100:2.1f}% of image available for sky measurements...')
     with alive_bar(N) as bar:
         while kept < N:
             px, py = np.random.uniform(0, 1, 2)
