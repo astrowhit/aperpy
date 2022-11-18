@@ -23,7 +23,7 @@ else:
 
 for filename in SCI_FILENAMES:
     print(filename)
-    if os.path.exists(filename.replace('.fits.gz', '_f444w-matched.fits.gz')): continue
+    if os.path.exists(filename.replace('.fits', '_f444w-matched.fits')): continue
     if f'sci_skysubvar' not in filename: continue
     for band in FILTERS:
         if band in filename:

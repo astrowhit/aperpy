@@ -20,7 +20,7 @@ for filt in FILTERS:
     filt = filt.upper()
     if filt not in WEBB_FILTERS: continue
     print(f'Fetching WebbPSF for {filt} at PA {ANGLE}deg...')
-    get_psf(filt, FIELD, ANGLE, output=DIR_PSFS, date=date)
+    get_psf(filt, FIELD, ANGLE, output=DIR_PSFS, date=date, pixscl=PIXEL_SCALE)
 
 
 def renorm_hst_psf(filt, field, dir=DIR_PSFS, pixscl=PIXEL_SCALE, fov=PSF_FOV):
