@@ -149,8 +149,9 @@ def empty_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=PIXEL
 
     kept = 0
     positions = np.zeros((N, 2))
+    medwht = np.zeros(N)
     checkimg = (segmap == 0) & (~np.isnan(img)) & (wht>0)
-    print(f'{np.sum(checkimg)/np.sum(checkimg!=-1)*100:2.1f}% of image available for sky measurements...')
+    print(f'{np.nansum(checkimg)/np.nansum(checkimg!=-1)*100:2.1f}% of image available for sky measurements...')
     with alive_bar(N) as bar:
         while kept < N:
             px, py = np.random.uniform(0, 1, 2)
@@ -165,6 +166,9 @@ def empty_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=PIXEL
                 # print(img[xlo:xhi, ylo:yhi])
                 # print()
                 positions[kept] = y, x
+                intx, inty = int(x), int(y)
+                boxwht = wht[intx-4:intx+5, inty-4:inty+5]
+                medwht[kept] = np.nanmedian(boxwht[boxwht>0])
                 kept += 1
                 # print(kept, (y, x), np.sum(checkimg[xlo:xhi, ylo:yhi]))
                 bar()
@@ -193,6 +197,7 @@ def empty_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=PIXEL
 
     aperstats['Naper'] = N
     aperstats['positions'] = positions
+    aperstats['medwht'] = medwht
 
     # Define the Gaussian function
     from scipy.stats import norm
@@ -422,7 +427,7 @@ def get_psf(filt, field='uncover', angle=None, fov=4, og_fov=10, pixscl=PIXEL_SC
 
 
 
-def make_cutout(ra, dec, size, nickname, filters, dir_images, row=None, plot=True, write=True, include_rgb=False, rgb=['f444w', 'f277w', 'f115w'], redshift=-99, matched_pattern='', dir='.'):
+def make_cutout(ra, dec, size, nickname, filters, dir_images, precomp=None, row=None, plot=True, write=True, include_rgb=False, rgb=['f444w', 'f277w', 'f115w'], redshift=-99, matched_pattern='', dir='.'):
     import astropy.units as u
     from astropy.coordinates import SkyCoord
     from astropy.wcs import WCS
@@ -449,16 +454,23 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, row=None, plot=Tru
 
     for filt, ax in zip(filters, axes.flatten()):
 
-        print(filt)
-        fn = glob.glob(os.path.join(dir_images, f'*{filt}*_sci_skysubvar{matched_pattern}.fits.gz'))[0]
-        if not os.path.exists(fn):
-            print(f'WARNING -- image for {filt} does not exist at {fn}. Skipping!')
-            continue
-        hdu = fits.open(fn)[0]
-        img = hdu.data
-        # if plot: # get these from the big mosaic!
-        #     mean, median, rms = sigma_clipped_stats(img[img!=0], sigma=3)
-        wcs = WCS(hdu.header)
+        # print(filt)
+        if precomp is None:
+            fn = glob.glob(os.path.join(dir_images, f'*{filt}*_sci_skysubvar{matched_pattern}.fits.gz'))[0]
+            if not os.path.exists(fn):
+                print(f'WARNING -- image for {filt} does not exist at {fn}. Skipping!')
+                continue
+            # print('foo')
+            hdu = fits.open(fn)[0]
+            img = hdu.data
+            # print('foo2')
+            # if plot: # get these from the big mosaic!
+            #     mean, median, rms = sigma_clipped_stats(img[img!=0], sigma=3)
+            wcs = WCS(hdu.header)
+        else:
+            hdu, img, head = precomp[filt]
+            wcs = WCS(head)
+
         if not wcs.footprint_contains(coord):
             print(f'CRITICAL -- {coord} is not within the image footprint!')
             sys.exit()
@@ -517,7 +529,7 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, row=None, plot=Tru
                 scale = 0.02
             elif np.isnan(scale):
                 scale = 1
-            print(filt, rms, scale, np.nanmedian(img), np.nanmin(img), np.nanmax(img), np.sum(img))
+            # print(filt, rms, scale, np.nanmedian(img), np.nanmin(img), np.nanmax(img), np.sum(img))
             ax.imshow(img, cmap='RdGy', norm=SymLogNorm(3*rms, 1, -scale, scale))
             ax.text(0.05, 1.05, f'{filt}\n{flux:2.2f}+/-{fluxerr:2.2f} 10*nJy (S/N:{snr:2.2f})', transform=ax.transAxes)
             ax.axes.xaxis.set_visible(False)
