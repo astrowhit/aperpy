@@ -51,7 +51,7 @@ def fit_apercurve(stats, plotname=None, pixelscale=PIXEL_SCALE, stat_type=['ksnm
     py1 = []
     psizes = []
     for size in stats:
-        if size in ('Naper', 'positions'):
+        if size in ('Naper', 'positions', 'medwht'):
             continue
         if size == -1:
             py1.append([stats[size][stype] for stype in stat_type])
