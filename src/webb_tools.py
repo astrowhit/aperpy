@@ -134,6 +134,7 @@ def empty_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=PIXEL
 
     from config import TARGET_ZP, SCI_APER
 
+    img*=zpt_factor
 
     aper = np.array(aper)
     aperrad = aper / 2. / pixscl # diam sky to rad pix
@@ -161,7 +162,7 @@ def empty_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=PIXEL
             # print(x, y)
             if np.all(checkimg[xlo:xhi, ylo:yhi]):
                 # print(x, y)
-                # print(xlo, xhi, ylo, yhi) 
+                # print(xlo, xhi, ylo, yhi)
                 # print(img[xlo:xhi, ylo:yhi])
                 # print()
                 positions[kept] = y, x
@@ -178,13 +179,12 @@ def empty_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=PIXEL
     output = aperture_photometry(img, apertures)
     print(f'Done!')
 
-
     aperstats = OrderedDict()
     aperstats[-1] = {}
-    clean_img = img[(wht>0) & (segmap==0) & (~np.isnan(img))].flatten() * zpt_factor
+    clean_img = img[(wht>0) & (segmap==0) & (~np.isnan(img))].flatten()
 
     print('Sigma clipping...')
-    klip_clean_img = sigma_clip(clean_img)
+    klip_clean_img = sigma_clip(clean_img,masked=False)
     print('Done. Saving statistics...')
     kmean, kmed, kstd = np.mean(klip_clean_img), np.median(klip_clean_img), np.std(klip_clean_img)
     ksnmad = mad_std(klip_clean_img)
@@ -255,7 +255,7 @@ def empty_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=PIXEL
         med = np.nanmedian(phot)
 
         print('Sigma clipping...')
-        klip_phot = sigma_clip(phot)
+        klip_phot = sigma_clip(phot,masked=False)
 
         pc = np.nanpercentile(klip_phot, q=(5, 95))
         bins = np.linspace(pc[0], pc[1], 20)
@@ -277,7 +277,7 @@ def empty_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=PIXEL
         aperstats[diam]['snmad'] = snmad
         aperstats[diam]['norm'] = stats.normaltest(phot)
         aperstats[diam]['median'] = med
-        
+
         aperstats[diam]['ksnmad'] = ksnmad
         aperstats[diam]['kmean'] = kmean
         aperstats[diam]['kmed'] = kmed
