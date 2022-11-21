@@ -15,7 +15,7 @@ import sys
 PATH_CONFIG = sys.argv[1]
 sys.path.insert(0, PATH_CONFIG)
 
-from config import FILTERS, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, TARGET_ZP, \
+from config import FILTERS, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, TARGET_ZP, SCI_APER,\
     REF_BAND, PIXEL_SCALE, PHOT_APER, DIR_PSFS, FIELD, ZSPEC, MAX_SEP, ZCONF, ZRA, ZDEC, ZCOL, FLUX_UNIT, \
     PS_FLUXRATIO, PS_FLUXRATIO_RANGE, PS_FILT, PS_MAGLIMIT, PS_APERSIZE, \
         BP_FLUXRATIO, BP_FLUXRATIO_RANGE, BP_FILT, BP_MAGLIMIT, BP_APERSIZE
@@ -234,7 +234,9 @@ for colname in ztable.colnames:
     
 
 # use flag (minimum SNR cut + not a star)
-snr_ref = maincat[f'{REF_BAND}_FLUX_APER0_7_COLOR'] / maincat[f'{REF_BAND}_FLUXERR_APER0_7_COLOR']
+str_aper = str(SCI_APER).replace('.', '_')
+snr_ref = maincat[f'{REF_BAND}_FLUX_APER{str_aper}_COLOR'] / maincat[f'{REF_BAND}_FLUXERR_APER{str_aper}_COLOR']
+snr_ref[maincat[f'{REF_BAND}_FLUXERR_APER{str_aper}_COLOR']<=0] = -1
 use_phot = np.zeros(len(maincat))
 use_phot[snr_ref >= 3] = 1
 use_phot[is_star | is_badpixel] = 0
@@ -305,7 +307,8 @@ for apersize in PHOT_APER:
         subcat[coln].name = newcol
 
     # use flag (minimum SNR cut + not a star)
-    snr_ref = subcat[f'faper_{REF_BAND}'] / subcat[f'eaper_{REF_BAND}']
+    snr_ref = subcat[f'f_{REF_BAND}'] / subcat[f'e_{REF_BAND}']
+    snr_ref[subcat[f'e_{REF_BAND}']<=0] = -1
     use_phot = np.zeros(len(subcat))
     use_phot[snr_ref >= 3] = 1
     use_phot[is_star | is_badpixel] = 0
