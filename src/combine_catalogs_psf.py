@@ -122,8 +122,6 @@ for apersize in PHOT_APER:
 m = sfdmap.SFDMap(DIR_SFD)
 ebmv = m.ebv(maincat['RA'], maincat['DEC'])
 maincat.add_column(Column(ebmv, name='EBV'), 1+np.where(np.array(maincat.colnames) == 'DEC')[0][0])
-print(ebmv)
-
 
 if APPLY_MWDUST == 'MEDIAN':
     Av = np.median(ebmv)*3.1

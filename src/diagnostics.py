@@ -52,7 +52,7 @@ for filt in FILTERS:
     cell_area = (RA_RANGE[1]-RA_RANGE[0])/gridsize[0]*(DEC_RANGE[1]-DEC_RANGE[0])/gridsize[1]
     area = np.sum(H>5) * cell_area # ~deg2 per cell at this grid
     areas[filt] = area
-    print(filt, area, area*3600.)
+    # print(filt, area, area*3600.)
 
     im = axes[0].hexbin(ra, dec, extent=extent, gridsize=gridsize, **opt_d)
     cbaxes = inset_axes(axes[0], width="40%", height="3%", loc='upper right')
@@ -87,7 +87,7 @@ for i, filt in enumerate(FILTERS):
     fig, ax = plt.subplots(figsize=(5*1, 5*1))
 
     area = areas[filt]
-    print(filt, area, areas[filt])
+    # print(filt, area, areas[filt])
 
     ra, dec = cat['ra'], cat['dec']
     flux, ferr = cat[f'f_{filt}'], cat[f'e_{filt}']
