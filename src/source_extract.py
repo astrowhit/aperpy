@@ -320,11 +320,12 @@ for ind, PHOT_NICKNAME in enumerate(FILTERS):
 
 
     # SOURCE WEIGHT + MEDIAN WEIGHT
+    photwht_corr = photwht / (conv_flux(PHOT_ZPT)**2) # puts all weights (incl. errors later on) in the requested target units!
     srcmedwht = np.nan * np.ones(len(catalog))
     srcmeanwht = np.nan * np.ones(len(catalog))
     for i, (ixphot, iyphot) in enumerate(zip(xphot, yphot)):
         intx, inty = int(ixphot), int(iyphot)
-        boxwht = photwht[inty-4:inty+5, intx-4:intx+5]
+        boxwht = photwht_corr[inty-4:inty+5, intx-4:intx+5]
         srcmedwht[i] = np.nanmedian(boxwht[boxwht>0])
         srcmeanwht[i] = np.nanmean(boxwht[boxwht>0])
 
@@ -333,18 +334,18 @@ for ind, PHOT_NICKNAME in enumerate(FILTERS):
 
     catalog['SRC_MEDWHT'] = srcmedwht
     catalog['SRC_MEANWHT'] = srcmeanwht
-    catalog['MED_WHT'] = np.nanmedian(photwht[photwht>0])
-    catalog['MAX_WHT'] = np.nanmax(photwht[photwht>0])
+    catalog['MED_WHT'] = np.nanmedian(photwht_corr[photwht_corr>0])
+    catalog['MAX_WHT'] = np.nanmax(photwht_corr[photwht_corr>0])
 
     # COMPUTE EMPTY APERTURE ERRORS + SAVE TO MASTER FILE
     empty_aper = list(PHOT_APER)+list(np.linspace(PHOT_APER[0], PHOT_APER[-1], 30))
     empty_aper = np.sort(empty_aper)
     plotname = os.path.join(FULLDIR_CATALOGS, f'figures/{PHOT_NICKNAME}_K{KERNEL}_emptyaper.pdf')
-    zpt_factor = conv_flux(PHOT_ZPT)
+    # zpt_factor = conv_flux(PHOT_ZPT)
     noise_equal = photsci * np.sqrt(photwht)
     noise_equal[photwht<=0] = 0.
     stats[PHOT_NICKNAME] = empty_apertures(noise_equal, photwht, segmap, N=int(1e4), pixscl=PIXEL_SCALE,
-                                           aper=empty_aper, plotname=plotname, zpt_factor=zpt_factor)
+                                           aper=empty_aper, plotname=plotname)
 
     # WRITE OUT
     print(f'DONE. Writing out catalog.')
