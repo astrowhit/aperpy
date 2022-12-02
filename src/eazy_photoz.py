@@ -198,7 +198,7 @@ for test, ylabel, fname in zip((rel_diff, ztest, dmag),
     axes[-1].set(xlim=(0, 6.3))
     fig.suptitle(ylabel, y=0.99, fontsize=20)
 
-    from aperpy.src.webb_tools import histedges_equalN, binned_med
+    from webb_tools import histedges_equalN, binned_med
 
     for i, (filt, ax) in enumerate(zip(FILTERS, axes)):
 
