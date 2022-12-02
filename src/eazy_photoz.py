@@ -6,9 +6,12 @@ import eazy
 print(eazy.__version__)
 
 # Symlink templates & filters from the eazy-code repository
-print('EAZYCODE = '+os.getenv('EAZYCODE'))
+envpath = os.getenv('EAZYCODE')
+if envpath is None:
+    envpath = os.path.join(eazy.utils.path_to_eazy_data(), 'eazy-photoz')
+print('EAZYCODE = '+envpath)
 
-eazy.symlink_eazy_inputs() 
+eazy.symlink_eazy_inputs()
 
 # quiet numpy/astropy warnings
 import warnings
@@ -20,7 +23,7 @@ warnings.simplefilter('ignore', category=AstropyWarning)
 DIR_CONFIG = sys.argv[1]
 sys.path.insert(0, DIR_CONFIG)
 
-DET_NICKNAME =  sys.argv[2] #'LW_f277w-f356w-f444w'  
+DET_NICKNAME =  sys.argv[2] #'LW_f277w-f356w-f444w'
 KERNEL = sys.argv[3] #'f444w'
 APERSIZE = str(sys.argv[4]).replace('.', '_')
 TEMPLATES = sys.argv[5]
@@ -71,13 +74,13 @@ ez.param.params['VERBOSITY'] = 1.
 if ITERATE_ZP:
     for iter in range(NITER):
         print('Iteration: ', iter)
-        
+
         sn = ez.fnu/ez.efnu
         clip = (sn > 5).sum(axis=1) > 5 # Generally make this higher to ensure reasonable fits
         clip &= ez.cat['use_phot'] == 1
-        ez.iterate_zp_templates(idx=ez.idx[clip], update_templates=False, 
-                                update_zeropoints=True, iter=iter, n_proc=8, 
-                                save_templates=False, error_residuals=(iter > 0), 
+        ez.iterate_zp_templates(idx=ez.idx[clip], update_templates=False,
+                                update_zeropoints=True, iter=iter, n_proc=8,
+                                save_templates=False, error_residuals=(iter > 0),
                                 NBIN=NBIN, get_spatial_offset=False)
 
 
@@ -94,7 +97,7 @@ fig = plt.gcf()
 fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_{TEMPLATES}.photoz-specz.pdf'))
 
 
-zout, hdu = ez.standard_output(rf_pad_width=0.5, rf_max_err=2, 
+zout, hdu = ez.standard_output(rf_pad_width=0.5, rf_max_err=2,
                                  prior=False, beta_prior=True)
 
 ez.fit_phoenix_stars()
@@ -123,7 +126,7 @@ clas[np.isnan(u_v) | np.isnan(v_j)] = -1
 zout['u_v'] = u_v
 zout['v_j'] = v_j
 zout['uvj_class'] = clas
-    
+
 zout.write(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_{TEMPLATES}.zout.fits'), overwrite=True)
 
 import eazy.hdf5
@@ -137,14 +140,14 @@ rel_diff = diff / ez.fmodel
 ztest = diff / ez.efnu
 dmag = -2.5*np.log10(ez.fnu/ez.fmodel)
 
-for test, ylabel, fname in zip((rel_diff, ztest, dmag), 
+for test, ylabel, fname in zip((rel_diff, ztest, dmag),
                         ('Relative Flux $\\frac{\\rm{observed}-\\rm{model}}{\\rm{model}}$', '$f$-test $\\frac{\\rm{observed}-\\rm{model}}{\\rm{uncertainty}}$', '$\Delta$Mag observed - model (AB)'),
                         ('reldiff_wav', 'ztest_wav', 'dmag_wav')
                         ):
 
     fig, ax = plt.subplots(figsize=(10,5))
     ax.axhline(0, ls='solid', c='grey')
-    
+
     if test is ztest:
         ax.set_ylim(-3, 3)
         hline = 1
@@ -184,7 +187,7 @@ rel_diff = diff / ez.fmodel
 ztest = diff / ez.efnu
 dmag = -2.5*np.log10(ez.fnu/ez.fmodel)
 
-for test, ylabel, fname in zip((rel_diff, ztest, dmag), 
+for test, ylabel, fname in zip((rel_diff, ztest, dmag),
                         ('Relative Flux $\\frac{\\rm{observed}-\\rm{model}}{\\rm{model}}$', '$f$-test $\\frac{\\rm{observed}-\\rm{model}}{\\rm{uncertainty}}$', '$\Delta$Mag observed - model (AB)'),
                         ('reldiff_z', 'ztest_z', 'dmag_z')
                         ):
@@ -242,7 +245,7 @@ rel_diff = diff / ez.fmodel
 ztest = diff / ez.efnu
 dmag = -2.5*np.log10(ez.fnu/ez.fmodel)
 
-for test, ylabel, fname in zip((rel_diff, ztest, dmag), 
+for test, ylabel, fname in zip((rel_diff, ztest, dmag),
                         ('Relative Flux $\\frac{\\rm{observed}-\\rm{model}}{\\rm{model}}$', '$f$-test $\\frac{\\rm{observed}-\\rm{model}}{\\rm{uncertainty}}$', '$\Delta$Mag observed - model (AB)'),
                         ('reldiff_mag', 'ztest_mag', 'dmag_mag')
                         ):
