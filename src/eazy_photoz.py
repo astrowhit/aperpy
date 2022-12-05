@@ -28,7 +28,7 @@ KERNEL = sys.argv[3] #'f444w'
 APERSIZE = str(sys.argv[4]).replace('.', '_')
 TEMPLATES = sys.argv[5]
 
-from config import DIR_CATALOGS, DET_TYPE, TRANSLATE_FNAME, TARGET_ZP, ITERATE_ZP, FILTERS
+from config import DIR_CATALOGS, DET_TYPE, TRANSLATE_FNAME, TARGET_ZP, ITERATE_ZP, FILTERS, REF_BAND
 
 FULLDIR_CATALOGS = os.path.join(DIR_CATALOGS, f'{DET_NICKNAME}_{DET_TYPE}/{KERNEL}/')
 
@@ -49,7 +49,7 @@ params['USE_ZSPEC_FOR_REST'] = 'n'
 
 
 params['Z_MAX'] = 30
-params['Z_STEP'] = 0.1
+params['Z_STEP'] = 0.005
 
 if TEMPLATES == 'fsps_full':
     params['TEMPLATES_FILE'] = 'templates/fsps_full/tweak_fsps_QSF_12_v3.param'
@@ -321,11 +321,11 @@ axes[2].scatter(zout['v_j'][sanity], zout['u_v'][sanity], s=3, c='grey', alpha=0
 axes[2].scatter(zout['v_j'][qg & sanity], zout['u_v'][qg & sanity], s=3, c='orange')
 axes[2].set(xlabel='$V-J$', ylabel='$U-V$', xlim=(-0.6, 2.0), ylim=(0, 2.4))
 
-# F444W
+# REF_BAND
 bins = np.arange(17, 30, 0.5)
-axes[3].hist(TARGET_ZP - 2.5*np.log10(ez.cat['f_f444w'])[sanity], bins=bins, color='grey')
-axes[3].hist(TARGET_ZP - 2.5*np.log10(ez.cat['f_f444w'])[qg & sanity], bins=bins, color='orange')
-axes[3].set(xlabel='F444W')
+axes[3].hist(TARGET_ZP - 2.5*np.log10(ez.cat['f_'+REF_BAND])[sanity], bins=bins, color='grey')
+axes[3].hist(TARGET_ZP - 2.5*np.log10(ez.cat['f_'+REF_BAND])[qg & sanity], bins=bins, color='orange')
+axes[3].set(xlabel=REF_BAND.upper())
 axes[3].semilogy()
 
 fig.tight_layout()
