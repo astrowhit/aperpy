@@ -68,7 +68,7 @@ else:
 # SOME BASIC INFO
 pixel_scale = utils.proj_plane_pixel_scales(detwcs)[0] * 3600
 print(f'Pixel scale: {pixel_scale}')
-area = np.sum((detwht!=0) & (detmask==0)) * (pixel_scale  / 3600)**2
+area = np.sum((detwht!=0) & (detmask==0) & (~np.isnan(detsci))) * (pixel_scale  / 3600)**2
 print(f'Area of detection image: {area} deg2')
 
 # SOURCE DETECTION
@@ -115,7 +115,7 @@ bigreg = Regions(regs)
 bigreg.write(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_OBJECTS.reg'), overwrite=True, format='ds9')
 
 segmap[np.isnan(detsci)] = -99
-del detsci
+# del detsci
 del detwht
 del detmask
 del deterr
@@ -134,13 +134,14 @@ stats = {}
 for ind, PHOT_NICKNAME in enumerate(FILTERS):
 
     print(PHOT_NICKNAME)
+    skyext = '' # 'skysubvar'
     ext = ''
     dir_weight = DIR_IMAGES
     if KERNEL != 'None':
         ext=f'_{KERNEL}-matched'
         dir_weight = DIR_OUTPUT
     print(DIR_OUTPUT)
-    PHOTSCI_NAME = f'*{PHOT_NICKNAME}*_sci_skysubvar{ext}.fits'
+    PHOTSCI_NAME = f'*{PHOT_NICKNAME}*_sci{skyext}{ext}.fits'
     PHOTWHT_NAME = f'*{PHOT_NICKNAME}*_wht{ext}.fits'
     if IS_COMPRESSED:
         PHOTSCI_NAME += '.gz'
@@ -181,8 +182,8 @@ for ind, PHOT_NICKNAME in enumerate(FILTERS):
     # SOME BASIC INFO
     pixel_scale = utils.proj_plane_pixel_scales(photwcs)[0] * 3600
     print(f'Pixel scale: {pixel_scale}')
-    area = np.sum(np.isfinite(photwht) & (photwht > 0.)) * (pixel_scale  / 3600)**2
-    print(f'Area of photometry image: {area} deg2')
+    area = np.sum(np.isfinite(photwht) & (photwht > 0.) & ~np.isnan(detsci)) * (pixel_scale  / 3600)**2
+    print(f'Usable area of photometry image: {area} deg2')
     areas[PHOT_NICKNAME] = area
 
     # Hack the x,y coords

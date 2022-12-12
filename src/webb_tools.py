@@ -7,6 +7,9 @@ import numpy as np
 import sep
 import os
 from astropy.io import fits
+import astropy.units as u
+from astropy.coordinates import SkyCoord
+import matplotlib.pyplot as plt
 
 import sys
 
@@ -150,6 +153,7 @@ def empty_apertures(img, wht, segmap, N=1E6, aper=[0.35, 0.7, 2.0], pixscl=PIXEL
     kept = 0
     positions = np.zeros((N, 2))
     medwht = np.zeros(N)
+    print(np.shape(segmap), np.shape(img), np.shape(wht))
     checkimg = (segmap == 0) & (~np.isnan(img)) & (wht>0)
     print(f'{np.nansum(checkimg)/np.nansum(checkimg!=-1)*100:2.1f}% of image available for sky measurements...')
     with alive_bar(N) as bar:
@@ -597,3 +601,188 @@ def median_confidence_interval(data, confidence=0.34):
     except:
         hmin = m
     return m, hmin, hmax
+
+def get_gaia_radec_at_time(gaia_tbl, date=2015.5, format='decimalyear'):
+    """
+    Use `~astropy.coordinates.SkyCoord.apply_space_motion` to compute GAIA positions at a specific observation date
+    Parameters
+    ----------
+    gaia_tbl : `~astropy.table.Table`
+        GAIA table query, e.g., provided by `get_gaia_DR2_catalog`.
+    date : e.g., float
+        Observation date that can be parsed with `~astropy.time.Time`
+    format : str
+        Date format, see `~astropy.time.Time.FORMATS`.
+    Returns
+    -------
+    coords : `~astropy.coordinates.SkyCoord`
+        Projected sky coordinates.
+    """
+    from astropy.time import Time
+    from astropy.coordinates import SkyCoord
+    import astropy.units as u
+
+    # Distance and radial_velocity are dummy numbers needed
+    # to get the space motion correct
+
+    try:
+        # Try to use pyia
+        import pyia
+        g = pyia.GaiaData(gaia_tbl)
+        coord = g.get_skycoord(distance=1*u.kpc, frame='icrs',
+                               radial_velocity=0.*u.km/u.second)
+    except:
+        # From table itself
+        if 'ref_epoch' in gaia_tbl.colnames:
+            ref_epoch = Time(gaia_tbl['ref_epoch'].data,
+                             format='decimalyear')
+        else:
+            ref_epoch = Time(2015.5, format='decimalyear')
+
+        coord = SkyCoord(ra=gaia_tbl['ra'], dec=gaia_tbl['dec'],
+                         pm_ra_cosdec=gaia_tbl['pmra'],
+                         pm_dec=gaia_tbl['pmdec'],
+                         obstime=ref_epoch,
+                         frame='icrs',
+                         distance=1*u.kpc, radial_velocity=0.*u.km/u.second)
+
+    new_obstime = Time(date, format=format)
+    coord_at_time = coord.apply_space_motion(new_obstime=new_obstime)
+    return(coord_at_time)
+
+
+def crossmatch(cat1, cat2, thresh=[1*u.arcsec,], verbose=1, plot=False, col1=None, col2=None, return_idx=False, checkmask=True):
+    """Quick crossmatching of catalogs, including debug plots.
+    
+    Parameters
+    ----------
+    cat1 : Astropy Table
+        Primary catalog containing recognized coordinates (e.g. RA, Dec) in decimal degrees.
+    cat2 : Astropy Table
+        Catalog to match with, containing recognized coordinates (e.g. RA, Dec) in decimal degrees.
+    thresh : float, optional
+        Sky threshold, assumes arcsec untis, by default 1*u.arcsec
+    verbose : int, optional
+        Verbosity parameter (0=None, 1=Normal, 2=Full), by default 0
+    plot : bool, optional
+        Plotting switch, by default False
+    """
+
+    if verbose > 0: print('catalog_tools.crossmatch :: Beginning catalog crossmatch.')
+
+    # See if cats have coordinates
+    if verbose > 0: print('catalog_tools.crossmatch :: Starting search for coordinate columns in primary catalog...')
+    if col1 is not None:
+        trials = zip((col1[0], 'RA', 'ra', 'ALPHA_J2000', 'alpha'), (col1[1], 'DEC', 'dec', 'DELTA_J2000', 'delta'))
+    else:
+        trials = zip(('RA', 'ra', 'ALPHA_J2000', 'alpha'), ('DEC', 'dec', 'DELTA_J2000', 'delta'))
+    for i, (col_ra, col_dec) in enumerate(trials):
+        try:
+            if verbose > 1: print(f'catalog_tools.crossmatch :: Looking for coordinates under {col_ra}, {col_dec}')
+            ra, dec = cat1[col_ra], cat1[col_dec]
+            if verbose > 0: print(f'catalog_tools.crossmatch :: Found coordinates under {col_ra}, {col_dec}')
+            break
+        except:
+            if verbose > 1: print(f'catalog_tools.crossmatch :: WARNING -- Could not find coordinates under {col_ra}, {col_dec}')
+            if i == 3:
+                raise ValueError('catalog_tools.crossmatch :: ERROR -- RA and DEC could not be found in primary catalog.')
+    if checkmask:
+        mask1 = (ra > 0) & (ra < 360) & (dec >= -90) & (dec <= 90)
+    else:
+        mask1 = np.ones_like(ra, dtype=bool)
+    coord_primary = SkyCoord(ra = ra[mask1], dec = dec[mask1], unit=u.deg)
+
+    if verbose > 0: print('catalog_tools.crossmatch :: Starting search for coordinate columns in match catalog...')
+    if col2 is not None:
+        trials = zip((col2[0], 'RA', 'ra', 'ALPHA_J2000', 'alpha'), (col2[1], 'DEC', 'dec', 'DELTA_J2000', 'delta'))
+    else:
+        trials = zip(('RA', 'ra', 'ALPHA_J2000', 'alpha'), ('DEC', 'dec', 'DELTA_J2000', 'delta'))
+    for i, (col_ra, col_dec) in enumerate(trials):
+        try:
+            if verbose > 1: print(f'catalog_tools.crossmatch :: Looking for coordinates under {col_ra}, {col_dec}')
+            ra, dec = cat2[col_ra], cat2[col_dec]
+            if verbose > 0: print(f'catalog_tools.crossmatch :: Found coordinates under {col_ra}, {col_dec}')
+            break
+        except:
+            if verbose > 1: print(f'catalog_tools.crossmatch :: WARNING -- Could not find coordinates under {col_ra}, {col_dec}')
+            if i == 3:
+                raise ValueError('catalog_tools.crossmatch :: ERROR -- RA and DEC could not be found in match catalog.')
+    if checkmask:
+        mask2 = (ra > 0) & (ra < 360) & (dec >= -90) & (dec <= 90)
+    else:
+        mask2 = np.ones_like(ra, dtype=bool)
+    ra.unit = u.deg
+    dec.unit = u.deg
+    coord_match = SkyCoord(ra=ra[mask2], dec=dec[mask2], unit=u.deg)
+
+
+    print(f'catalog_tools.crossmatch :: Results')
+    print(f'        Size of primary catalog:    {len(cat1)} ({np.sum(~mask1)} masked)')
+    print(f'        Size of match catalog:      {len(cat2)} ({np.sum(~mask2)} masked)')
+
+    # if until_convergence is None:
+    for i, iter_thresh in enumerate(thresh):
+
+        # Perform crossmatch
+        # print(len(np.unique(coord_primary.ra)), len(coord_primary))
+        # print(len(np.unique(coord_match.ra)), len(coord_match))
+        idx, d2d, d3d = coord_primary.match_to_catalog_sky(coord_match)
+        d2d = d2d.to(u.arcsec)
+
+        sel_thresh = d2d < iter_thresh
+        # print(len(np.unique(idx)), len(idx))
+        # print(len(np.unique(idx[sel_thresh])), np.sum(sel_thresh))
+        mcoord_primary = coord_primary[sel_thresh]
+        mcoord_match = coord_match[idx[sel_thresh]]
+
+        dra = np.median(mcoord_primary.ra - mcoord_match.ra)
+        ddec = np.median(mcoord_primary.dec - mcoord_match.dec)
+        dsky = np.hypot(dra, ddec)
+        
+        coord_primary = SkyCoord(coord_primary.ra - dra, coord_primary.dec - ddec)
+
+        if verbose > 0:
+            Nthresh = np.sum(sel_thresh)
+            pc = Nthresh / len(cat1) * 100
+            print(f'        Iteration:                  {i+1}')
+            print(f'        Threshold:                  {iter_thresh}')
+            print(f'        Number of matches:          {Nthresh} ({pc:2.2f}%) ({len(np.unique(idx[sel_thresh]))} unique within threshold)')
+            print(f'        dRA, dDec, dSky:            {dra.to(u.arcsec):3.3f}, {ddec.to(u.arcsec):3.3f}, {dsky.to(u.arcsec):3.3f}')
+
+    # If plot, plot some stuff
+    if plot:
+        pthresh = 1.5*thresh[-1].value
+        bins = np.linspace(0, pthresh, 50)
+        fig, ax = plt.subplots(ncols=2, figsize=(22,10))
+        ax[0].hist(d2d[sel_thresh].value, bins=bins, color='royalblue')
+        ax[0].hist(d2d[~sel_thresh].value, bins=bins, color='grey', alpha=0.4)
+        ax[0].axvline(thresh[-1].value, color='k', ls='dotted')
+        ax[0].set(xlabel='Separation (arcsec)', xlim=(0, pthresh))
+
+        mcoord_primary = coord_primary
+        mcoord_match = coord_match[idx]
+        dx = mcoord_primary.ra - mcoord_match.ra
+        dy = mcoord_primary.dec - mcoord_match.dec
+
+        dx = dx.to(u.arcsec)
+        dy = dy.to(u.arcsec)
+        ax[1].scatter(dx[~sel_thresh], dy[~sel_thresh], c='grey', s=1, alpha=0.4)
+        ax[1].scatter(dx[sel_thresh], dy[sel_thresh], c='royalblue', s=1, alpha=0.7)
+        ax[1].axvline(0, ls='dotted', c='k')
+        ax[1].axhline(0, ls='dotted', c='k')
+        ax[1].set(xlim=(-pthresh, pthresh), ylim=(-pthresh, pthresh), xlabel='arcsec')
+
+
+    idx1 = np.arange(len(cat1))
+    idx1 = idx1[mask1][sel_thresh]
+    idx2 = np.arange(len(cat2))
+    idx2 = idx2[mask2][idx[sel_thresh]]
+
+    print(f'idx1: {len(np.unique(idx1))} unique entires out of {len(idx1)}')
+    print(f'idx2: {len(np.unique(idx2))} unique entires out of {len(idx2)}')
+    # print(np.sum(np.unique(idx2, return_counts=True)[1]==1))
+
+    if return_idx:
+        return cat1[idx1], cat2[idx2], idx1, idx2 
+    
+    return cat1[idx1], cat2[idx2]

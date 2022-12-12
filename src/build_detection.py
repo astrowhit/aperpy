@@ -7,9 +7,7 @@ import sys
 PATH_CONFIG = sys.argv[1]
 sys.path.insert(0, PATH_CONFIG)
 
-from config import DIR_CATALOGS, DETECTION_GROUPS, DETECTION_IMAGES, DET_TYPE, DIRWHT_REPLACE, IS_COMPRESSED
-
-WHT_REPLACE = ('sci_skysubvar', 'wht')
+from config import DIR_CATALOGS, DETECTION_GROUPS, DETECTION_IMAGES, DET_TYPE, DIRWHT_REPLACE, IS_COMPRESSED, WHT_REPLACE
 
 # chi-mean, noise-equalized, stack
 def chi_mean(bands, outname):
@@ -50,6 +48,8 @@ def noise_equalized(bands, outname):
     for i, band in enumerate(bands):
         fn_sci = DETECTION_IMAGES[band]
         fn_wht = DETECTION_IMAGES[band].replace(WHT_REPLACE[0], WHT_REPLACE[1]).replace(DIRWHT_REPLACE[0], DIRWHT_REPLACE[1])
+        print(fn_sci)
+        print(fn_wht)
         print(f'{i+1}/{len(bands)} ', band, fn_sci.split('/')[-1], fn_wht.split('/')[-1])
         if i == 0:
             head = fits.getheader(fn_sci, 0)

@@ -9,10 +9,12 @@ import sys
 PATH_CONFIG = sys.argv[1]
 sys.path.insert(0, PATH_CONFIG)
 
-from config import DIR_OUTPUT, DIR_IMAGES, DIR_KERNELS, DIR_OUTPUT, FILTERS, USE_FFT_CONV
+from config import DIR_OUTPUT, DIR_IMAGES, DIR_KERNELS, DIR_OUTPUT, FILTERS, USE_FFT_CONV, WHT_REPLACE
+
+ext = '' # 'skysubvar'
 
 KERNEL = sys.argv[2]
-SCI_FILENAMES = list(glob.glob(DIR_OUTPUT+'/*_sci_skysubvar.fits*'))
+SCI_FILENAMES = list(glob.glob(DIR_OUTPUT+f'/*_sci{ext}.fits*'))
 
 if USE_FFT_CONV:
     convolve_func = convolve_fft
@@ -23,14 +25,14 @@ else:
 
 for filename in SCI_FILENAMES:
     print(filename)
-    if os.path.exists(filename.replace('.fits', '_f444w-matched.fits')): continue
-    if f'sci_skysubvar' not in filename: continue
+    if os.path.exists(filename.replace('.fits', f'_{KERNEL}-matched.fits')): continue
+    if f'sci{ext}' not in filename: continue
     for band in FILTERS:
         if band in filename:
             break
     # if not ('f444w' in filename): continue
     hdul = fits.open(filename)
-    fn_weight = filename.replace(DIR_OUTPUT, DIR_IMAGES).replace(f'sci_skysubvar', 'wht')
+    fn_weight = filename.replace(DIR_OUTPUT, DIR_IMAGES).replace(WHT_REPLACE[0], WHT_REPLACE[1])
     hdul_wht = fits.open(fn_weight)
 
     if band != KERNEL:
@@ -46,15 +48,15 @@ for filename in SCI_FILENAMES:
         print(np.shape(hdul[0].data))
         hdul[0].data = convolve_func(hdul[0].data, kernel, **convolve_kwargs).astype(np.float32)
         hdul[0].data[weight==0] = 0.
-        hdul.writeto(filename.replace(DIR_IMAGES, DIR_OUTPUT).replace(f'_skysubvar.fits', f'_skysubvar_{KERNEL}-matched.fits'), overwrite=True)
+        hdul.writeto(filename.replace(DIR_IMAGES, DIR_OUTPUT).replace(f'{ext}.fits', f'{ext}_{KERNEL}-matched.fits'), overwrite=True)
 
         err = np.where(weight==0, 0, 1/np.sqrt(weight))
         err_conv = convolve_func(err, kernel, **convolve_kwargs).astype(np.float32)
         hdul_wht[0].data = np.where(err_conv==0, 0, 1./(err**2))
         hdul_wht[0].data[weight==0] = 0.
-        hdul_wht.writeto(filename.replace(DIR_IMAGES, DIR_OUTPUT).replace(f'_sci_skysubvar.fits', f'_wht_{KERNEL}-matched.fits'), overwrite=True)
+        hdul_wht.writeto(filename.replace(DIR_IMAGES, DIR_OUTPUT).replace(f'_sci{ext}.fits', f'_wht_{KERNEL}-matched.fits'), overwrite=True)
         print(f'Finished in {time.time()-tstart:2.2f}s')
 
     else:
-        hdul.writeto(filename.replace(DIR_IMAGES, DIR_OUTPUT).replace(f'_skysubvar.fits', f'_skysubvar_{KERNEL}-matched.fits'), overwrite=True)
-        hdul_wht.writeto(filename.replace(DIR_IMAGES, DIR_OUTPUT).replace(f'_sci_skysubvar.fits', f'_wht_{KERNEL}-matched.fits'), overwrite=True)
+        hdul.writeto(filename.replace(DIR_IMAGES, DIR_OUTPUT).replace(f'{ext}.fits', f'{ext}_{KERNEL}-matched.fits'), overwrite=True)
+        hdul_wht.writeto(filename.replace(DIR_IMAGES, DIR_OUTPUT).replace(f'_sci{ext}.fits', f'_wht_{KERNEL}-matched.fits'), overwrite=True)

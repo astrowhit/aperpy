@@ -11,7 +11,7 @@ import sys
 PATH_CONFIG = sys.argv[1]
 sys.path.insert(0, PATH_CONFIG)
 
-from config import DIR_IMAGES, SW_FILTERS, WEBB_FILTERS
+from config import DIR_IMAGES, SW_FILTERS, WEBB_FILTERS, WHT_REPLACE
 
 print(DIR_IMAGES)
 SCI_FILENAMES = list(glob.glob(DIR_IMAGES+'/*_sci.fits*'))
@@ -28,7 +28,7 @@ for filename in SCI_FILENAMES:
     # for region in ('ne', 'sw'):
     #     # get file
     sci, header = fits.getdata(filename), fits.getheader(filename)
-    wht = fits.getdata(filename.replace('sci', 'wht'))
+    wht = fits.getdata(filename.replace(WHT_REPLACE[0], WHT_REPLACE[1]))
 
     wcs = WCS(header)
     # blocked_wht = block_reduce(wht, 2, func=np.sum) / 4**2
