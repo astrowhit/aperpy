@@ -119,18 +119,40 @@ TEMPLATE_SETS = ('fsps_full', 'sfhz')
 RA_RANGE = (3.487, 3.687)
 DEC_RANGE = (-30.5, -30.2)
 
-### POINT-LIKE FLAG
-PS_FLUXRATIO = (1.0, 0.32)
-PS_FLUXRATIO_RANGE = (1.0, 1.4)
-PS_FILT = 'f200w'
-PS_MAGLIMIT = 25.0
-PS_APERSIZE = 0.7
+### STARS AND BAD PIXELS -- currrently set for f444w-matched images only!
+# POINT-LIKE FLAG - WEBB
+PS_WEBB_FLUXRATIO = (0.7, 0.32)
+PS_WEBB_FLUXRATIO_RANGE = (1.2, 1.5)
+PS_WEBB_FILT = 'f200w'
+PS_WEBB_MAGLIMIT = 25.0
+PS_WEBB_APERSIZE = 0.7
+
+# POINT-LIKE FLAG - HST
+PS_HST_FLUXRATIO = (0.7, 0.32)
+PS_HST_FLUXRATIO_RANGE = (1.2, 1.5)
+PS_HST_FILT = 'f160w'
+PS_HST_MAGLIMIT = 23.8
+PS_HST_APERSIZE = 0.7
+
+# GAIA
+GAIA_ROW_LIMIT = 10000
+GAIA_XMATCH_RADIUS = 0.7*u.arcsec
+
+# BADWHT
+FN_BADWHT = os.path.join(os.path.join(WORKING_DIR, DIR_IMAGES), 'uncover_v5.4_abell2744clu_f200w_block40_wht.fits.gz')
+SATURATEDSTAR_MAGLIMIT = 21
+SATURATEDSTAR_FILT = 'f200w'
+
+# EXTRABAD (e.g. bCGs)
+FN_EXTRABAD = '/Volumes/External1/Projects/Current/UNCOVER/data/external/grizli_v5.4-bcgsub-other/uncover_v5.4_f444w_bcgs_out.fits'
+EXTRABAD_XMATCH_RADIUS = 2*u.arcsec
+EXTRABAD_LABEL = 'bCG residuals'
 
 ### BAD PIXELS
-BP_FLUXRATIO = (0.32, 0.48)
-BP_FLUXRATIO_RANGE = (0.95, 1.1)
-BP_FILT = {'LW':'f444w', 'SW':'f277w'}
-BP_MAGLIMIT = 27.8
+BP_FLUXRATIO = (0.7, 0.32)
+BP_FLUXRATIO_RANGE = (0, 1.1)
+BP_FILT = {'LW':'f444w'}
+BP_MAGLIMIT = 26.
 BP_APERSIZE = 0.7
 
 # ----------------

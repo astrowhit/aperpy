@@ -344,13 +344,14 @@ fig.tight_layout()
 fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_K{KERNEL}_star_id.pdf'))
 
 
-
 # extra bad flag (e.g. bCG)
-tab_badobj = Table.read(FN_EXTRABAD)
-mCATALOG_badobj, mtab_badobj = crossmatch(maincat, tab_badobj, [EXTRABAD_XMATCH_RADIUS], plot=True)
-SEL_EXTRABAD = np.isin(maincat['ID'], mCATALOG_badobj['ID'])
-print(f'Flagged {np.sum(SEL_EXTRABAD)} objects as bad from the extra table ({EXTRABAD_LABEL})')
-maincat.add_column(Column(SEL_EXTRABAD.astype(int), name='extrabad_flag'))
+SEL_EXTRABAD = np.zeros(len(maincat), dtype=bool)
+if FN_EXTRABAD is not None:
+    tab_badobj = Table.read(FN_EXTRABAD)
+    mCATALOG_badobj, mtab_badobj = crossmatch(maincat, tab_badobj, [EXTRABAD_XMATCH_RADIUS], plot=True)
+    SEL_EXTRABAD = np.isin(maincat['ID'], mCATALOG_badobj['ID'])
+    print(f'Flagged {np.sum(SEL_EXTRABAD)} objects as bad from the extra table ({EXTRABAD_LABEL})')
+    maincat.add_column(Column(SEL_EXTRABAD.astype(int), name='extrabad_flag'))
 
 # z-spec
 ztable = Table.read(ZSPEC)
@@ -402,7 +403,8 @@ maincat.meta['PHOT_UNIT'] = FLUX_UNIT
 maincat.meta['PIXSCALE'] = PIXEL_SCALE
 maincat.meta['WEBBSTARFILT'] = PS_WEBB_FILT
 maincat.meta['HSTSTARFILT'] = PS_HST_FILT
-maincat.meta['EXTRABAD'] = EXTRABAD_LABEL
+if FN_EXTRABAD is not None:
+    maincat.meta['EXTRABAD'] = EXTRABAD_LABEL
 
 for i, colname in enumerate(maincat.colnames):
     if 'FLAG' in colname:
