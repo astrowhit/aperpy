@@ -35,7 +35,7 @@ def renorm_hst_psf(filt, field, dir=DIR_PSFS, pixscl=PIXEL_SCALE, fov=PSF_FOV):
     # encircled['F606W'] = 0.980
     # encircled['F814W'] = 0.976
 
-    # Encircled energy for WFC3 IR, ACS Optical, and UVIS from HST docs
+    # Encircled energy for WFC3 IR within 2" radius, ACS Optical, and UVIS from HST docs
     encircled = {}
     encircled['F225W'] = 0.993
     encircled['F275W'] = 0.984

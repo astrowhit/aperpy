@@ -21,7 +21,8 @@ from config import FILTERS, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, TARGET_ZP, SCI_
     PS_HST_FLUXRATIO, PS_HST_FLUXRATIO_RANGE, PS_HST_FILT, PS_HST_MAGLIMIT, PS_HST_APERSIZE, \
     BP_FLUXRATIO, BP_FLUXRATIO_RANGE, BP_FILT, BP_MAGLIMIT, BP_APERSIZE, RA_RANGE, DEC_RANGE, \
     GAIA_ROW_LIMIT, GAIA_XMATCH_RADIUS, FN_BADWHT, SATURATEDSTAR_MAGLIMIT, SATURATEDSTAR_FILT, \
-        FN_EXTRABAD, EXTRABAD_XMATCH_RADIUS, EXTRABAD_LABEL
+    FN_EXTRABAD, EXTRABAD_XMATCH_RADIUS, EXTRABAD_LABEL, BK_MINSIZE, BK_SLOPE, PATH_BADOBJECT, \
+    GLASS_MASK, SATURATEDSTAR_APERSIZE
 
 DET_NICKNAME =  sys.argv[2] #'LW_f277w-f356w-f444w'  
 KERNEL = sys.argv[3] #'f444w'
@@ -213,8 +214,16 @@ maincat.add_column(Column(SEL_GAIA.astype(int), name='star_gaia_flag'))
 
 # Select by WEBB weight saturation (for stars AND bad pixels)
 weightmap = fits.getdata(FN_BADWHT) # this is lazy, but OK.
+str_aper = str(SATURATEDSTAR_APERSIZE).replace('.', '_')
+mag_sat = TARGET_ZP - 2.5*np.log10(maincat[f'{SATURATEDSTAR_FILT}_FLUX_APER{str_aper}_PSF'])
 SEL_BADWHT = (weightmap[maincat['y'].astype(int).value, maincat['x'].astype(int).value] == 0) 
-SEL_SATSTAR = SEL_BADWHT & (mag < SATURATEDSTAR_MAGLIMIT)
+sw_wht = maincat[f'{SATURATEDSTAR_FILT}_SRC_MEDWHT'].copy()
+sw_wht[np.isnan(sw_wht)] = 0
+SEL_BADWHT[sw_wht <= 0] = 0
+maincat.add_column(Column(SEL_BADWHT.astype(int), name='bad_wht_flag'))
+SEL_SATSTAR = SEL_BADWHT & (mag_sat < SATURATEDSTAR_MAGLIMIT)
+maincat.add_column(Column(SEL_SATSTAR.astype(int), name='saturated_star_flag'))
+print(f'Flagged {np.sum(SEL_SATSTAR)} objects as saturated bright sources (stars) from {FN_BADWHT}')
 
 SEL_STAR = SEL_WEBB | SEL_HST | SEL_GAIA | SEL_SATSTAR
 
@@ -229,9 +238,8 @@ size_bp = maincat[f'{BP_FILT_SEL}_FLUX_APER{str(BP_FLUXRATIO[0]).replace(".", "_
 SEL_LWBADPIXEL = (size_bp > BP_FLUXRATIO_RANGE[0]) & (size_bp < BP_FLUXRATIO_RANGE[1])
 SEL_LWBADPIXEL &= (mag_bp < BP_MAGLIMIT)
 print(f'Flagged {np.sum(SEL_LWBADPIXEL)} objects as bad pixels')
-maincat.add_column(Column(SEL_BADWHT.astype(int), name='bad_wht_flag'))
 maincat.add_column(Column(SEL_LWBADPIXEL.astype(int), name='bad_pixel_lw_flag'))
-SEL_BADPIX = SEL_LWBADPIXEL | SEL_BADWHT
+# SEL_BADPIX = SEL_LWBADPIXEL | SEL_BADWHT
 
 
 
@@ -283,6 +291,37 @@ axes[0].legend(loc='upper left', ncol=1, fontsize=11, markerscale=1.5)
 fig.tight_layout()
 fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_KNone_star_id.pdf'))
 
+
+# bad kron radius flag
+krc = maincat[f'{REF_BAND}_KRON_RADIUS_CIRC'] * PIXEL_SCALE
+snr = (maincat[f'{REF_BAND}_FLUX_APER{str_aper}_COLOR']/maincat[f'{REF_BAND}_FLUXERR_APER{str_aper}_COLOR'])
+SEL_BADKRON = (snr < BK_SLOPE*(krc - BK_MINSIZE))  #| (krc > 9)
+print(f'Flagged {np.sum(SEL_BADKRON)} objects as having enormous kron radii for their SNR')
+maincat.add_column(Column(SEL_BADKRON.astype(int), name='badkron_flag'))
+
+# low-weight source flag -  TODO
+
+# HACK for glass
+SEL_BADGLASS = np.zeros(len(maincat), dtype=bool)
+if GLASS_MASK is not None:
+    in_glass = GLASS_MASK[maincat['y'].astype(int), maincat['x'].astype(int)] == 1
+    print(f'{np.sum(in_glass)} objects in GLASS region')
+    sw_wht = maincat['f200w_SRC_MEDWHT'].copy()
+    sw_wht[np.isnan(sw_wht)] = 0
+    sw_snr = maincat['f200w_FLUX_APER0_32_COLOR'] / maincat['f200w_FLUXERR_APER0_32_COLOR']
+    SEL_BADGLASS = (((sw_snr < 3) & (sw_wht > 0)) | (sw_wht <= 0)) & in_glass
+    print(f'Flagged {np.sum(SEL_BADGLASS)} objects as bad in the GLASS region')
+    maincat.add_column(Column(SEL_BADGLASS.astype(int), name='badglass_flag'))
+    
+# user supplied bad objects
+SEL_BADOBJECT = np.zeros(len(maincat), dtype=bool)
+if PATH_BADOBJECT is not None:
+    id_badobjects = np.load(PATH_BADOBJECT, allow_pickle=True).getitem()
+    SEL_BADOBJECT = np.isin(maincat['ID'], id_badobjects)
+    print(f'Flagged {np.sum(SEL_BADOBJECT)} objects as bad based on user-supplied ID')
+    print(f'   based on file {PATH_BADOBJECT}')
+    maincat.add_column(Column(SEL_BADOBJECT.astype(int), name='badobject_flag'))
+
 # extra bad flag (e.g. bCG)
 SEL_EXTRABAD = np.zeros(len(maincat), dtype=bool)
 if FN_EXTRABAD is not None:
@@ -325,9 +364,12 @@ for colname in ztable.colnames:
 str_aper = str(SCI_APER).replace('.', '_')
 snr_ref = maincat[f'{REF_BAND}_FLUX_APER{str_aper}_COLOR'] / maincat[f'{REF_BAND}_FLUXERR_APER{str_aper}_COLOR']
 snr_ref[maincat[f'{REF_BAND}_FLUXERR_APER{str_aper}_COLOR']<=0] = -1
-use_phot = np.zeros(len(maincat))
-use_phot[snr_ref >= 3] = 1
-use_phot[SEL_STAR | SEL_BADPIX | SEL_EXTRABAD] = 0
+SEL_LOWSNR = (snr_ref < 3) | np.isnan(maincat[f'{REF_BAND}_RELWHT'])
+print(f'Flagged {np.sum(SEL_LOWSNR)} objects as having low SNR < 3')
+maincat.add_column(Column(SEL_LOWSNR.astype(int), name='lowsnr_flag'))
+use_phot = np.zeros(len(maincat)).astype(int)
+use_phot[~SEL_LOWSNR] = 1
+use_phot[SEL_LOWSNR | SEL_STAR | SEL_LWBADPIXEL | SEL_EXTRABAD | SEL_BADOBJECT | SEL_BADGLASS | SEL_BADKRON] = 0
 print(f'Flagged {np.sum(use_phot)} objects as reliable ({np.sum(use_phot)/len(use_phot)*100:2.1f}%)')
 maincat.add_column(Column(use_phot, name='use_phot'))
 # use 1 only
@@ -392,7 +434,15 @@ for apersize in PHOT_APER:
     cols['theta'] = 'theta_J2000' # double check this!
     cols[f'{REF_BAND}_FLUX_RADIUS_0_5'] = 'flux_radius' # arcsec
     cols['use_phot'] = 'use_phot'
-    cols['star_flag'] = 'star_flag'
+    cols['lowsnr_flag'] = 'flag_lowsnr'
+    cols['star_flag'] = 'flag_star'
+    # cols['bad_wht_flag'] = 'flag_badwht'
+    cols['bad_pixel_lw_flag'] = 'flag_artifact'
+    cols['extrabad_flag'] = 'flag_nearbcg'
+    if PATH_BADOBJECT is not None: 
+        cols['badobject_flag'] = 'flag_badobject'
+    cols['badkron_flag'] = 'flag_badkron'
+    cols['badglass_flag'] = 'flag_badflat'
     cols['z_spec'] = 'z_spec'
 
     subcat = maincat[list(cols.keys())].copy()
@@ -402,13 +452,13 @@ for apersize in PHOT_APER:
         print(f'   {subcat[coln].name} --> {newcol}')
         subcat[coln].name = newcol
 
-    # use flag (minimum SNR cut + not a star)
-    snr_ref = subcat[f'f_{REF_BAND}'] / subcat[f'e_{REF_BAND}']
-    snr_ref[subcat[f'e_{REF_BAND}']<=0] = -1
-    use_phot = np.zeros(len(subcat))
-    use_phot[snr_ref >= 3] = 1
-    use_phot[SEL_STAR | SEL_BADPIX | SEL_EXTRABAD] = 0
-    subcat['use_phot'] = use_phot
+    # # use flag (minimum SNR cut + not a star)
+    # snr_ref = subcat[f'f_{REF_BAND}'] / subcat[f'e_{REF_BAND}']
+    # snr_ref[subcat[f'e_{REF_BAND}']<=0] = -1
+    # use_phot = np.zeros(len(subcat))
+    # use_phot[snr_ref >= 3] = 1
+    # use_phot[SEL_STAR | SEL_BADPIX | SEL_EXTRABAD | SEL_BADOBJECT | SEL_BADGLASS | SEL_BADKRON] = 0
+    # subcat['use_phot'] = use_phot
 
     sub_outfilename = outfilename.replace('COMBINED', f'SCIREADY_{str_aper}')
     subcat.write(sub_outfilename, overwrite=True)

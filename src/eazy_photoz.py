@@ -46,6 +46,7 @@ params['CAT_HAS_EXTCORR'] = 'y'
 params['N_MIN_COLORS'] = 2
 params['Z_COLUMN'] = 'z_phot'
 params['USE_ZSPEC_FOR_REST'] = 'n'
+params['SYS_ERR'] = 0.05
 
 
 params['Z_MAX'] = 30
@@ -58,11 +59,14 @@ elif TEMPLATES == 'sfhz':
 
 params['VERBOSITY'] = 1
 
-ez = eazy.photoz.PhotoZ(param_file=None,
+# from astropy.cosmology import WMAP9
+
+ez = eazy.photoz.PhotoZ(param_file=None,  #cosmology=WMAP9,
                               translate_file=translate_file,
                               zeropoint_file=None, params=params,
                               load_prior=False, load_products=False)
 
+print(ez.cosmology)
 
 NITER = 10
 NBIN = np.minimum(ez.NOBJ//100, 180)
@@ -98,7 +102,7 @@ fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_K{KERNEL}_SC
 
 
 zout, hdu = ez.standard_output(rf_pad_width=0.5, rf_max_err=2,
-                                 prior=False, beta_prior=True)
+                                 prior=False, beta_prior=False)
 
 ez.fit_phoenix_stars()
 star_coln = ['star_chi2', 'star_min_ix', 'star_min_chi2', 'star_min_chinu']

@@ -431,7 +431,7 @@ def get_psf(filt, field='uncover', angle=None, fov=4, og_fov=10, pixscl=PIXEL_SC
 
 
 
-def make_cutout(ra, dec, size, nickname, filters, dir_images, precomp=None, row=None, plot=True, write=True, include_rgb=False, rgb=['f444w', 'f277w', 'f115w'], redshift=-99, matched_pattern='', dir='.'):
+def make_cutout(ra, dec, size, nickname, filters, dir_images, precomp=None, row=None, plot=True, write=True, target_zp=28.9, include_rgb=False, rgb=['f444w', 'f277w', 'f115w'], redshift=-99, matched_pattern='', dir='.'):
     import astropy.units as u
     from astropy.coordinates import SkyCoord
     from astropy.wcs import WCS
@@ -443,7 +443,6 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, precomp=None, row=
     coord = SkyCoord(ra=ra*u.deg, dec=dec*u.deg)
     print(coord)
 
-    from config import TARGET_ZP
 
     hdul = fits.HDUList()
 
@@ -452,7 +451,7 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, precomp=None, row=
 
     if plot:
         if len(filters) > 7:
-            fig, axes = plt.subplots(ncols=8, nrows=2, figsize=(3*8, 3*2))
+            fig, axes = plt.subplots(ncols=7, nrows=2, figsize=(3*8, 3*2))
         else:
             fig, axes = plt.subplots(ncols=len(filters), figsize=(3*len(filters), 3))
 
@@ -460,7 +459,7 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, precomp=None, row=
 
         # print(filt)
         if precomp is None:
-            fn = glob.glob(os.path.join(dir_images, f'*{filt}*_sci_skysubvar{matched_pattern}.fits.gz'))[0]
+            fn = glob.glob(os.path.join(dir_images, f'*{filt}*_sci*.fits.gz'))[0]
             if not os.path.exists(fn):
                 print(f'WARNING -- image for {filt} does not exist at {fn}. Skipping!')
                 continue
@@ -479,7 +478,7 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, precomp=None, row=
             print(f'CRITICAL -- {coord} is not within the image footprint!')
             sys.exit()
         try:
-            cutout = Cutout2D(img, position=coord, size=size*u.arcsec, wcs=wcs)
+            cutout = Cutout2D(img, position=coord, size=size*u.arcsec, wcs=wcs, copy=True)
         except:
             ax.axes.xaxis.set_visible(False)
             ax.axes.yaxis.set_visible(False)
@@ -519,7 +518,7 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, precomp=None, row=
                 flux, fluxerr = row[f'f_{filt}'], row[f'e_{filt}']
                 snr = flux / fluxerr
 
-                mag = TARGET_ZP - 2.5*np.log10(flux)
+                mag = target_zp - 2.5*np.log10(flux)
                 magerr = 2.5 / np.log(10) / (flux/fluxerr)
 
                 if flux <=0:
@@ -552,8 +551,9 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, precomp=None, row=
         if write:
             fig_rgb.savefig(os.path.join(dir, f'cutouts/{nickname}_z{redshift:2.1f}_RGB.pdf'), dpi=300)
 
-    if write:
+    if plot:
         fig.savefig(os.path.join(dir, f'cutouts/{nickname}_z{redshift:2.1f}.pdf'), dpi=300)
+    if write:
         hdul.writeto(os.path.join(dir, f'cutouts/{nickname}_z{redshift:2.1f}.fits'), overwrite=True)
 
 
