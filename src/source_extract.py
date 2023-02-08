@@ -134,7 +134,7 @@ stats = {}
 for ind, PHOT_NICKNAME in enumerate(FILTERS):
 
     print(PHOT_NICKNAME)
-    skyext = '' # 'skysubvar'
+    skyext = '_skysubvar'
     ext = ''
     dir_weight = DIR_IMAGES
     if KERNEL != 'None':

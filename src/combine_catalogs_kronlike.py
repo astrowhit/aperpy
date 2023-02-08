@@ -116,7 +116,7 @@ else:
     kernel = fits.getdata(DIR_KERNEL(REF_BAND))
     conv_psfmodel = convolve(psfmodel, kernel)
 
-# Get some static refband stuff 
+# Get some static refband stuff
 plotname = os.path.join(FULLDIR_CATALOGS, f'figures/aper_{REF_BAND}_nmad.pdf')
 p, pcov, sigma1 = fit_apercurve(stats[REF_BAND], plotname=plotname, stat_type=['fit_std'], pixelscale=PIXEL_SCALE)
 alpha, beta = p['fit_std']
@@ -147,7 +147,7 @@ for apersize in PHOT_APER:
     sig_ref_total = sigma_ref_total(sig1, alpha, beta, kronrad_circ, wht_ref)
     newcoln =f'{REF_BAND}_FLUXERR_REFTOTAL_MINDIAM{str_aper}'
     maincat.add_column(Column(sig_ref_total, newcoln))
-    
+
     tot_corr = f_ref_total / f_ref_aper
     tot_corr[(f_ref_aper <= 0) | (f_ref_total <= 0)] = np.nan
     maincat.add_column(MaskedColumn(1./tot_corr, f'TOTAL_CORR_APER{str_aper}', mask=np.isnan(tot_corr)))
@@ -278,7 +278,7 @@ mag_sat = TARGET_ZP - 2.5*np.log10(maincat[f'{SATURATEDSTAR_FILT}_FLUX_APER{str_
 SEL_BADWHT = (weightmap[maincat['y'].astype(int).value, maincat['x'].astype(int).value] == 0)
 sw_wht = maincat[f'{SATURATEDSTAR_FILT}_SRC_MEDWHT'].copy()
 sw_wht[np.isnan(sw_wht)] = 0
-SEL_BADWHT[sw_wht <= 0] = 0 
+SEL_BADWHT[sw_wht <= 0] = 0
 maincat.add_column(Column(SEL_BADWHT.astype(int), name='bad_wht_flag'))
 SEL_SATSTAR = SEL_BADWHT & (mag_sat < SATURATEDSTAR_MAGLIMIT)
 maincat.add_column(Column(SEL_SATSTAR.astype(int), name='saturated_star_flag'))
@@ -501,11 +501,13 @@ for apersize in PHOT_APER:
         cols['star_flag'] = 'flag_star'
         # cols['bad_wht_flag'] = 'flag_badwht'
         cols['bad_pixel_lw_flag'] = 'flag_artifact'
-        cols['extrabad_flag'] = 'flag_nearbcg'
-        if PATH_BADOBJECT is not None: 
+        if FN_EXTRABAD is not None:
+            cols['extrabad_flag'] = 'flag_nearbcg'
+        if PATH_BADOBJECT is not None:
             cols['badobject_flag'] = 'flag_badobject'
         cols['badkron_flag'] = 'flag_badkron'
-        cols['badglass_flag'] = 'flag_badflat'
+        if GLASS_MASK is not None:
+            cols['badglass_flag'] = 'flag_badflat'
         cols['z_spec'] = 'z_spec'
 
         subcat = maincat[list(cols.keys())].copy()
