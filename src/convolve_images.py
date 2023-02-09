@@ -11,7 +11,7 @@ sys.path.insert(0, PATH_CONFIG)
 
 from config import DIR_OUTPUT, DIR_IMAGES, DIR_KERNELS, DIR_OUTPUT, FILTERS, USE_FFT_CONV, WHT_REPLACE
 
-ext = '' # 'skysubvar'
+ext = '_skysubvar'
 
 KERNEL = sys.argv[2]
 SCI_FILENAMES = list(glob.glob(DIR_OUTPUT+f'/*_sci{ext}.fits*'))
