@@ -203,7 +203,8 @@ if APPLY_MWDUST is not None:
         for i, tryfilt in enumerate(filter_table['filterID']):
             if filter == 'f410m':
                 if 'NIRCam' in tryfilt:
-                    filter_pwav[filter] = filter_table[i]['WavelengthPivot']
+                    if tryfilt.endswith(filter.upper()):
+                        filter_pwav[filter] = filter_table[i]['WavelengthPivot']
             if filter != 'f410m':
                 if 'ACS' in tryfilt or 'WFC3' in tryfilt or 'NIRCam' in tryfilt: # ADD OTHERS HERE
                     if tryfilt.endswith(filter.upper()):
