@@ -24,7 +24,8 @@ from config import FILTERS, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, DIR_OUTPUT, \
     BP_FLUXRATIO, BP_FLUXRATIO_RANGE, BP_FILT, BP_MAGLIMIT, BP_APERSIZE, RA_RANGE, DEC_RANGE, \
     GAIA_ROW_LIMIT, GAIA_XMATCH_RADIUS, FN_BADWHT, SATURATEDSTAR_MAGLIMIT, SATURATEDSTAR_FILT, \
     FN_EXTRABAD, EXTRABAD_XMATCH_RADIUS, EXTRABAD_LABEL, BK_MINSIZE, BK_SLOPE, PATH_BADOBJECT, \
-    GLASS_MASK, SATURATEDSTAR_APERSIZE
+    GLASS_MASK, SATURATEDSTAR_APERSIZE, PS_WEBB_USE, PS_HST_USE, GAIA_USE, BADWHT_USE, EXTRABAD_USE, \
+    BP_USE, BADOBJECT_USE
 
 
 DET_NICKNAME =  sys.argv[2] #'LW_f277w-f356w-f444w'
@@ -226,128 +227,165 @@ if APPLY_MWDUST is not None:
         elif 'MAG' in coln:
             maincat[coln] -= atten_mag[np.array(FILTERS) == filtname][0]
 
-# star-galaxy flag
-# Select from Webb band
-str_aper = str(PS_WEBB_APERSIZE).replace('.', '_')
-mag = TARGET_ZP - 2.5*np.log10(maincat[f'{PS_WEBB_FILT}_FLUX_APER{str_aper}_TOTAL'])
-size = maincat[f'{PS_WEBB_FILT}_FLUX_APER{str(PS_WEBB_FLUXRATIO[0]).replace(".", "_")}_COLOR']  \
-                / maincat[f'{PS_WEBB_FILT}_FLUX_APER{str(PS_WEBB_FLUXRATIO[1]).replace(".", "_")}_COLOR']
-SEL_WEBB = (size > PS_WEBB_FLUXRATIO_RANGE[0]) & (size < PS_WEBB_FLUXRATIO_RANGE[1]) & (mag < PS_WEBB_MAGLIMIT)
-print(f'Flagged {np.sum(SEL_WEBB)} objects as point-like (stars) from {PS_WEBB_FILT}')
-maincat.add_column(Column(SEL_WEBB.astype(int), name='star_webb_flag'))
-fsize = maincat[f'{PS_WEBB_FILT}_FLUX_RADIUS_0_5'] * PIXEL_SCALE
+# low-snr flag
+str_aper = str(SCI_APER).replace('.', '_')
+snr_ref = maincat[f'{REF_BAND}_FLUX_APER{str_aper}_COLOR'] / maincat[f'{REF_BAND}_FLUXERR_APER{str_aper}_COLOR']
+snr_ref[maincat[f'{REF_BAND}_FLUXERR_APER{str_aper}_COLOR']<=0] = -1
+SEL_LOWSNR = (snr_ref < 3) | np.isnan(maincat[f'{REF_BAND}_RELWHT'])
+print(f'Flagged {np.sum(SEL_LOWSNR)} objects as having low SNR < 3')
+maincat.add_column(Column(SEL_LOWSNR.astype(int), name='lowsnr_flag'))
+
+SEL_STAR = np.zeros(len(maincat),dtype=bool)
 
 # Select in F160W
-str_aper = str(PS_HST_APERSIZE).replace('.', '_')
-mag_hst = TARGET_ZP - 2.5*np.log10(maincat[f'{PS_HST_FILT}_FLUX_APER{str_aper}_TOTAL'])
-size_hst = maincat[f'{PS_HST_FILT}_FLUX_APER{str(PS_HST_FLUXRATIO[0]).replace(".", "_")}_COLOR']  \
-                / maincat[f'{PS_HST_FILT}_FLUX_APER{str(PS_HST_FLUXRATIO[1]).replace(".", "_")}_COLOR']
+if PS_HST_USE:
+    str_aper = str(PS_HST_APERSIZE).replace('.', '_')
+    mag_hst = TARGET_ZP - 2.5*np.log10(maincat[f'{PS_HST_FILT}_FLUX_APER{str_aper}_TOTAL'])
+    size_hst = maincat[f'{PS_HST_FILT}_FLUX_APER{str(PS_HST_FLUXRATIO[0]).replace(".", "_")}_COLOR']  \
+                    / maincat[f'{PS_HST_FILT}_FLUX_APER{str(PS_HST_FLUXRATIO[1]).replace(".", "_")}_COLOR']
 
-SEL_HST = (size_hst > PS_HST_FLUXRATIO_RANGE[0]) & (size_hst < PS_HST_FLUXRATIO_RANGE[1]) & (mag_hst < PS_HST_MAGLIMIT)
-print(f'Flagged {np.sum(SEL_HST)} objects as point-like (stars) from {PS_HST_FILT}')
-maincat.add_column(Column(SEL_HST.astype(int), name='star_hst_flag'))
+    SEL_HST = (size_hst > PS_HST_FLUXRATIO_RANGE[0]) & (size_hst < PS_HST_FLUXRATIO_RANGE[1]) & (mag_hst < PS_HST_MAGLIMIT)
+    print(f'Flagged {np.sum(SEL_HST)} objects as point-like (stars) from {PS_HST_FILT}')
+    maincat.add_column(Column(SEL_HST.astype(int), name='star_hst_flag'))
+    SEL_STAR |= SEL_HST
+
+# star-galaxy flag
+# Select from Webb band
+if PS_WEBB_USE:
+    str_aper = str(PS_WEBB_APERSIZE).replace('.', '_')
+    mag = TARGET_ZP - 2.5*np.log10(maincat[f'{PS_WEBB_FILT}_FLUX_APER{str_aper}_TOTAL'])
+    size = maincat[f'{PS_WEBB_FILT}_FLUX_APER{str(PS_WEBB_FLUXRATIO[0]).replace(".", "_")}_COLOR']  \
+                    / maincat[f'{PS_WEBB_FILT}_FLUX_APER{str(PS_WEBB_FLUXRATIO[1]).replace(".", "_")}_COLOR']
+    SEL_WEBB = (size > PS_WEBB_FLUXRATIO_RANGE[0]) & (size < PS_WEBB_FLUXRATIO_RANGE[1]) & (mag < PS_WEBB_MAGLIMIT)
+    print(f'Flagged {np.sum(SEL_WEBB)} objects as point-like (stars) from {PS_WEBB_FILT}')
+    maincat.add_column(Column(SEL_WEBB.astype(int), name='star_webb_flag'))
+    fsize = maincat[f'{PS_WEBB_FILT}_FLUX_RADIUS_0_5'] * PIXEL_SCALE
+    SEL_STAR |= SEL_WEBB
 
 # GAIA selection
-fn_gaia = os.path.join(DIR_OUTPUT, 'gaia.fits')
-if os.path.exists(fn_gaia):
-    tab_gaia = Table.read(fn_gaia)
-else:
-    from astroquery.gaia import Gaia
-    Gaia.ROW_LIMIT = GAIA_ROW_LIMIT  # Ensure the default row limit.
-    cra, cdec = np.mean(RA_RANGE)*u.deg, np.mean(DEC_RANGE)*u.deg
-    coord = SkyCoord(ra=cra, dec=cdec, unit=(u.degree, u.degree), frame='icrs')
-    radius = u.Quantity(0.15, u.deg)
-    print(coord)
-    j = Gaia.cone_search_async(coord, radius)
-    gaia = j.get_results()
-    gaia.pprint()
-    tab = Table(gaia)['solution_id', 'source_id', 'ra', 'dec', 'ref_epoch', 'pmra', 'pmdec']
-    tab.write(os.path.join(DIR_OUTPUT, 'gaia.fits'), format='fits', overwrite=True)
+if GAIA_USE:
+    fn_gaia = os.path.join(DIR_OUTPUT, 'gaia.fits')
+    if os.path.exists(fn_gaia):
+        tab_gaia = Table.read(fn_gaia)
+    else:
+        from astroquery.gaia import Gaia
+        Gaia.ROW_LIMIT = GAIA_ROW_LIMIT  # Ensure the default row limit.
+        cra, cdec = np.mean(RA_RANGE)*u.deg, np.mean(DEC_RANGE)*u.deg
+        coord = SkyCoord(ra=cra, dec=cdec, unit=(u.degree, u.degree), frame='icrs')
+        radius = u.Quantity(0.15, u.deg)
+        print(coord)
+        j = Gaia.cone_search_async(coord, radius)
+        gaia = j.get_results()
+        gaia.pprint()
+        tab = Table(gaia)['solution_id', 'source_id', 'ra', 'dec', 'ref_epoch', 'pmra', 'pmdec']
+        tab.write(os.path.join(DIR_OUTPUT, 'gaia.fits'), format='fits', overwrite=True)
 
-from webb_tools import crossmatch
-mCATALOG_gaia, mtab_gaia = crossmatch(maincat, tab_gaia, [GAIA_XMATCH_RADIUS,])
-has_pm = np.hypot(mtab_gaia['pmra'], mtab_gaia['pmdec']) > 0
-SEL_GAIA = np.isin(maincat['ID'], mCATALOG_gaia['ID'][has_pm])
-print(f'Flagged {np.sum(SEL_GAIA)} objects as point-like (stars) from GAIA')
-maincat.add_column(Column(SEL_GAIA.astype(int), name='star_gaia_flag'))
+    from webb_tools import crossmatch
+    mCATALOG_gaia, mtab_gaia = crossmatch(maincat, tab_gaia, [GAIA_XMATCH_RADIUS,])
+    has_pm = np.hypot(mtab_gaia['pmra'], mtab_gaia['pmdec']) > 0
+    SEL_GAIA = np.isin(maincat['ID'], mCATALOG_gaia['ID'][has_pm])
+    print(f'Flagged {np.sum(SEL_GAIA)} objects as point-like (stars) from GAIA')
+    maincat.add_column(Column(SEL_GAIA.astype(int), name='star_gaia_flag'))
+    SEL_STAR |= SEL_GAIA
 
 # Select by WEBB weight saturation (for stars AND bad pixels)
-weightmap = fits.getdata(FN_BADWHT) # this is lazy, but OK.
-str_aper = str(SATURATEDSTAR_APERSIZE).replace('.', '_')
-mag_sat = TARGET_ZP - 2.5*np.log10(maincat[f'{SATURATEDSTAR_FILT}_FLUX_APER{str_aper}_TOTAL'])
-SEL_BADWHT = (weightmap[maincat['y'].astype(int).value, maincat['x'].astype(int).value] == 0)
-sw_wht = maincat[f'{SATURATEDSTAR_FILT}_SRC_MEDWHT'].copy()
-sw_wht[np.isnan(sw_wht)] = 0
-SEL_BADWHT[sw_wht <= 0] = 0
-maincat.add_column(Column(SEL_BADWHT.astype(int), name='bad_wht_flag'))
-SEL_SATSTAR = SEL_BADWHT & (mag_sat < SATURATEDSTAR_MAGLIMIT)
-maincat.add_column(Column(SEL_SATSTAR.astype(int), name='saturated_star_flag'))
-print(f'Flagged {np.sum(SEL_SATSTAR)} objects as saturated bright sources (stars) from {FN_BADWHT}')
+if BADWHT_USE:
+    weightmap = fits.getdata(FN_BADWHT) # this is lazy, but OK.
+    str_aper = str(SATURATEDSTAR_APERSIZE).replace('.', '_')
+    mag_sat = TARGET_ZP - 2.5*np.log10(maincat[f'{SATURATEDSTAR_FILT}_FLUX_APER{str_aper}_TOTAL'])
+    SEL_BADWHT = (weightmap[maincat['y'].astype(int).value, maincat['x'].astype(int).value] == 0)
+    sw_wht = maincat[f'{SATURATEDSTAR_FILT}_SRC_MEDWHT'].copy()
+    sw_wht[np.isnan(sw_wht)] = 0
+    SEL_BADWHT[sw_wht <= 0] = 0
+    maincat.add_column(Column(SEL_BADWHT.astype(int), name='bad_wht_flag'))
+    SEL_SATSTAR = SEL_BADWHT & (mag_sat < SATURATEDSTAR_MAGLIMIT)
+    maincat.add_column(Column(SEL_SATSTAR.astype(int), name='saturated_star_flag'))
+    print(f'Flagged {np.sum(SEL_SATSTAR)} objects as saturated bright sources (stars) from {FN_BADWHT}')
+    SEL_STAR |= SEL_BADWHT
 
-SEL_STAR = SEL_WEBB | SEL_HST | SEL_GAIA | SEL_SATSTAR
 print(f'Flagged {np.sum(SEL_STAR)} total objects as stars ({np.sum(SEL_STAR)/len(SEL_STAR)*100:2.2f}%)')
-
 maincat.add_column(Column(SEL_STAR.astype(int), name='star_flag'))
 
+SEL_GEN = SEL_LOWSNR | SEL_STAR
+
+
 # bad pixel flag
-str_aper = str(BP_APERSIZE).replace('.', '_')
-BP_FILT_SEL = BP_FILT[DET_NICKNAME.split('_')[0]]
-mag_bp = TARGET_ZP - 2.5*np.log10(maincat[f'{BP_FILT_SEL}_FLUX_APER{str_aper}_TOTAL'])
-size_bp = maincat[f'{BP_FILT_SEL}_FLUX_APER{str(BP_FLUXRATIO[0]).replace(".", "_")}_COLOR']  \
-                / maincat[f'{BP_FILT_SEL}_FLUX_APER{str(BP_FLUXRATIO[1]).replace(".", "_")}_COLOR']
-SEL_LWBADPIXEL = (size_bp > BP_FLUXRATIO_RANGE[0]) & (size_bp < BP_FLUXRATIO_RANGE[1])
-SEL_LWBADPIXEL &= (mag_bp < BP_MAGLIMIT)
-print(f'Flagged {np.sum(SEL_LWBADPIXEL)} objects as bad pixels')
-maincat.add_column(Column(SEL_LWBADPIXEL.astype(int), name='bad_pixel_lw_flag'))
-# SEL_BADPIX = SEL_LWBADPIXEL | SEL_BADWHT
+if BP_USE:
+    str_aper = str(BP_APERSIZE).replace('.', '_')
+    BP_FILT_SEL = BP_FILT[DET_NICKNAME.split('_')[0]]
+    mag_bp = TARGET_ZP - 2.5*np.log10(maincat[f'{BP_FILT_SEL}_FLUX_APER{str_aper}_TOTAL'])
+    size_bp = maincat[f'{BP_FILT_SEL}_FLUX_APER{str(BP_FLUXRATIO[0]).replace(".", "_")}_COLOR']  \
+                    / maincat[f'{BP_FILT_SEL}_FLUX_APER{str(BP_FLUXRATIO[1]).replace(".", "_")}_COLOR']
+    SEL_LWBADPIXEL = (size_bp > BP_FLUXRATIO_RANGE[0]) & (size_bp < BP_FLUXRATIO_RANGE[1])
+    SEL_LWBADPIXEL &= (mag_bp < BP_MAGLIMIT)
+    print(f'Flagged {np.sum(SEL_LWBADPIXEL)} objects as bad pixels')
+    maincat.add_column(Column(SEL_LWBADPIXEL.astype(int), name='bad_pixel_lw_flag'))
+    # SEL_BADPIX = SEL_LWBADPIXEL | SEL_BADWHT
+    SEL_GEN |= SEL_LWBADPIXEL
 
 # diagnostic plot
-fig, axes = plt.subplots(ncols=4, figsize=(20, 5))
-axes[0].text(16, 0.9, f'{PS_WEBB_FILT}-selected stars', fontsize=15, color='royalblue')
-axes[0].hlines(PS_WEBB_FLUXRATIO_RANGE[0], 0, PS_WEBB_MAGLIMIT, alpha=0.5, color='royalblue')
-axes[0].hlines(PS_WEBB_FLUXRATIO_RANGE[1], 0, PS_WEBB_MAGLIMIT, alpha=0.5, color='royalblue')
-axes[0].vlines(PS_WEBB_MAGLIMIT, PS_WEBB_FLUXRATIO_RANGE[0], PS_WEBB_FLUXRATIO_RANGE[1], alpha=0.5, color='royalblue')
-axes[0].scatter(mag, size, s=3, alpha=0.2, c='grey')
-axes[0].scatter(mag[SEL_LWBADPIXEL], size[SEL_LWBADPIXEL], s=12, alpha=0.8, c='firebrick', label='Bad LW pixel')
-axes[0].invert_yaxis()
-axes[0].set(xlim=(15.2, 30.2), ylim=(0, 5), ylabel=('$\mathcal{F}\,'+f'({PS_WEBB_FLUXRATIO[0]} / {PS_WEBB_FLUXRATIO[1]})$'), xlabel=f'${PS_WEBB_FILT}$ Mag (AB)')
+if PS_WEBB_USE or PS_HST_USE or BP_USE:
+    fig, axes = plt.subplots(ncols=4, figsize=(20, 5))
+    plot_elts = []
+    if PS_WEBB_USE:
+        axes[0].text(16, 0.9, f'{PS_WEBB_FILT}-selected stars', fontsize=15, color='royalblue')
+        axes[0].hlines(PS_WEBB_FLUXRATIO_RANGE[0], 0, PS_WEBB_MAGLIMIT, alpha=0.5, color='royalblue')
+        axes[0].hlines(PS_WEBB_FLUXRATIO_RANGE[1], 0, PS_WEBB_MAGLIMIT, alpha=0.5, color='royalblue')
+        axes[0].vlines(PS_WEBB_MAGLIMIT, PS_WEBB_FLUXRATIO_RANGE[0], PS_WEBB_FLUXRATIO_RANGE[1], alpha=0.5, color='royalblue')
+        axes[0].scatter(mag, size, s=3, alpha=0.2, c='grey')
+        axes[0].invert_yaxis()
+        axes[0].set(xlim=(15.2, 30.2), ylim=(0, 5), ylabel=('$\mathcal{F}\,'+f'({PS_WEBB_FLUXRATIO[0]} / {PS_WEBB_FLUXRATIO[1]})$'), xlabel=f'${PS_WEBB_FILT}$ Mag (AB)')
+        plot_elts.append((SEL_WEBB, 'royalblue', None))
 
-axes[1].text(16, 0.9, 'f160w-selected stars', fontsize=15, color='orange')
-axes[1].hlines(PS_HST_FLUXRATIO_RANGE[0], 0, PS_HST_MAGLIMIT, alpha=0.5, color='orange')
-axes[1].hlines(PS_HST_FLUXRATIO_RANGE[1], 0, PS_HST_MAGLIMIT, alpha=0.5, color='orange')
-axes[1].vlines(PS_HST_MAGLIMIT, PS_HST_FLUXRATIO_RANGE[0], PS_HST_FLUXRATIO_RANGE[1], alpha=0.5, color='orange')
-axes[1].scatter(mag_hst, size_hst, s=3, alpha=0.2, c='grey')
-axes[1].scatter(mag_hst[SEL_LWBADPIXEL], size_hst[SEL_LWBADPIXEL], s=12, alpha=0.8, c='firebrick')
-axes[1].invert_yaxis()
-axes[1].set(xlim=(15.2, 30.2), ylim=(0, 5), xlabel=f'${PS_HST_FILT}$ Mag (AB)', ylabel=('$\mathcal{F}\,'+f'({PS_HST_FLUXRATIO[0]} / {PS_HST_FLUXRATIO[1]})$'))
-axes[2].scatter(mag, fsize, s=3, alpha=0.2, c='grey')
-axes[2].scatter(mag[SEL_LWBADPIXEL], fsize[SEL_LWBADPIXEL], s=12, alpha=0.8, c='firebrick', label='Bad LW pixel')
-axes[2].invert_yaxis()
-axes[2].set(xlim=(15.2, 32), ylim=(0, 0.4), ylabel=(f'${PS_WEBB_FILT}$ Flux Radius (arcsec)'), xlabel=f'${PS_WEBB_FILT}$ Mag (AB)')
+    if PS_HST_USE:
+        axes[1].text(16, 0.9, 'f160w-selected stars', fontsize=15, color='orange')
+        axes[1].hlines(PS_HST_FLUXRATIO_RANGE[0], 0, PS_HST_MAGLIMIT, alpha=0.5, color='orange')
+        axes[1].hlines(PS_HST_FLUXRATIO_RANGE[1], 0, PS_HST_MAGLIMIT, alpha=0.5, color='orange')
+        axes[1].vlines(PS_HST_MAGLIMIT, PS_HST_FLUXRATIO_RANGE[0], PS_HST_FLUXRATIO_RANGE[1], alpha=0.5, color='orange')
+        axes[1].scatter(mag_hst, size_hst, s=3, alpha=0.2, c='grey')
+        axes[1].invert_yaxis()
+        axes[1].set(xlim=(15.2, 30.2), ylim=(0, 5), xlabel=f'${PS_HST_FILT}$ Mag (AB)', ylabel=('$\mathcal{F}\,'+f'({PS_HST_FLUXRATIO[0]} / {PS_HST_FLUXRATIO[1]})$'))
+        plot_elts.append((SEL_HST, 'orange', None))
 
-axes[3].text(17, 1.13, 'Bad Pixels in LW bands', fontsize=15, color='firebrick')
-axes[3].hlines(BP_FLUXRATIO_RANGE[0], 0, BP_MAGLIMIT, alpha=0.5, color='firebrick')
-axes[3].hlines(BP_FLUXRATIO_RANGE[1], 0, BP_MAGLIMIT, alpha=0.5, color='firebrick')
-axes[3].vlines(BP_MAGLIMIT, BP_FLUXRATIO_RANGE[0], BP_FLUXRATIO_RANGE[1], alpha=0.5, color='firebrick')
+    if GAIA_USE:
+        plot_elts.append((SEL_GAIA, 'green', 'GAIA stars'))
 
-axes[3].scatter(mag_bp, size_bp, s=3, alpha=0.2, c='grey')
+    if BADWHT_USE:
+        plot_elts.append((SEL_SATSTAR, 'purple', f'{SATURATEDSTAR_FILT} saturated stars'))
 
-axes[3].scatter(mag_bp[SEL_LWBADPIXEL], size_bp[SEL_LWBADPIXEL], s=12, alpha=0.8, c='firebrick')
-axes[3].invert_yaxis()
-axes[3].set(xlim=(15.2, 30.2), ylim=(0, 2), ylabel=('$\mathcal{F}\,'+f'({BP_FLUXRATIO[0]} / {BP_FLUXRATIO[1]})$'), xlabel=f'${BP_FILT_SEL}$ Mag (AB)')
+    if BP_USE:
+        axes[0].scatter(mag[SEL_LWBADPIXEL], size[SEL_LWBADPIXEL], s=12, alpha=0.8, c='firebrick', label='Bad LW pixel')
+        axes[1].scatter(mag_hst[SEL_LWBADPIXEL], size_hst[SEL_LWBADPIXEL], s=12, alpha=0.8, c='firebrick')
+
+        axes[2].scatter(mag, fsize, s=3, alpha=0.2, c='grey')
+        axes[2].scatter(mag[SEL_LWBADPIXEL], fsize[SEL_LWBADPIXEL], s=12, alpha=0.8, c='firebrick', label='Bad LW pixel')
+        axes[2].invert_yaxis()
+        axes[2].set(xlim=(15.2, 32), ylim=(0, 0.4), ylabel=(f'${PS_WEBB_FILT}$ Flux Radius (arcsec)'), xlabel=f'${PS_WEBB_FILT}$ Mag (AB)')
+
+        axes[3].text(17, 1.13, 'Bad Pixels in LW bands', fontsize=15, color='firebrick')
+        axes[3].hlines(BP_FLUXRATIO_RANGE[0], 0, BP_MAGLIMIT, alpha=0.5, color='firebrick')
+        axes[3].hlines(BP_FLUXRATIO_RANGE[1], 0, BP_MAGLIMIT, alpha=0.5, color='firebrick')
+        axes[3].vlines(BP_MAGLIMIT, BP_FLUXRATIO_RANGE[0], BP_FLUXRATIO_RANGE[1], alpha=0.5, color='firebrick')
+
+        axes[3].scatter(mag_bp, size_bp, s=3, alpha=0.2, c='grey')
+
+        axes[3].scatter(mag_bp[SEL_LWBADPIXEL], size_bp[SEL_LWBADPIXEL], s=12, alpha=0.8, c='firebrick')
+        axes[3].invert_yaxis()
+        axes[3].set(xlim=(15.2, 30.2), ylim=(0, 2), ylabel=('$\mathcal{F}\,'+f'({BP_FLUXRATIO[0]} / {BP_FLUXRATIO[1]})$'), xlabel=f'${BP_FILT_SEL}$ Mag (AB)')
 
 
-for stars, color, label in ((SEL_WEBB, 'royalblue', None), (SEL_HST, 'orange', None), (SEL_GAIA, 'green', 'GAIA stars'), \
-                (SEL_SATSTAR, 'purple', f'{SATURATEDSTAR_FILT} saturated stars')):
+    for stars, color, label in plot_elts:
+        if PS_WEBB_USE:
+            axes[0].scatter(mag[stars], size[stars], s=12, alpha=1, c=color, label=label)
+        if PS_HST_USE:
+            axes[1].scatter(mag_hst[stars], size_hst[stars], s=12, alpha=1, c=color)
+        if BP_USE:
+            axes[2].scatter(mag[stars], fsize[stars], s=12, alpha=1, c=color)
+            axes[3].scatter(mag_bp[stars], size_bp[stars], s=12, alpha=1, c=color)
 
-    axes[0].scatter(mag[stars], size[stars], s=12, alpha=1, c=color, label=label)
-    axes[1].scatter(mag_hst[stars], size_hst[stars], s=12, alpha=1, c=color)
-    axes[2].scatter(mag[stars], fsize[stars], s=12, alpha=1, c=color)
-    axes[3].scatter(mag_bp[stars], size_bp[stars], s=12, alpha=1, c=color)
-
-axes[0].legend(loc='upper left', ncol=1, fontsize=11, markerscale=1.5)
-fig.tight_layout()
-fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_K{KERNEL}_star_id.pdf'))
+    axes[0].legend(loc='upper left', ncol=1, fontsize=11, markerscale=1.5)
+    fig.tight_layout()
+    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_K{KERNEL}_star_id.pdf'))
 
 
 # bad kron radius flag
@@ -357,11 +395,12 @@ SEL_BADKRON = (snr < BK_SLOPE*(krc - BK_MINSIZE))  #| (krc > 9)
 print(f'Flagged {np.sum(SEL_BADKRON)} objects as having enormous kron radii for their SNR')
 maincat.add_column(Column(SEL_BADKRON.astype(int), name='badkron_flag'))
 
+SEL_GEN |= SEL_BADKRON
 # low-weight source flag -  TODO
 
 # HACK for glass
-SEL_BADGLASS = np.zeros(len(maincat), dtype=bool)
 if GLASS_MASK is not None:
+    SEL_BADGLASS = np.zeros(len(maincat), dtype=bool)
     in_glass = GLASS_MASK[maincat['y'].astype(int), maincat['x'].astype(int)] == 1
     print(f'{np.sum(in_glass)} objects in GLASS region')
     sw_wht = maincat['f200w_SRC_MEDWHT'].copy()
@@ -370,24 +409,27 @@ if GLASS_MASK is not None:
     SEL_BADGLASS = (((sw_snr < 3) & (sw_wht > 0)) | (sw_wht <= 0)) & in_glass
     print(f'Flagged {np.sum(SEL_BADGLASS)} objects as bad in the GLASS region')
     maincat.add_column(Column(SEL_BADGLASS.astype(int), name='badglass_flag'))
+    SEL_GEN |= SEL_BADGLASS
 
 # user supplied bad objects
-SEL_BADOBJECT = np.zeros(len(maincat), dtype=bool)
-if PATH_BADOBJECT is not None:
+if BADOBJECT_USE:
+    SEL_BADOBJECT = np.zeros(len(maincat), dtype=bool)
     id_badobjects = np.load(PATH_BADOBJECT, allow_pickle=True).getitem()
     SEL_BADOBJECT = np.isin(maincat['ID'], id_badobjects)
     print(f'Flagged {np.sum(SEL_BADOBJECT)} objects as bad based on user-supplied ID')
     print(f'   based on file {PATH_BADOBJECT}')
     maincat.add_column(Column(SEL_BADOBJECT.astype(int), name='badobject_flag'))
+    SEL_GEN |= SEL_BADOBJECT
 
 # extra bad flag (e.g. bCG)
-SEL_EXTRABAD = np.zeros(len(maincat), dtype=bool)
-if FN_EXTRABAD is not None:
+if EXTRABAD_USE:
+    SEL_EXTRABAD = np.zeros(len(maincat), dtype=bool)
     tab_badobj = Table.read(FN_EXTRABAD)
     mCATALOG_badobj, mtab_badobj = crossmatch(maincat, tab_badobj, [EXTRABAD_XMATCH_RADIUS], plot=True)
     SEL_EXTRABAD = np.isin(maincat['ID'], mCATALOG_badobj['ID'])
     print(f'Flagged {np.sum(SEL_EXTRABAD)} objects as bad from the extra table ({EXTRABAD_LABEL})')
     maincat.add_column(Column(SEL_EXTRABAD.astype(int), name='extrabad_flag'))
+    SEL_GEN |= SEL_EXTRABAD
 
 # z-spec
 ztable = Table.read(ZSPEC)
@@ -419,15 +461,9 @@ for colname in ztable.colnames:
 
 
 # use flag (minimum SNR cut + not a star)
-str_aper = str(SCI_APER).replace('.', '_')
-snr_ref = maincat[f'{REF_BAND}_FLUX_APER{str_aper}_COLOR'] / maincat[f'{REF_BAND}_FLUXERR_APER{str_aper}_COLOR']
-snr_ref[maincat[f'{REF_BAND}_FLUXERR_APER{str_aper}_COLOR']<=0] = -1
-SEL_LOWSNR = (snr_ref < 3) | np.isnan(maincat[f'{REF_BAND}_RELWHT'])
-print(f'Flagged {np.sum(SEL_LOWSNR)} objects as having low SNR < 3')
-maincat.add_column(Column(SEL_LOWSNR.astype(int), name='lowsnr_flag'))
 use_phot = np.zeros(len(maincat)).astype(int)
 use_phot[~SEL_LOWSNR] = 1
-use_phot[SEL_LOWSNR | SEL_STAR | SEL_LWBADPIXEL | SEL_EXTRABAD | SEL_BADOBJECT | SEL_BADGLASS | SEL_BADKRON] = 0
+use_phot[SEL_GEN] = 0
 print(f'Flagged {np.sum(use_phot)} objects as reliable ({np.sum(use_phot)/len(use_phot)*100:2.1f}%)')
 maincat.add_column(Column(use_phot, name='use_phot'))
 # use 1 only
@@ -500,8 +536,9 @@ for apersize in PHOT_APER:
         cols['lowsnr_flag'] = 'flag_lowsnr'
         cols['star_flag'] = 'flag_star'
         # cols['bad_wht_flag'] = 'flag_badwht'
-        cols['bad_pixel_lw_flag'] = 'flag_artifact'
-        if FN_EXTRABAD is not None:
+        if BP_USE:
+            cols['bad_pixel_lw_flag'] = 'flag_artifact'
+        if EXTRABAD_USE:
             cols['extrabad_flag'] = 'flag_nearbcg'
         if PATH_BADOBJECT is not None:
             cols['badobject_flag'] = 'flag_badobject'
