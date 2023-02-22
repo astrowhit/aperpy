@@ -134,10 +134,14 @@ PATH_KRONSCI = None
 if (KERNEL != 'None') & (USE_COMBINED_KRON_IMAGE):
     print(f'Constructing a noise-equalized co-add for Kron measurements based on {KRON_REF_BAND}')
     outpath = os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_KRON_K{KERNEL}')
-    trypath = glob.glob(outpath+'*')
-    if len(trypath) > 0: 
+    trypath = f'{outpath}_optavg.fits'
+    if os.path.exists(trypath): 
         print('Kron image exists! I will use the existing one...')
-        print(trypath)
+        PATH_KRONSCI = f'{outpath}_optavg.fits' # inverse variance image!!!
+        PATH_KRONERR = f'{outpath}_opterr.fits' # inverse variance image!!!
+        if IS_COMPRESSED:
+            PATH_KRONSCI += '.gz'
+            PATH_KRONERR += '.gz'
     else:    
         from build_detection import noise_equalized
         science_fnames = {}
