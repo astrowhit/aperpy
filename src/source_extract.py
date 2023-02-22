@@ -14,8 +14,9 @@ import sys
 PATH_CONFIG = sys.argv[1]
 sys.path.insert(0, PATH_CONFIG)
 
-from config import TARGET_ZP, PHOT_APER, PHOT_AUTOPARAMS, PHOT_FLUXFRAC, DETECTION_PARAMS,\
-         DIR_IMAGES, PHOT_ZP, FILTERS, DIR_OUTPUT, DIR_CATALOGS, IS_COMPRESSED, PIXEL_SCALE, PHOT_KRONPARAM
+from config import TARGET_ZP, PHOT_APER, PHOT_AUTOPARAMS, PHOT_FLUXRADIUS, DETECTION_PARAMS, SKYEXT,\
+         DIR_IMAGES, PHOT_ZP, FILTERS, DIR_OUTPUT, DIR_CATALOGS, IS_COMPRESSED, PIXEL_SCALE, PHOT_KRONPARAM,\
+             USE_COMBINED_KRON_IMAGE, KRON_REF_BAND
 
 # MAIN PARAMETERS
 DET_NICKNAME = sys.argv[2] #'LW_f277w-f356w-f444w'
@@ -120,7 +121,7 @@ del detwht
 del detmask
 del deterr
 
-if FILTERS == 'None':
+if FILTERS is None:
     # WRITE OUT
     print(f'DONE. Writing out catalog.')
     DETCATALOG_NAME = f'{DET_NICKNAME}_DET_CATALOG.fits'
@@ -128,13 +129,52 @@ if FILTERS == 'None':
         DETCATALOG_NAME += '.gz'
     catalog.write(os.path.join(FULLDIR_CATALOGS, DETCATALOG_NAME), overwrite=True)
     sys.exit()
-
+    
+PATH_KRONSCI = None
+if (KERNEL != 'None') & (USE_COMBINED_KRON_IMAGE):
+    print(f'Constructing a noise-equalized co-add for Kron measurements based on {KRON_REF_BAND}')
+    outpath = os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_KRON_K{KERNEL}')
+    trypath = glob.glob(outpath+'*')
+    if len(trypath) > 0: 
+        print('Kron image exists! I will use the existing one...')
+        print(trypath)
+    else:    
+        from build_detection import noise_equalized
+        science_fnames = {}
+        weight_fnames = {}
+        
+        # gather directories
+        for PHOT_NICKNAME in KRON_REF_BAND:
+            ext=f'_{KERNEL}-matched'
+            dir_weight = DIR_OUTPUT
+            print(DIR_OUTPUT)
+            PHOTSCI_NAME = f'*{PHOT_NICKNAME}*_sci{SKYEXT}{ext}.fits'
+            PHOTWHT_NAME = f'*{PHOT_NICKNAME}*_wht{ext}.fits'
+            if IS_COMPRESSED:
+                PHOTSCI_NAME += '.gz'
+                PHOTWHT_NAME += '.gz'
+            science_fnames[PHOT_NICKNAME] = glob.glob(os.path.join(DIR_OUTPUT, PHOTSCI_NAME))[0]
+            weight_fnames[PHOT_NICKNAME] = glob.glob(os.path.join(DIR_OUTPUT, PHOTWHT_NAME))[0]
+            
+        # run it
+        noise_equalized(KRON_REF_BAND, outpath,
+                    science_fnames= science_fnames,
+                    weight_fnames= weight_fnames, 
+                    is_compressed=IS_COMPRESSED)
+        PATH_KRONSCI = f'{outpath}_optavg.fits' # inverse variance image!!!
+        PATH_KRONERR = f'{outpath}_opterr.fits' # inverse variance image!!!
+        if IS_COMPRESSED:
+            PATH_KRONSCI += '.gz'
+            PATH_KRONERR += '.gz'
+        print(f'Wrote Kron image to {PATH_KRONSCI}')
+        
+            
 areas = {}
 stats = {}
 for ind, PHOT_NICKNAME in enumerate(FILTERS):
 
     print(PHOT_NICKNAME)
-    skyext = '_skysubvar'
+    skyext = SKYEXT #'_skysubvar'
     ext = ''
     dir_weight = DIR_IMAGES
     if KERNEL != 'None':
@@ -179,6 +219,18 @@ for ind, PHOT_NICKNAME in enumerate(FILTERS):
     photerr[~np.isfinite(photerr)] = np.median(photerr[np.isfinite(photerr)]) # HACK fill in holes with median weight.
     # fits.ImageHDU(photerr).writeto('PHOTERR.fits')
 
+    # IMAGE FOR KRON RADII 
+    # We actually run AUTO fluxes on each band
+    # So just do again for each band and take their coverage -- uber consistent this way.)
+    if USE_COMBINED_KRON_IMAGE:
+        kronsci = fits.getdata(PATH_KRONSCI).byteswap().newbyteorder()
+        kronerr = fits.getdata(PATH_KRONERR).byteswap().newbyteorder()
+        kronsci[kronerr<=0.] = 0. 
+        # if photmask is not None:
+        #     kronsci[photmask==1.0] = 0.
+    else:
+        kronsci = photsci
+
     # SOME BASIC INFO
     pixel_scale = utils.proj_plane_pixel_scales(photwcs)[0] * 3600
     print(f'Pixel scale: {pixel_scale}')
@@ -189,7 +241,7 @@ for ind, PHOT_NICKNAME in enumerate(FILTERS):
     # Hack the x,y coords
     xphot,yphot = photwcs.wcs_world2pix(catalog['RA'], catalog['DEC'],1)
 
-    # APERTURE PHOTOMETRY
+    # APERTURE PHOTOMETRY -- NOTE: we do NOT apply ANY masking here. Color apertures are small enough.
     sep_fluxes = {}
     for diam in PHOT_APER:
         rad = diam / 2. / pixel_scale
@@ -238,86 +290,90 @@ for ind, PHOT_NICKNAME in enumerate(FILTERS):
         # catalog[f'MAGERR_APER{diam}'] = 2.5 / np.log(10) / ( flux / fluxerr )
         catalog[f'FLAG_APER{diam}'] = flag
 
-    # KRON RADII AND MAG_AUTO
-    print(f"{PHOT_NICKNAME} :: MEASURING PHOTOMETRY in kron-corrected AUTO apertures...")
-    kronrad, krflag = sep.kron_radius(photsci, xphot, yphot, #objects['x'], objects['y'],
-                                        objects['a'], objects['b'], objects['theta'], PHOT_KRONPARAM) # SE uses 6
-    kronrad[np.isnan(kronrad)] = 0.
-    kronrad *= PHOT_AUTOPARAMS[0]
-    kronrad = np.maximum(kronrad, PHOT_AUTOPARAMS[1])
-    # print(np.isnan(kronrad).sum(), np.max(kronrad), np.min(kronrad))
-    objects['theta'][objects['theta'] > np.pi / 2.] = np.pi / 2. # numerical rounding correction!
-    flux, fluxerr, flag = sep.sum_ellipse(photsci, xphot, yphot, #objects['x'], objects['y'],
-                                        objects['a'], objects['b'], objects['theta'], kronrad,
-                                        err = photerr,
-                                        subpix=0)
+    # Compute Kron, flux radii with and without segmap masking
+    # let's hope this works as we expect...
+    for seg, seg_id, ext in ((None, None, ''), (segmap, catalog['ID'], '_masked')):
+        # KRON RADII AND MAG_AUTO
+        print(f"{PHOT_NICKNAME} :: MEASURING PHOTOMETRY in kron-corrected AUTO apertures...")
+        kronrad, krflag = sep.kron_radius(kronsci, xphot, yphot, #catalog['x'], catalog['y'],
+                                            catalog['a'], catalog['b'], catalog['theta'], PHOT_KRONPARAM,
+                                            segmap=seg, seg_id=seg_id) # SE uses 6
+        kronrad[np.isnan(kronrad)] = 0.
+        kronrad *= PHOT_AUTOPARAMS[0]
+        kronrad = np.maximum(kronrad, PHOT_AUTOPARAMS[1])
+        # print(np.isnan(kronrad).sum(), np.max(kronrad), np.min(kronrad))
+        catalog['theta'][catalog['theta'] > np.pi / 2.] = np.pi / 2. # numerical rounding correction!
+        flux, fluxerr, flag = sep.sum_ellipse(kronsci, xphot, yphot, #catalog['x'], catalog['y'],
+                                            catalog['a'], catalog['b'], catalog['theta'], kronrad,
+                                            err = kronerr,
+                                            subpix=0, segmap=seg, seg_id=seg_id)
 
-    badflux = (flux == 0.) | ~np.isfinite(flux)
-    badfluxerr = (fluxerr <= 0.) | ~np.isfinite(fluxerr)
-    pc_badflux = np.sum(badflux) / len(flux)
-    pc_badfluxerr = np.sum(badfluxerr) / len(flux)
-    pc_ORbad = np.sum(badflux | badfluxerr) / len(flux)
-    pc_ANDbad = np.sum(badflux & badfluxerr) / len(flux)
-    print(f'{pc_badflux*100:2.5f}% have BAD fluxes')
-    print(f'{pc_badfluxerr*100:2.5f}% have BAD fluxerrs')
-    print(f'{pc_ORbad*100:2.5f}% have BAD fluxes OR fluxerrs')
-    print(f'{pc_ANDbad*100:2.5f}% have BAD fluxes AND fluxerrs')
+        badflux = (flux == 0.) | ~np.isfinite(flux)
+        badfluxerr = (fluxerr <= 0.) | ~np.isfinite(fluxerr)
+        pc_badflux = np.sum(badflux) / len(flux)
+        pc_badfluxerr = np.sum(badfluxerr) / len(flux)
+        pc_ORbad = np.sum(badflux | badfluxerr) / len(flux)
+        pc_ANDbad = np.sum(badflux & badfluxerr) / len(flux)
+        print(f'{pc_badflux*100:2.5f}% have BAD fluxes')
+        print(f'{pc_badfluxerr*100:2.5f}% have BAD fluxerrs')
+        print(f'{pc_ORbad*100:2.5f}% have BAD fluxes OR fluxerrs')
+        print(f'{pc_ANDbad*100:2.5f}% have BAD fluxes AND fluxerrs')
 
-    bad = badflux | badfluxerr
+        bad = badflux | badfluxerr
 
-    flux[bad] = np.nan
-    fluxerr[bad] = np.nan
-    flag[bad] = 1
+        flux[bad] = np.nan
+        fluxerr[bad] = np.nan
+        flag[bad] = 1
 
-    flag |= krflag  # combine flags into 'flag'
+        flag |= krflag  # combine flags into 'flag'
 
 
-    # r_min = PHOT_AUTOPARAMS[1] / 2.  # minimum diameter = 3.5
-    kronrad_circ = kronrad * np.sqrt(objects['a'] * objects['b'])
-    # use_circle = kronrad_circ < r_min
-    # cflux, cfluxerr, cflag = sep.sum_circle(photsci, xphot[use_circle], yphot[use_circle],
-    #                                         r=r_min, subpix=0,
-    #                                         err = photerr, gain=1.0
-    #                                         )
+        # r_min = PHOT_AUTOPARAMS[1] / 2.  # minimum diameter = 3.5
+        kronrad_circ = kronrad * np.sqrt(catalog['a'] * catalog['b'])
+        # use_circle = kronrad_circ < r_min
+        # cflux, cfluxerr, cflag = sep.sum_circle(kronsci, xphot[use_circle], yphot[use_circle],
+        #                                         r=r_min, subpix=0,
+        #                                         err = photerr, gain=1.0
+        #                                         )
 
-    # badflux = (cflux == 0.) |  np.isnan(cflux) | ~np.isfinite(cflux)
-    # badfluxerr = (cfluxerr <= 0.) | np.isnan(cfluxerr) | ~np.isfinite(cfluxerr)
-    # pc_badflux = np.sum(badflux) / len(cflux)
-    # pc_badfluxerr = np.sum(badfluxerr) / len(cflux)
-    # pc_ORbad = np.sum(badflux | badfluxerr) / len(cflux)
-    # pc_ANDbad = np.sum(badflux & badfluxerr) / len(cflux)
-    # print(f'{pc_badflux*100:2.5f}% have BAD fluxes')
-    # print(f'{pc_badfluxerr*100:2.5f}% have BAD fluxerrs')
-    # print(f'{pc_ORbad*100:2.5f}% have BAD fluxes OR fluxerrs')
-    # print(f'{pc_ANDbad*100:2.5f}% have BAD fluxes AND fluxerrs')
+        # badflux = (cflux == 0.) |  np.isnan(cflux) | ~np.isfinite(cflux)
+        # badfluxerr = (cfluxerr <= 0.) | np.isnan(cfluxerr) | ~np.isfinite(cfluxerr)
+        # pc_badflux = np.sum(badflux) / len(cflux)
+        # pc_badfluxerr = np.sum(badfluxerr) / len(cflux)
+        # pc_ORbad = np.sum(badflux | badfluxerr) / len(cflux)
+        # pc_ANDbad = np.sum(badflux & badfluxerr) / len(cflux)
+        # print(f'{pc_badflux*100:2.5f}% have BAD fluxes')
+        # print(f'{pc_badfluxerr*100:2.5f}% have BAD fluxerrs')
+        # print(f'{pc_ORbad*100:2.5f}% have BAD fluxes OR fluxerrs')
+        # print(f'{pc_ANDbad*100:2.5f}% have BAD fluxes AND fluxerrs')
 
-    # bad = badflux | badfluxerr
+        # bad = badflux | badfluxerr
 
-    # cflux[bad] = np.nan
-    # cfluxerr[bad] = np.nan
-    # cflag[bad] = 1
+        # cflux[bad] = np.nan
+        # cfluxerr[bad] = np.nan
+        # cflag[bad] = 1
 
-    # flux[use_circle] = cflux
-    # fluxerr[use_circle] = cfluxerr
-    # flag[use_circle] = cflag
+        # flux[use_circle] = cflux
+        # fluxerr[use_circle] = cfluxerr
+        # flag[use_circle] = cflag
 
-    catalog[f'FLUX_AUTO'] = flux * conv_flux(PHOT_ZPT)
-    catalog[f'FLUXERR_AUTO'] = fluxerr * conv_flux(PHOT_ZPT)
-    # catalog[f'MAG_AUTO'] = PHOT_ZPT - 2.5*np.log10(flux)
-    # catalog[f'MAGERR_AUTO'] = 2.5 / np.log(10) / ( flux / fluxerr )
-    catalog[f'KRON_RADIUS'] = kronrad
-    catalog[f'KRON_RADIUS_CIRC'] = kronrad_circ
-    catalog[f'FLAG_AUTO'] = flag
+        catalog[f'FLUX_AUTO{ext}'] = flux * conv_flux(PHOT_ZPT)
+        catalog[f'FLUXERR_AUTO{ext}'] = fluxerr * conv_flux(PHOT_ZPT)
+        # catalog[f'MAG_AUTO{ext}'] = PHOT_ZPT - 2.5*np.log10(flux)
+        # catalog[f'MAGERR_AUTO{ext}'] = 2.5 / np.log(10) / ( flux / fluxerr )
+        catalog[f'KRON_RADIUS{ext}'] = kronrad
+        catalog[f'KRON_RADIUS_CIRC{ext}'] = kronrad_circ
+        catalog[f'FLAG_AUTO{ext}'] = flag
 
-    # FLUX RADIUS
-    print(f"{PHOT_NICKNAME} :: MEASURING FLUX RADIUS...")
-    """In Source Extractor, the FLUX_RADIUS parameter gives the radius of a circle enclosing a desired fraction of the total flux."""
-    r, flag = sep.flux_radius(photsci,  xphot, yphot, 6.*objects['a'],
-                            PHOT_FLUXFRAC, normflux=flux, subpix=5)
-    rt = r.T
-    for i, fluxfrac in enumerate(PHOT_FLUXFRAC):
-        catalog[f'FLUX_RADIUS_{fluxfrac}'] = rt[i]
-    catalog['FLUX_RADIUS_FLAG'] = flag
+        # FLUX RADIUS
+        print(f"{PHOT_NICKNAME} :: MEASURING FLUX RADIUS...")
+        """In Source Extractor, the FLUX_RADIUS parameter gives the radius of a circle enclosing a desired fraction of the total flux."""
+        r, flag = sep.flux_radius(kronsci,  xphot, yphot, 6.*catalog['a'],
+                                PHOT_FLUXRADIUS, normflux=flux, subpix=5, segmap=seg, seg_id=seg_id)
+        rt = r.T
+        for i, fluxfrac in enumerate(PHOT_FLUXRADIUS):
+            catalog[f'FLUX_RADIUS_FRAC{fluxfrac}{ext}'] = rt[i]
+        catalog[f'FLAG_FLUX_RADIUS{ext}'] = flag
 
 
     # SOURCE WEIGHT + MEDIAN WEIGHT

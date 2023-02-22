@@ -131,6 +131,8 @@ zout['u_v'] = u_v
 zout['v_j'] = v_j
 zout['uvj_class'] = clas
 
+zout['flag_eazy'] = np.where(np.isnan(zout['mass']) | (zout['z_phot_chi2'] > 300), 1, 0)
+
 zout.write(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_{TEMPLATES}.zout.fits'), overwrite=True)
 
 import eazy.hdf5

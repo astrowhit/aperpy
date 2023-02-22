@@ -10,12 +10,12 @@ sys.path.insert(0, PATH_CONFIG)
 from config import DIR_CATALOGS, DETECTION_GROUPS, DETECTION_IMAGES, DET_TYPE, DIRWHT_REPLACE, IS_COMPRESSED, WHT_REPLACE
 
 # chi-mean, noise-equalized, stack
-def chi_mean(bands, outname):
+def chi_mean(bands, outname, science_fnames, weight_fnames, is_compressed=True):
     # sum (S / N) -- but why add sigma linearly
     print(f'Building chi-mean image from {bands}')
     for i, band in enumerate(bands):
-        fn_sci = DETECTION_IMAGES[band]
-        fn_wht = DETECTION_IMAGES[band].replace(WHT_REPLACE[0], WHT_REPLACE[1]).replace(DIRWHT_REPLACE[0], DIRWHT_REPLACE[1])
+        fn_sci = science_fnames[band]
+        fn_wht = weight_fnames[band]
         print(f'{i+1}/{len(bands)} ', band, fn_sci.split('/')[-1], fn_wht.split('/')[-1])
         if i == 0:
             head = fits.getheader(fn_sci, 0)
@@ -37,17 +37,19 @@ def chi_mean(bands, outname):
     img = ( np.sqrt(img) - mu ) / np.sqrt( n - mu**2 )
 
     chiout = f'{outname}_chimean.fits'
-    if IS_COMPRESSED:
+    if is_compressed:
         chiout += '.gz'
     fits.PrimaryHDU(data=img.astype(np.float32), header=head).writeto(chiout, overwrite=True)
 
 # optimum average, so "noise equalized"
-def noise_equalized(bands, outname):
+def noise_equalized(bands, outname, science_fnames, weight_fnames, is_compressed=True):
     # SUM( X * WHT) / SUM(WHT)
     print(f'Building noise equalized image from {bands}')
+    if np.isscalar(bands):
+        bands = [bands,]
     for i, band in enumerate(bands):
-        fn_sci = DETECTION_IMAGES[band]
-        fn_wht = DETECTION_IMAGES[band].replace(WHT_REPLACE[0], WHT_REPLACE[1]).replace(DIRWHT_REPLACE[0], DIRWHT_REPLACE[1])
+        fn_sci = science_fnames[band]
+        fn_wht = weight_fnames[band]
         print(fn_sci)
         print(fn_wht)
         print(f'{i+1}/{len(bands)} ', band, fn_sci.split('/')[-1], fn_wht.split('/')[-1])
@@ -74,7 +76,7 @@ def noise_equalized(bands, outname):
     avgout = f'{outname}_optavg.fits'
     errout = f'{outname}_opterr.fits'
     neqout = f'{outname}_noise-equal.fits'
-    if IS_COMPRESSED:
+    if is_compressed:
         avgout += '.gz'
         errout += '.gz'
         neqout += '.gz'
@@ -83,11 +85,11 @@ def noise_equalized(bands, outname):
     fits.PrimaryHDU(data=comb.astype(np.float32), header=head).writeto(neqout, overwrite=True)
 
 
-def sumstack(bands, outname):
+def sumstack(bands, outname, science_fnames, weight_fnames, is_compressed=True):
     print(f'Building simple stack image from {bands}')
     for i, band in enumerate(bands):
-        fn_sci = DETECTION_IMAGES[band]
-        fn_wht = DETECTION_IMAGES[band].replace(WHT_REPLACE[0], WHT_REPLACE[1]).replace(DIRWHT_REPLACE[0], DIRWHT_REPLACE[1])
+        fn_sci = science_fnames[band]
+        fn_wht = weight_fnames[band]
         print(f'{i+1}/{len(bands)} ', band, fn_sci.split('/')[-1], fn_wht.split('/')[-1])
         if i == 0:
             head = fits.getheader(fn_sci, 0)
@@ -104,16 +106,29 @@ def sumstack(bands, outname):
 
     sciout = f'{outname}_sumstack_sci.fits'
     whtout = f'{outname}_sumstack_wht.fits'
-    if IS_COMPRESSED:
+    if is_compressed:
         sciout += '.gz'
         whtout += '.gz'
     fits.PrimaryHDU(data=img.astype(np.float32), header=head).writeto(sciout, overwrite=True)
     fits.PrimaryHDU(data=wht.astype(np.float32), header=head).writeto(whtout, overwrite=True)
 
-DET_NICKNAME = sys.argv[2]
-outpath = os.path.join(DIR_CATALOGS, f'{DET_NICKNAME}_{DET_TYPE}')
-if not os.path.exists(outpath):
-    os.mkdir(outpath)
-bands = DETECTION_GROUPS[DET_NICKNAME.split('_')[0]]
-if DET_TYPE == 'noise-equal':
-    noise_equalized(bands, os.path.join(outpath, f'{DET_NICKNAME}'))
+
+if __name__ == "__main__":
+    DET_NICKNAME = sys.argv[2]
+    outpath = os.path.join(DIR_CATALOGS, f'{DET_NICKNAME}_{DET_TYPE}')
+    if not os.path.exists(outpath):
+        os.mkdir(outpath)
+    bands = DETECTION_GROUPS[DET_NICKNAME.split('_')[0]]
+    print(bands)
+    science_fnames = DETECTION_IMAGES
+    weight_fnames = {}
+    for band in bands:
+        weight_fnames[band] = DETECTION_IMAGES[band].replace(WHT_REPLACE[0], WHT_REPLACE[1]).replace(DIRWHT_REPLACE[0], DIRWHT_REPLACE[1])
+
+    if DET_TYPE == 'noise-equal':
+        noise_equalized(bands, os.path.join(outpath, f'{DET_NICKNAME}'),
+                        science_fnames= science_fnames,
+                        weight_fnames= weight_fnames, 
+                        is_compressed=IS_COMPRESSED)
+    else:
+        sys.exit('Other detecton choices are deprecated! Edit code at your own risk...')

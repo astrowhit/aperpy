@@ -24,7 +24,7 @@ from config import FILTERS, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, DIR_OUTPUT, \
     BP_FLUXRATIO, BP_FLUXRATIO_RANGE, BP_FILT, BP_MAGLIMIT, BP_APERSIZE, RA_RANGE, DEC_RANGE, \
     GAIA_ROW_LIMIT, GAIA_XMATCH_RADIUS, FN_BADWHT, SATURATEDSTAR_MAGLIMIT, SATURATEDSTAR_FILT, \
     FN_EXTRABAD, EXTRABAD_XMATCH_RADIUS, EXTRABAD_LABEL, BK_MINSIZE, BK_SLOPE, PATH_BADOBJECT, \
-    GLASS_MASK, SATURATEDSTAR_APERSIZE
+    GLASS_MASK, SATURATEDSTAR_APERSIZE, PHOT_USEMASK, PROJECT, VERSION, PSF_FOV
 
 
 DET_NICKNAME =  sys.argv[2] #'LW_f277w-f356w-f444w'
@@ -37,7 +37,7 @@ def DIR_KERNEL(band):
     return glob.glob(os.path.join(DIR_KERNELS, f'{KERNEL}*/{band.lower()}_kernel.fits'))[0]
 stats = np.load(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_emptyaper_stats.npy'), allow_pickle=True).item()
 
-FNAME_REF_PSF = f'{DIR_PSFS}/psf_{FIELD}_{REF_BAND.upper()}_4arcsec.fits'
+FNAME_REF_PSF = f'{DIR_PSFS}/psf_{FIELD}_{REF_BAND.upper()}_{PSF_FOV}arcsec.fits'
 
 def sigma_aper(filter, weight, apersize=0.7):
     # Equation 5
@@ -115,6 +115,10 @@ if KERNEL == REF_BAND:
 else:
     kernel = fits.getdata(DIR_KERNEL(REF_BAND))
     conv_psfmodel = convolve(psfmodel, kernel)
+    
+mask = ''
+if PHOT_USEMASK:
+    mask = '_masked'
 
 # Get some static refband stuff
 plotname = os.path.join(FULLDIR_CATALOGS, f'figures/aper_{REF_BAND}_nmad.pdf')
@@ -122,6 +126,8 @@ p, pcov, sigma1 = fit_apercurve(stats[REF_BAND], plotname=plotname, stat_type=['
 alpha, beta = p['fit_std']
 sig1 = sigma1['fit_std']
 wht_ref = maincat[f'{REF_BAND}_SRC_MEDWHT']
+SEL_BADKRON = (maincat['flag'] != 0)  #| (maincat[f'{REF_BAND}_FLAG_AUTO{mask}'] != 0)
+# ignore the auto mask as it's flagging a bunch of OK things based on "masked" pixels
 # medwht_ref = maincat[f'{REF_BAND}_MED_WHT']
 
 for filter in FILTERS:
@@ -133,30 +139,45 @@ for apersize in PHOT_APER:
     str_aper = str(apersize).replace('.', '_')
 
     # use REF_BAND Kron to correct to total fluxes and ferr
-    f_ref_auto = maincat[f'{REF_BAND}_FLUX_AUTO'].copy()
-    kronrad_circ = maincat[f'{REF_BAND}_KRON_RADIUS_CIRC'].copy()
+    f_ref_auto = maincat[f'{REF_BAND}_FLUX_AUTO{mask}'].copy()
+    kronrad_circ = maincat[f'{REF_BAND}_KRON_RADIUS_CIRC{mask}'].copy()
     f_ref_aper = maincat[f'{REF_BAND}_FLUX_APER{str_aper}']
 
-    use_circle = kronrad_circ < apersize / 2.
-    kronrad_circ[use_circle] = apersize / 2.
+    use_circle = kronrad_circ < (apersize / PIXEL_SCALE / 2.)
+    kronrad_circ[use_circle] = apersize / PIXEL_SCALE / 2.
+    # print(apersize, np.sum(use_circle), np.min(kronrad_circ), apersize / PIXEL_SCALE / 2.)
     f_ref_auto[use_circle] = f_ref_aper[use_circle]
 
-    psffrac_ref_auto = psf_cog(conv_psfmodel, nearrad = kronrad_circ) # in pixels
+    psffrac_ref_auto = psf_cog(conv_psfmodel, REF_BAND.upper(), nearrad = kronrad_circ) # in pixels
     # F160W kernel convolved REF_BAND PSF + missing flux from F160W beyond 2" radius
     f_ref_total = f_ref_auto / psffrac_ref_auto # equation 9
+    if apersize == PHOT_APER[0]:
+        newcoln =f'{REF_BAND}_FLUX_REF_AUTO'
+        maincat.add_column(Column(f_ref_auto, newcoln))
+    newcoln =f'{REF_BAND}_USE_CIRCLE_{str_aper}'
+    maincat.add_column(Column(use_circle.astype(int), newcoln))
+    newcoln =f'{REF_BAND}_KRONRAD_CIRC_APER{str_aper}'
+    maincat.add_column(Column(kronrad_circ, newcoln))
+    newcoln =f'{REF_BAND}_PSFFRAC_REF_AUTO_APER{str_aper}'
+    maincat.add_column(Column(psffrac_ref_auto, newcoln))
+    newcoln =f'{REF_BAND}_FLUX_REFTOTAL_APER{str_aper}'
+    maincat.add_column(Column(f_ref_total, newcoln))
     sig_ref_total = sigma_ref_total(sig1, alpha, beta, kronrad_circ, wht_ref)
     newcoln =f'{REF_BAND}_FLUXERR_REFTOTAL_MINDIAM{str_aper}'
     maincat.add_column(Column(sig_ref_total, newcoln))
 
     tot_corr = f_ref_total / f_ref_aper
     tot_corr[(f_ref_aper <= 0) | (f_ref_total <= 0)] = np.nan
-    maincat.add_column(MaskedColumn(1./tot_corr, f'TOTAL_CORR_APER{str_aper}', mask=np.isnan(tot_corr)))
+    min_corr = psf_cog(conv_psfmodel, REF_BAND, nearrad=(apersize / PIXEL_SCALE / 2.)) # defaults to EE(<R_aper)
+    tot_corr[tot_corr < min_corr] = min_corr 
+    tot_corr[SEL_BADKRON] = min_corr # if the detecton was iffy, you get the min_corr (i.e. PSF corr)
+    maincat.add_column(MaskedColumn(tot_corr, f'TOTAL_CORR_APER{str_aper}', mask=np.isnan(tot_corr)))
     sig_ref_aper = sigma_aper(REF_BAND.upper(), wht_ref, apersize) # sig_aper,REF_BAND
     sig_total_ref = sigma_total(sig_ref_aper, tot_corr) # sig_total,REF_BAND
 
     for filter in FILTERS:
         f_aper =maincat[f'{filter}_FLUX_APER{str_aper}']
-        f_total = flux_total(f_aper, tot_corr)
+        f_total = flux_total(f_aper, tot_corr)  # f_aper * tot_corr
         wht = maincat[f'{filter}_SRC_MEDWHT']
         # medwht = maincat[f'{filter}_MED_WHT']
 
@@ -236,7 +257,7 @@ size = maincat[f'{PS_WEBB_FILT}_FLUX_APER{str(PS_WEBB_FLUXRATIO[0]).replace(".",
 SEL_WEBB = (size > PS_WEBB_FLUXRATIO_RANGE[0]) & (size < PS_WEBB_FLUXRATIO_RANGE[1]) & (mag < PS_WEBB_MAGLIMIT)
 print(f'Flagged {np.sum(SEL_WEBB)} objects as point-like (stars) from {PS_WEBB_FILT}')
 maincat.add_column(Column(SEL_WEBB.astype(int), name='star_webb_flag'))
-fsize = maincat[f'{PS_WEBB_FILT}_FLUX_RADIUS_0_5'] * PIXEL_SCALE
+fsize = maincat[f'{PS_WEBB_FILT}_FLUX_RADIUS_FRAC0_5'] * PIXEL_SCALE
 
 # Select in F160W
 str_aper = str(PS_HST_APERSIZE).replace('.', '_')
@@ -351,12 +372,12 @@ fig.tight_layout()
 fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_K{KERNEL}_star_id.pdf'))
 
 
-# bad kron radius flag
-krc = maincat[f'{REF_BAND}_KRON_RADIUS_CIRC'] * PIXEL_SCALE
-snr = (maincat[f'{REF_BAND}_FLUX_APER{str_aper}_COLOR']/maincat[f'{REF_BAND}_FLUXERR_APER{str_aper}_COLOR'])
-SEL_BADKRON = (snr < BK_SLOPE*(krc - BK_MINSIZE))  #| (krc > 9)
-print(f'Flagged {np.sum(SEL_BADKRON)} objects as having enormous kron radii for their SNR')
-maincat.add_column(Column(SEL_BADKRON.astype(int), name='badkron_flag'))
+# # bad kron radius flag
+# krc = maincat[f'{REF_BAND}_KRON_RADIUS_CIRC{mask}'] * PIXEL_SCALE
+# snr = (maincat[f'{REF_BAND}_FLUX_APER{str_aper}_COLOR']/maincat[f'{REF_BAND}_FLUXERR_APER{str_aper}_COLOR'])
+# SEL_BADKRON = (snr < BK_SLOPE*(krc - BK_MINSIZE))  #| (krc > 9)
+# print(f'Flagged {np.sum(SEL_BADKRON)} objects as having enormous kron radii for their SNR')
+# maincat.add_column(Column(SEL_BADKRON.astype(int), name='badkron_flag'))
 
 # low-weight source flag -  TODO
 
@@ -418,6 +439,10 @@ for colname in ztable.colnames:
         colname = f'z_spec_{colname}'
     maincat.add_column(Column(filler, name=colname))
 
+# some extra columns
+maincat['iso_area'] = maincat['tnpix'] * PIXEL_SCALE**2
+maincat['iso_area'].unit = u.arcsec**2
+maincat['flag_kron'] = np.where(SEL_BADKRON, 1, 0)
 
 # use flag (minimum SNR cut + not a star)
 str_aper = str(SCI_APER).replace('.', '_')
@@ -462,6 +487,8 @@ for i, colname in enumerate(maincat.colnames):
         maincat[colname].unit = u.deg
 
     print(i, colname)
+    
+
 
 maincat.write(outfilename, overwrite=True)
 print(f'Added date stamp! ({today})')
@@ -490,13 +517,16 @@ for apersize in PHOT_APER:
         cols[f'TOTAL_CORR_APER{str_aper}'] = 'tot_cor'
         # cols[f'{REF_BAND}_FLUXERR_REFTOTAL'] = 'tot_ekron_f444w'
 
-        # wmin?
-        cols[f'{REF_BAND}_KRON_RADIUS'] = 'kron_radius'
-        cols[f'{REF_BAND}_KRON_RADIUS_CIRC'] = 'kron_radius_circ'
+        # cols[f'{REF_BAND}_FLAG_AUTO{mask}'] = 'flag_auto'
+        cols[f'{REF_BAND}_KRON_RADIUS_APER{str_aper}'] = 'kron_radius'   # this is the modified KR where KR = sci_aper/2 for small things.
+        cols[f'{REF_BAND}_KRON_RADIUS_CIRC_APER{str_aper}'] = 'kron_radius_circ' # ditto
+        cols['{REF_BAND}_USE_CIRCLE_{str_aper}'] = 'use_circle' # where kron radius is not used.
+        cols['flag_kron'] = 'flag_kron'
+        cols['iso_area'] = 'iso_area'
         cols['a'] = 'a_image'
         cols['b'] = 'b_image'
         cols['theta'] = 'theta_J2000' # double check this!
-        cols[f'{REF_BAND}_FLUX_RADIUS_0_5'] = 'flux_radius'
+        cols[f'{REF_BAND}_FLUX_RADIUS_FRAC0_5'] = 'flux_radius'
         cols['use_phot'] = 'use_phot'
         cols['lowsnr_flag'] = 'flag_lowsnr'
         cols['star_flag'] = 'flag_star'
@@ -506,7 +536,7 @@ for apersize in PHOT_APER:
             cols['extrabad_flag'] = 'flag_nearbcg'
         if PATH_BADOBJECT is not None:
             cols['badobject_flag'] = 'flag_badobject'
-        cols['badkron_flag'] = 'flag_badkron'
+        # cols['badkron_flag'] = 'flag_badkron'
         if GLASS_MASK is not None:
             cols['badglass_flag'] = 'flag_badflat'
         cols['z_spec'] = 'z_spec'
@@ -526,7 +556,10 @@ for apersize in PHOT_APER:
         # use_phot[snr_ref >= 3] = 1
         # use_phot[SEL_STAR | SEL_BADPIX | SEL_EXTRABAD | SEL_BADOBJECT | SEL_BADGLASS | SEL_BADKRON] = 0
         # subcat['use_phot'] = use_phot
-
-        sub_outfilename = outfilename.replace('COMBINED', f'SCIREADY_{str_aper}')
+        str_aper = str_aper.replace('_', '')
+        if len(str_aper) == 2:
+            str_aper += '0' # 07 -> 070
+        sub_outfilename = outfilename.replace('COMBINED', f'D{str_aper}')
+        sub_outfilename = sub_outfilename.replace(DET_NICKNAME+'_K', f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K")
         subcat.write(sub_outfilename, overwrite=True)
         print('Wrote formatted combined catalog to ', sub_outfilename)
