@@ -389,7 +389,7 @@ def get_date():
     return now
 
 # Make and rotate PSF
-def get_psf(filt, field='uncover', angle=None, fov=4, og_fov=10, pixscl=PIXEL_SCALE, date=None, output='', jitter_sigma=None):
+def get_psf(filt, field='uncover', angle=None, fov=4, og_fov=10, pixscl=None, date=None, output='', jitter_sigma=None):
     # makes the PSF at og_fov and clips down to fov. Works with 0.04 "/px
     import webbpsf
     from astropy.io import fits
@@ -399,6 +399,10 @@ def get_psf(filt, field='uncover', angle=None, fov=4, og_fov=10, pixscl=PIXEL_SC
     from astropy.io import ascii
 
     from config import SW_FILTERS, LW_FILTERS, PATH_SW_ENERGY, PATH_LW_ENERGY
+    
+    if pixscl is None:
+        from config import PIXEL_SCALE
+        pixscl = PIXEL_SCALE
 
     # Check if filter is valid and get correction term
     if filt in SW_FILTERS:

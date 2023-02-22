@@ -169,7 +169,7 @@ for apersize in PHOT_APER:
 
     tot_corr = f_ref_total / f_ref_aper
     tot_corr[(f_ref_aper <= 0) | (f_ref_total <= 0)] = np.nan
-    min_corr = psf_cog(conv_psfmodel, REF_BAND, nearrad=(apersize / PIXEL_SCALE / 2.)) # defaults to EE(<R_aper)
+    min_corr = psf_cog(conv_psfmodel, REF_BAND.upper(), nearrad=(apersize / PIXEL_SCALE / 2.)) # defaults to EE(<R_aper)
     tot_corr[tot_corr < min_corr] = min_corr 
     tot_corr[SEL_BADKRON] = min_corr # if the detecton was iffy, you get the min_corr (i.e. PSF corr)
     maincat.add_column(MaskedColumn(tot_corr, f'TOTAL_CORR_APER{str_aper}', mask=np.isnan(tot_corr)))
@@ -281,7 +281,7 @@ if PS_WEBB_USE:
     SEL_WEBB = (size > PS_WEBB_FLUXRATIO_RANGE[0]) & (size < PS_WEBB_FLUXRATIO_RANGE[1]) & (mag < PS_WEBB_MAGLIMIT)
     print(f'Flagged {np.sum(SEL_WEBB)} objects as point-like (stars) from {PS_WEBB_FILT}')
     maincat.add_column(Column(SEL_WEBB.astype(int), name='star_webb_flag'))
-    fsize = maincat[f'{PS_WEBB_FILT}_FLUX_RADIUS_0_5'] * PIXEL_SCALE
+    fsize = maincat[f'{PS_WEBB_FILT}_FLUX_RADIUS_FRAC0_5'] * PIXEL_SCALE
     SEL_STAR |= SEL_WEBB
 
 # GAIA selection

@@ -93,7 +93,7 @@ for apersize in PHOT_APER:
     for filter in FILTERS:
         psfmodel = fits.getdata(f'{DIR_PSFS}/psf_{FIELD}_{filter.upper()}_4arcsec.fits')
 
-        frac_aper = psf_cog(psfmodel, filter, nearrad=apersize / 2. / PIXEL_SCALE)
+        frac_aper = psf_cog(psfmodel, filter.upper(), nearrad=apersize / 2. / PIXEL_SCALE)
         f_aper = maincat[f'{filter}_FLUX_APER{str_aper}']
         f_total = flux_total(f_aper, frac_aper)
         wht = maincat[f'{filter}_SRC_MEDWHT']
