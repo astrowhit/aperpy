@@ -389,7 +389,7 @@ def get_date():
     return now
 
 # Make and rotate PSF
-def get_psf(filt, field='uncover', angle=None, fov=4, og_fov=10, pixscl=None, date=None, output='', jitter_sigma=None):
+def get_psf(filt, field='uncover', angle=None, fov=4, og_fov=10, pixscl=None, date=None, output='', jitter_kernel='gaussian', jitter_sigma=None):
     # makes the PSF at og_fov and clips down to fov. Works with 0.04 "/px
     import webbpsf
     from astropy.io import fits
@@ -425,7 +425,7 @@ def get_psf(filt, field='uncover', angle=None, fov=4, og_fov=10, pixscl=None, da
     nc = webbpsf.NIRCam()
     nc.options['parity'] = 'odd'
     if jitter_sigma is not None:
-        nc.options['jitter'] = 'gaussian'   # jitter model name or None
+        nc.options['jitter'] = jitter_kernel   # jitter model name or None
         nc.options['jitter_sigma'] = jitter_sigma  # in arcsec per axis, default 0.007
 
     outname = os.path.join(output, 'psf_'+field+'_'+filt+'_'+str(fov)+'arcsec') # what to save as?

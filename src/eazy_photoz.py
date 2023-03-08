@@ -28,7 +28,7 @@ KERNEL = sys.argv[3] #'f444w'
 APERSIZE = str(sys.argv[4]).replace('.', '_')
 TEMPLATES = sys.argv[5]
 
-from config import DIR_CATALOGS, DET_TYPE, TRANSLATE_FNAME, TARGET_ZP, ITERATE_ZP, FILTERS, REF_BAND
+from config import DIR_CATALOGS, DET_TYPE, TRANSLATE_FNAME, TARGET_ZP, ITERATE_ZP, FILTERS, MATCH_BAND, PROJECT, VERSION
 
 FULLDIR_CATALOGS = os.path.join(DIR_CATALOGS, f'{DET_NICKNAME}_{DET_TYPE}/{KERNEL}/')
 
@@ -36,8 +36,12 @@ translate_file = os.path.join(DIR_CONFIG, TRANSLATE_FNAME)
 
 params = {}
 
-params['CATALOG_FILE'] = os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_CATALOG.fits')
-params['MAIN_OUTPUT_FILE'] = os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_CATALOG.{TEMPLATES}.eazypy')
+str_aper = APERSIZE.replace('_', '')
+if len(str_aper) == 2:
+    str_aper += '0' # 07 -> 070
+
+params['CATALOG_FILE'] = os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_D{str_aper}_CATALOG.fits")
+params['MAIN_OUTPUT_FILE'] = os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_D{str_aper}_CATALOG.{TEMPLATES}.eazypy")
 
 params['APPLY_PRIOR'] = 'n'
 params['PRIOR_ABZP'] = TARGET_ZP
@@ -98,7 +102,7 @@ ez.fit_parallel(sample, n_proc=4, prior=False, beta_prior=False)
 
 ez.zphot_zspec(include_errors=True, zmax=6.5, selection=ez.cat['use_phot']==1)
 fig = plt.gcf()
-fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_{TEMPLATES}.photoz-specz.pdf'))
+fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{PROJECT}_v{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_D{str_aper}_CATALOG_{TEMPLATES}.photoz-specz.pdf'))
 
 
 zout, hdu = ez.standard_output(rf_pad_width=0.5, rf_max_err=2,
@@ -133,7 +137,7 @@ zout['uvj_class'] = clas
 
 zout['flag_eazy'] = np.where(np.isnan(zout['mass']) | (zout['z_phot_chi2'] > 300), 1, 0)
 
-zout.write(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_{TEMPLATES}.zout.fits'), overwrite=True)
+zout.write(os.path.join(FULLDIR_CATALOGS, f'{PROJECT}_v{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_D{str_aper}_CATALOG_{TEMPLATES}.zout.fits'), overwrite=True)
 
 import eazy.hdf5
 eazy.hdf5.write_hdf5(ez, h5file=ez.param['MAIN_OUTPUT_FILE'] + '.h5')
@@ -184,7 +188,7 @@ for test, ylabel, fname in zip((rel_diff, ztest, dmag),
     ax.set(xlim=(0.1, 5), xlabel='Observed Wavelength ($\mu$m)', ylabel=ylabel)
 
     fig.tight_layout()
-    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_{TEMPLATES}_{fname}.pdf'))
+    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{PROJECT}_v{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_D{str_aper}_CATALOG_{TEMPLATES}_{fname}.pdf'))
 
 
 # 2. mod - obs vs. z, per band
@@ -241,7 +245,7 @@ for test, ylabel, fname in zip((rel_diff, ztest, dmag),
         ax.text(0.65, 0.8, f'$\Delta={delta:2.3f}$', transform=ax.transAxes, fontsize=15)
 
     fig.tight_layout()
-    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_{TEMPLATES}_{fname}.pdf'))
+    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{PROJECT}_v{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_D{str_aper}_CATALOG_{TEMPLATES}_{fname}.pdf'))
 
 
 
@@ -301,7 +305,7 @@ for test, ylabel, fname in zip((rel_diff, ztest, dmag),
         ax.text(0.65, 0.8, f'$\Delta={delta:2.3f}$', transform=ax.transAxes, fontsize=15)
 
     fig.tight_layout()
-    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_{TEMPLATES}_{fname}.pdf'))
+    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{PROJECT}_v{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_D{str_aper}_CATALOG_{TEMPLATES}_{fname}.pdf'))
 
 # Basic properties
 
@@ -327,12 +331,12 @@ axes[2].scatter(zout['v_j'][sanity], zout['u_v'][sanity], s=3, c='grey', alpha=0
 axes[2].scatter(zout['v_j'][qg & sanity], zout['u_v'][qg & sanity], s=3, c='orange')
 axes[2].set(xlabel='$V-J$', ylabel='$U-V$', xlim=(-0.6, 2.0), ylim=(0, 2.4))
 
-# REF_BAND
+# MATCH_BAND
 bins = np.arange(17, 30, 0.5)
-axes[3].hist(TARGET_ZP - 2.5*np.log10(ez.cat['f_'+REF_BAND])[sanity], bins=bins, color='grey')
-axes[3].hist(TARGET_ZP - 2.5*np.log10(ez.cat['f_'+REF_BAND])[qg & sanity], bins=bins, color='orange')
-axes[3].set(xlabel=REF_BAND.upper())
+axes[3].hist(TARGET_ZP - 2.5*np.log10(ez.cat['f_'+MATCH_BAND])[sanity], bins=bins, color='grey')
+axes[3].hist(TARGET_ZP - 2.5*np.log10(ez.cat['f_'+MATCH_BAND])[qg & sanity], bins=bins, color='orange')
+axes[3].set(xlabel=MATCH_BAND.upper())
 axes[3].semilogy()
 
 fig.tight_layout()
-fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_K{KERNEL}_SCIREADY_{APERSIZE}_{TEMPLATES}_properties_scatter.pdf'))
+fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{PROJECT}_v{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_D{str_aper}_CATALOG_{TEMPLATES}_properties_scatter.pdf'))

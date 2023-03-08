@@ -17,7 +17,7 @@ PATH_CONFIG = sys.argv[1]
 sys.path.insert(0, PATH_CONFIG)
 
 from config import FILTERS, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, DIR_OUTPUT, \
-    REF_BAND, PIXEL_SCALE, PHOT_APER, DIR_KERNELS, DIR_PSFS, FIELD, ZSPEC, \
+    MATCH_BAND, PIXEL_SCALE, PHOT_APER, DIR_KERNELS, DIR_PSFS, FIELD, ZSPEC, \
     MAX_SEP, SCI_APER, MAKE_SCIREADY_ALL, TARGET_ZP, ZCONF, ZRA, ZDEC, ZCOL, FLUX_UNIT, \
     PS_WEBB_FLUXRATIO, PS_WEBB_FLUXRATIO_RANGE, PS_WEBB_FILT, PS_WEBB_MAGLIMIT, PS_WEBB_APERSIZE, \
     PS_HST_FLUXRATIO, PS_HST_FLUXRATIO_RANGE, PS_HST_FILT, PS_HST_MAGLIMIT, PS_HST_APERSIZE, \
@@ -25,7 +25,7 @@ from config import FILTERS, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, DIR_OUTPUT, \
     GAIA_ROW_LIMIT, GAIA_XMATCH_RADIUS, FN_BADWHT, SATURATEDSTAR_MAGLIMIT, SATURATEDSTAR_FILT, \
     FN_EXTRABAD, EXTRABAD_XMATCH_RADIUS, EXTRABAD_LABEL, BK_MINSIZE, BK_SLOPE, PATH_BADOBJECT, \
     GLASS_MASK, SATURATEDSTAR_APERSIZE, PS_WEBB_USE, PS_HST_USE, GAIA_USE, BADWHT_USE, EXTRABAD_USE, \
-    BP_USE, BADOBJECT_USE, PHOT_USEMASK, PROJECT, VERSION, PSF_FOV
+    BP_USE, BADOBJECT_USE, PHOT_USEMASK, PROJECT, VERSION, PSF_FOV, USE_COMBINED_KRON_IMAGE, KRON_COMBINED_BANDS
 
 
 DET_NICKNAME =  sys.argv[2] #'LW_f277w-f356w-f444w'
@@ -38,7 +38,7 @@ def DIR_KERNEL(band):
     return glob.glob(os.path.join(DIR_KERNELS, f'{KERNEL}*/{band.lower()}_kernel.fits'))[0]
 stats = np.load(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_emptyaper_stats.npy'), allow_pickle=True).item()
 
-FNAME_REF_PSF = f'{DIR_PSFS}/psf_{FIELD}_{REF_BAND.upper()}_{PSF_FOV}arcsec.fits'
+FNAME_REF_PSF = f'{DIR_PSFS}/psf_{FIELD}_{MATCH_BAND.upper()}_{PSF_FOV}arcsec.fits'
 
 def sigma_aper(filter, weight, apersize=0.7):
     # Equation 5
@@ -78,7 +78,11 @@ def flux_total(flux_aper, tot_cor):
 
 
 # loop over filters
-for filter in FILTERS:
+USE_FILTERS = FILTERS
+if (KERNEL != 'None') & (USE_COMBINED_KRON_IMAGE):
+    KRON_MATCH_BAND = '+'.join(KRON_COMBINED_BANDS)
+    USE_FILTERS = [KRON_MATCH_BAND, ] + list(FILTERS)
+for filter in USE_FILTERS:
     filename = os.path.join(FULLDIR_CATALOGS, f'{filter}_{DET_NICKNAME}_K{KERNEL}_PHOT_CATALOG.fits')
     if not os.path.exists(filename):
         print(f'ERROR :: {filename} not found!')
@@ -101,7 +105,7 @@ for filter in FILTERS:
             except:
                 pass
 
-    if filter == FILTERS[0]:
+    if filter == USE_FILTERS[0]:
         maincat = cat
     else:
         newcols = [coln for coln in cat.colnames if coln not in maincat.colnames]
@@ -109,12 +113,17 @@ for filter in FILTERS:
 
 outfilename = os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_COMBINED_CATALOG.fits')
 
-# grab REF_BAND PSF convolved to kernel
+if USE_COMBINED_KRON_IMAGE:
+    KRON_MATCH_BAND = '+'.join(KRON_COMBINED_BANDS)
+else:
+    KRON_MATCH_BAND = MATCH_BAND # behaves as usual with a single ref band
+    
+# grab MATCH_BAND PSF convolved to kernel
 psfmodel = fits.getdata(FNAME_REF_PSF)
-if KERNEL == REF_BAND:
+if KERNEL == MATCH_BAND:
     conv_psfmodel = psfmodel.copy()
 else:
-    kernel = fits.getdata(DIR_KERNEL(REF_BAND))
+    kernel = fits.getdata(DIR_KERNEL(MATCH_BAND))
     conv_psfmodel = convolve(psfmodel, kernel)
     
 mask = ''
@@ -122,16 +131,16 @@ if PHOT_USEMASK:
     mask = '_masked'
 
 # Get some static refband stuff
-plotname = os.path.join(FULLDIR_CATALOGS, f'figures/aper_{REF_BAND}_nmad.pdf')
-p, pcov, sigma1 = fit_apercurve(stats[REF_BAND], plotname=plotname, stat_type=['fit_std'], pixelscale=PIXEL_SCALE)
+plotname = os.path.join(FULLDIR_CATALOGS, f'figures/aper_{KRON_MATCH_BAND}_nmad.pdf')
+p, pcov, sigma1 = fit_apercurve(stats[KRON_MATCH_BAND], plotname=plotname, stat_type=['fit_std'], pixelscale=PIXEL_SCALE)
 alpha, beta = p['fit_std']
 sig1 = sigma1['fit_std']
-wht_ref = maincat[f'{REF_BAND}_SRC_MEDWHT']
-SEL_BADKRON = (maincat['flag'] != 0)  #| (maincat[f'{REF_BAND}_FLAG_AUTO{mask}'] != 0)
+wht_ref = maincat[f'{KRON_MATCH_BAND}_SRC_MEDWHT']
+SEL_BADKRON = (maincat['flag'] != 0)  #| (maincat[f'{KRON_MATCH_BAND}_FLAG_AUTO{mask}'] != 0)
 # ignore the auto mask as it's flagging a bunch of OK things based on "masked" pixels
-# medwht_ref = maincat[f'{REF_BAND}_MED_WHT']
+# medwht_ref = maincat[f'{KRON_MATCH_BAND}_MED_WHT']
 
-for filter in FILTERS:
+for filter in USE_FILTERS:
     relwht = maincat[f'{filter}_SRC_MEDWHT'] / maincat[f'{filter}_MAX_WHT']
     newcoln = f'{filter}_RELWHT'
     maincat.add_column(Column(relwht, newcoln))
@@ -139,44 +148,48 @@ for filter in FILTERS:
 for apersize in PHOT_APER:
     str_aper = str(apersize).replace('.', '_')
 
-    # use REF_BAND Kron to correct to total fluxes and ferr
-    f_ref_auto = maincat[f'{REF_BAND}_FLUX_AUTO{mask}'].copy()
-    kronrad_circ = maincat[f'{REF_BAND}_KRON_RADIUS_CIRC{mask}'].copy()
-    f_ref_aper = maincat[f'{REF_BAND}_FLUX_APER{str_aper}']
+    # use KRON_MATCH_BAND Kron to correct to total fluxes and ferr
+    f_ref_auto = maincat[f'{KRON_MATCH_BAND}_FLUX_AUTO{mask}'].copy()
+    kronrad_circ = maincat[f'{KRON_MATCH_BAND}_KRON_RADIUS_CIRC{mask}'].copy()
+    kronrad = maincat[f'{KRON_MATCH_BAND}_KRON_RADIUS{mask}'].copy()
+    f_ref_aper = maincat[f'{KRON_MATCH_BAND}_FLUX_APER{str_aper}']
 
     use_circle = kronrad_circ < (apersize / PIXEL_SCALE / 2.)
     kronrad_circ[use_circle] = apersize / PIXEL_SCALE / 2.
+    kronrad[use_circle] = np.nan
     # print(apersize, np.sum(use_circle), np.min(kronrad_circ), apersize / PIXEL_SCALE / 2.)
     f_ref_auto[use_circle] = f_ref_aper[use_circle]
 
-    psffrac_ref_auto = psf_cog(conv_psfmodel, REF_BAND.upper(), nearrad = kronrad_circ) # in pixels
-    # F160W kernel convolved REF_BAND PSF + missing flux from F160W beyond 2" radius
+    psffrac_ref_auto = psf_cog(conv_psfmodel, MATCH_BAND.upper(), nearrad = kronrad_circ) # in pixels
+    # F160W kernel convolved MATCH_BAND PSF + missing flux from F160W beyond 2" radius
     f_ref_total = f_ref_auto / psffrac_ref_auto # equation 9
     if apersize == PHOT_APER[0]:
-        newcoln =f'{REF_BAND}_FLUX_REF_AUTO'
+        newcoln =f'{KRON_MATCH_BAND}_FLUX_REF_AUTO'
         maincat.add_column(Column(f_ref_auto, newcoln))
-    newcoln =f'{REF_BAND}_USE_CIRCLE_{str_aper}'
+    newcoln =f'{KRON_MATCH_BAND}_USE_CIRCLE_{str_aper}'
     maincat.add_column(Column(use_circle.astype(int), newcoln))
-    newcoln =f'{REF_BAND}_KRONRAD_CIRC_APER{str_aper}'
+    newcoln =f'{KRON_MATCH_BAND}_KRON_RADIUS_CIRC_APER{str_aper}'
     maincat.add_column(Column(kronrad_circ, newcoln))
-    newcoln =f'{REF_BAND}_PSFFRAC_REF_AUTO_APER{str_aper}'
+    newcoln =f'{KRON_MATCH_BAND}_KRON_RADIUS_APER{str_aper}'
+    maincat.add_column(Column(kronrad, newcoln))
+    newcoln =f'{KRON_MATCH_BAND}_PSFFRAC_REF_AUTO_APER{str_aper}'
     maincat.add_column(Column(psffrac_ref_auto, newcoln))
-    newcoln =f'{REF_BAND}_FLUX_REFTOTAL_APER{str_aper}'
+    newcoln =f'{KRON_MATCH_BAND}_FLUX_REFTOTAL_APER{str_aper}'
     maincat.add_column(Column(f_ref_total, newcoln))
     sig_ref_total = sigma_ref_total(sig1, alpha, beta, kronrad_circ, wht_ref)
-    newcoln =f'{REF_BAND}_FLUXERR_REFTOTAL_MINDIAM{str_aper}'
+    newcoln =f'{KRON_MATCH_BAND}_FLUXERR_REFTOTAL_MINDIAM{str_aper}'
     maincat.add_column(Column(sig_ref_total, newcoln))
 
     tot_corr = f_ref_total / f_ref_aper
     tot_corr[(f_ref_aper <= 0) | (f_ref_total <= 0)] = np.nan
-    min_corr = psf_cog(conv_psfmodel, REF_BAND.upper(), nearrad=(apersize / PIXEL_SCALE / 2.)) # defaults to EE(<R_aper)
+    min_corr = 1. / psf_cog(conv_psfmodel, MATCH_BAND.upper(), nearrad=(apersize / PIXEL_SCALE / 2.)) # defaults to EE(<R_aper)
     tot_corr[tot_corr < min_corr] = min_corr 
     tot_corr[SEL_BADKRON] = min_corr # if the detecton was iffy, you get the min_corr (i.e. PSF corr)
     maincat.add_column(MaskedColumn(tot_corr, f'TOTAL_CORR_APER{str_aper}', mask=np.isnan(tot_corr)))
-    sig_ref_aper = sigma_aper(REF_BAND.upper(), wht_ref, apersize) # sig_aper,REF_BAND
-    sig_total_ref = sigma_total(sig_ref_aper, tot_corr) # sig_total,REF_BAND
+    sig_ref_aper = sigma_aper(KRON_MATCH_BAND.upper(), wht_ref, apersize) # sig_aper,KRON_MATCH_BAND
+    sig_total_ref = sigma_total(sig_ref_aper, tot_corr) # sig_total,KRON_MATCH_BAND
 
-    for filter in FILTERS:
+    for filter in USE_FILTERS:
         f_aper =maincat[f'{filter}_FLUX_APER{str_aper}']
         f_total = flux_total(f_aper, tot_corr)  # f_aper * tot_corr
         wht = maincat[f'{filter}_SRC_MEDWHT']
@@ -243,17 +256,19 @@ if APPLY_MWDUST is not None:
         if 'RADIUS' in coln:
             continue
         filtname = coln.split('_')[0]
-        if 'FLUX' in coln:
-            maincat[coln] /= atten_factor[np.array(FILTERS) == filtname][0]
+        if filtname in FILTERS:
+            if 'FLUX' in coln:
+                maincat[coln] /= atten_factor[np.array(FILTERS) == filtname][0]
 
-        elif 'MAG' in coln:
-            maincat[coln] -= atten_mag[np.array(FILTERS) == filtname][0]
+            elif 'MAG' in coln:
+                maincat[coln] -= atten_mag[np.array(FILTERS) == filtname][0]
 
 # low-snr flag
+for coln in maincat.colnames: print(coln)
 str_aper = str(SCI_APER).replace('.', '_')
-snr_ref = maincat[f'{REF_BAND}_FLUX_APER{str_aper}_COLOR'] / maincat[f'{REF_BAND}_FLUXERR_APER{str_aper}_COLOR']
-snr_ref[maincat[f'{REF_BAND}_FLUXERR_APER{str_aper}_COLOR']<=0] = -1
-SEL_LOWSNR = (snr_ref < 3) | np.isnan(maincat[f'{REF_BAND}_RELWHT'])
+snr_ref = maincat[f'{KRON_MATCH_BAND}_FLUX_APER{str_aper}_COLOR'] / maincat[f'{KRON_MATCH_BAND}_FLUXERR_APER{str_aper}_COLOR']
+snr_ref[maincat[f'{KRON_MATCH_BAND}_FLUXERR_APER{str_aper}_COLOR']<=0] = -1
+SEL_LOWSNR = (snr_ref < 3) | np.isnan(maincat[f'{KRON_MATCH_BAND}_RELWHT'])
 print(f'Flagged {np.sum(SEL_LOWSNR)} objects as having low SNR < 3')
 maincat.add_column(Column(SEL_LOWSNR.astype(int), name='lowsnr_flag'))
 
@@ -411,8 +426,8 @@ if PS_WEBB_USE or PS_HST_USE or BP_USE:
 
 
 # # bad kron radius flag
-# krc = maincat[f'{REF_BAND}_KRON_RADIUS_CIRC{mask}'] * PIXEL_SCALE
-# snr = (maincat[f'{REF_BAND}_FLUX_APER{str_aper}_COLOR']/maincat[f'{REF_BAND}_FLUXERR_APER{str_aper}_COLOR'])
+# krc = maincat[f'{KRON_MATCH_BAND}_KRON_RADIUS_CIRC{mask}'] * PIXEL_SCALE
+# snr = (maincat[f'{KRON_MATCH_BAND}_FLUX_APER{str_aper}_COLOR']/maincat[f'{KRON_MATCH_BAND}_FLUXERR_APER{str_aper}_COLOR'])
 # SEL_BADKRON = (snr < BK_SLOPE*(krc - BK_MINSIZE))  #| (krc > 9)
 # print(f'Flagged {np.sum(SEL_BADKRON)} objects as having enormous kron radii for their SNR')
 # maincat.add_column(Column(SEL_BADKRON.astype(int), name='badkron_flag'))
@@ -542,8 +557,8 @@ for apersize in PHOT_APER:
         cols['RA'] = 'ra'
         cols['DEC'] = 'dec'
         cols['EBV'] = 'ebv_mw'
-        cols[f'{REF_BAND}_FLUX_APER{str_aper}_COLOR'] = f'faper_{REF_BAND}'
-        cols[f'{REF_BAND}_FLUXERR_APER{str_aper}_COLOR'] = f'eaper_{REF_BAND}'
+        cols[f'{KRON_MATCH_BAND}_FLUX_APER{str_aper}_COLOR'] = f'faper_{KRON_MATCH_BAND}'
+        cols[f'{KRON_MATCH_BAND}_FLUXERR_APER{str_aper}_COLOR'] = f'eaper_{KRON_MATCH_BAND}'
 
         for filter in FILTERS:
             cols[f'{filter}_FLUX_APER{str_aper}_TOTAL'] = f'f_{filter}'
@@ -551,18 +566,18 @@ for apersize in PHOT_APER:
             cols[f'{filter}_RELWHT'] = f'w_{filter}'
 
         cols[f'TOTAL_CORR_APER{str_aper}'] = 'tot_cor'
-        # cols[f'{REF_BAND}_FLUXERR_REFTOTAL'] = 'tot_ekron_f444w'
+        # cols[f'{KRON_MATCH_BAND}_FLUXERR_REFTOTAL'] = 'tot_ekron_f444w'
 
-        # cols[f'{REF_BAND}_FLAG_AUTO{mask}'] = 'flag_auto'
-        cols[f'{REF_BAND}_KRON_RADIUS_APER{str_aper}'] = 'kron_radius'   # this is the modified KR where KR = sci_aper/2 for small things.
-        cols[f'{REF_BAND}_KRON_RADIUS_CIRC_APER{str_aper}'] = 'kron_radius_circ' # ditto
-        cols['{REF_BAND}_USE_CIRCLE_{str_aper}'] = 'use_circle' # where kron radius is not used.
+        # cols[f'{KRON_MATCH_BAND}_FLAG_AUTO{mask}'] = 'flag_auto'
+        cols[f'{KRON_MATCH_BAND}_KRON_RADIUS_APER{str_aper}'] = 'kron_radius'   # this is the modified KR where KR = sci_aper/2 for small things.
+        cols[f'{KRON_MATCH_BAND}_KRON_RADIUS_CIRC_APER{str_aper}'] = 'kron_radius_circ' # ditto
+        cols[f'{KRON_MATCH_BAND}_USE_CIRCLE_{str_aper}'] = 'use_circle' # where kron radius is not used.
         cols['flag_kron'] = 'flag_kron'
         cols['iso_area'] = 'iso_area'
         cols['a'] = 'a_image'
         cols['b'] = 'b_image'
         cols['theta'] = 'theta_J2000' # double check this!
-        cols[f'{REF_BAND}_FLUX_RADIUS_FRAC0_5'] = 'flux_radius'
+        cols[f'{KRON_MATCH_BAND}_FLUX_RADIUS_FRAC0_5'] = 'flux_radius'
         cols['use_phot'] = 'use_phot'
         cols['lowsnr_flag'] = 'flag_lowsnr'
         cols['star_flag'] = 'flag_star'
@@ -587,8 +602,8 @@ for apersize in PHOT_APER:
             subcat[coln].name = newcol
 
         # # use flag (minimum SNR cut + not a star)
-        # snr_ref = subcat[f'f_{REF_BAND}'] / subcat[f'e_{REF_BAND}']
-        # snr_ref[subcat[f'e_{REF_BAND}']<=0] = -1
+        # snr_ref = subcat[f'f_{KRON_MATCH_BAND}'] / subcat[f'e_{KRON_MATCH_BAND}']
+        # snr_ref[subcat[f'e_{KRON_MATCH_BAND}']<=0] = -1
         # use_phot = np.zeros(len(subcat))
         # use_phot[snr_ref >= 3] = 1
         # use_phot[SEL_STAR | SEL_BADPIX | SEL_EXTRABAD | SEL_BADOBJECT | SEL_BADGLASS | SEL_BADKRON] = 0

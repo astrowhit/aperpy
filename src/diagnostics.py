@@ -9,13 +9,16 @@ plt.ioff()
 # DIR_CONFIG = '/Volumes/External1/Projects/Current/UNCOVER/scripts/'
 DIR_CONFIG = sys.argv[1]
 sys.path.insert(0, DIR_CONFIG)
-from config import FILTERS, DET_TYPE, DIR_CATALOGS, TARGET_ZP, REF_BAND, RA_RANGE, DEC_RANGE, PIXEL_SCALE
+from config import FILTERS, DET_TYPE, DIR_CATALOGS, TARGET_ZP, MATCH_BAND, RA_RANGE, DEC_RANGE, PIXEL_SCALE, PROJECT, VERSION
 
 DET_NICKNAME = sys.argv[2]
 KERNEL = sys.argv[3]
 STR_APER = sys.argv[4]
 
-CATALOG = os.path.join(DIR_CATALOGS, f'{DET_NICKNAME}_{DET_TYPE}/{KERNEL}/{DET_NICKNAME}_K{KERNEL}_SCIREADY_{STR_APER}_CATALOG.fits')
+str_aper = STR_APER.replace('_', '')
+if len(str_aper) == 2:
+    str_aper += '0' # 07 -> 070
+CATALOG = os.path.join(DIR_CATALOGS, f"{DET_NICKNAME}_{DET_TYPE}/{KERNEL}/{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_D{str_aper}_CATALOG.fits")
 DIR_FIGURES = os.path.join(DIR_CATALOGS, f'{DET_NICKNAME}_{DET_TYPE}/{KERNEL}/figures/')
 
 cat = Table.read(CATALOG)
@@ -155,7 +158,7 @@ if 'tot_cor' in cat.colnames:
 
     fig, axes = plt.subplots(ncols=2, figsize=(10, 5), sharey=True)
 
-    mag = TARGET_ZP-2.5*np.log10(cat[f'f_{REF_BAND}'])
+    mag = TARGET_ZP-2.5*np.log10(cat[f'f_{MATCH_BAND}'])
 
     sanity = cat['use_phot'] == 1
     sanity &= (mag > 20) & (mag < 30)
@@ -163,7 +166,7 @@ if 'tot_cor' in cat.colnames:
     im = axes[0].scatter(mag[sanity], cat['tot_cor'][sanity], c=cat['kron_radius_circ'][sanity], s=2, cmap='viridis')
     axes[0].semilogy()
     axes[0].axhline(1, ls='dashed', c='grey')
-    axes[0].set(xlabel=f'{REF_BAND} Mag (AB)', ylabel='tot_cor', ylim=(1e-2, 5))
+    axes[0].set(xlabel=f'{MATCH_BAND} Mag (AB)', ylabel='tot_cor', ylim=(1e-2, 5))
     axins = inset_axes(axes[0],
                         width="100%",  
                         height="5%",
@@ -186,6 +189,6 @@ if 'tot_cor' in cat.colnames:
                     )
     cbar = fig.colorbar(im, cax=axins, orientation="horizontal")
     cbar.ax.xaxis.set_ticks_position("top")
-    cbar.set_label(f'{REF_BAND} Mag (AB)', labelpad=-50)
+    cbar.set_label(f'{MATCH_BAND} Mag (AB)', labelpad=-50)
     fig.subplots_adjust(top=0.8)
     fig.savefig(os.path.join(DIR_FIGURES, f'tot_cor_{filt}_{STR_APER}.pdf'))

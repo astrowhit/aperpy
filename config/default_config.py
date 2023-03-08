@@ -23,10 +23,10 @@ PHOT_AUTOPARAMS = 2.0, 1.0 # Kron-scaling radius, mimumum kron factor
 PHOT_FLUXRADIUS = 0.5, 0.6 # FLUX_RADIUS at 50% and 60% of flux (always keep 0.5!)
 PHOT_KRONPARAM = 6.0 # SE hardcodes this as 6.0
 PHOT_USEMASK = True # masks out neighbors when measuring kron, auto fluxes, and flux radius (not circ apers)
-REF_BAND = 'f444w'
+MATCH_BAND = 'f444w' # indicates band used to match PSFs
 USE_COMBINED_KRON_IMAGE = True   # uses a REF_BAND PSF-matched NE image for kron radius/flux + flux radius
-KRON_REF_BAND = ['f277w', 'f356w', 'f444w']
-
+KRON_COMBINED_BANDS = ['f277w', 'f356w', 'f444w']
+KRON_ZPT = 28.9 # I hope it's the same as all of your combined mosaics!
 
 PIXEL_SCALE = 0.04 # arcsec / px
 APPLY_MWDUST = 'MEDIAN'

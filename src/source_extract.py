@@ -16,7 +16,7 @@ sys.path.insert(0, PATH_CONFIG)
 
 from config import TARGET_ZP, PHOT_APER, PHOT_AUTOPARAMS, PHOT_FLUXRADIUS, DETECTION_PARAMS, SKYEXT,\
          DIR_IMAGES, PHOT_ZP, FILTERS, DIR_OUTPUT, DIR_CATALOGS, IS_COMPRESSED, PIXEL_SCALE, PHOT_KRONPARAM,\
-             USE_COMBINED_KRON_IMAGE, KRON_REF_BAND
+             USE_COMBINED_KRON_IMAGE, KRON_COMBINED_BANDS, KRON_ZPT
 
 # MAIN PARAMETERS
 DET_NICKNAME = sys.argv[2] #'LW_f277w-f356w-f444w'
@@ -132,7 +132,7 @@ if FILTERS is None:
     
 PATH_KRONSCI = None
 if (KERNEL != 'None') & (USE_COMBINED_KRON_IMAGE):
-    print(f'Constructing a noise-equalized co-add for Kron measurements based on {KRON_REF_BAND}')
+    print(f'Constructing a noise-equalized co-add for Kron measurements based on {KRON_COMBINED_BANDS}')
     outpath = os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_KRON_K{KERNEL}')
     trypath = f'{outpath}_optavg.fits'
     if os.path.exists(trypath): 
@@ -148,7 +148,7 @@ if (KERNEL != 'None') & (USE_COMBINED_KRON_IMAGE):
         weight_fnames = {}
         
         # gather directories
-        for PHOT_NICKNAME in KRON_REF_BAND:
+        for PHOT_NICKNAME in KRON_COMBINED_BANDS:
             ext=f'_{KERNEL}-matched'
             dir_weight = DIR_OUTPUT
             print(DIR_OUTPUT)
@@ -161,7 +161,7 @@ if (KERNEL != 'None') & (USE_COMBINED_KRON_IMAGE):
             weight_fnames[PHOT_NICKNAME] = glob.glob(os.path.join(DIR_OUTPUT, PHOTWHT_NAME))[0]
             
         # run it
-        noise_equalized(KRON_REF_BAND, outpath,
+        noise_equalized(KRON_COMBINED_BANDS, outpath,
                     science_fnames= science_fnames,
                     weight_fnames= weight_fnames, 
                     is_compressed=IS_COMPRESSED)
@@ -175,65 +175,75 @@ if (KERNEL != 'None') & (USE_COMBINED_KRON_IMAGE):
             
 areas = {}
 stats = {}
-for ind, PHOT_NICKNAME in enumerate(FILTERS):
+
+USE_FILTERS = FILTERS
+if (KERNEL != 'None') & (USE_COMBINED_KRON_IMAGE):
+    KRON_MATCH_BAND = '+'.join(KRON_COMBINED_BANDS)
+    USE_FILTERS = [KRON_MATCH_BAND, ] + list(FILTERS)
+    
+for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
 
     print(PHOT_NICKNAME)
-    skyext = SKYEXT #'_skysubvar'
-    ext = ''
-    dir_weight = DIR_IMAGES
-    if KERNEL != 'None':
-        ext=f'_{KERNEL}-matched'
-        dir_weight = DIR_OUTPUT
-    print(DIR_OUTPUT)
-    PHOTSCI_NAME = f'*{PHOT_NICKNAME}*_sci{skyext}{ext}.fits'
-    PHOTWHT_NAME = f'*{PHOT_NICKNAME}*_wht{ext}.fits'
-    if IS_COMPRESSED:
-        PHOTSCI_NAME += '.gz'
-        PHOTWHT_NAME += '.gz'
-    print(PHOTSCI_NAME)
-    PATH_PHOTSCI = glob.glob(os.path.join(DIR_OUTPUT, PHOTSCI_NAME))[0]
-    PATH_PHOTHEAD = PATH_PHOTSCI
-    PATH_PHOTWHT = glob.glob(os.path.join(dir_weight, PHOTWHT_NAME))[0]
-    PATH_PHOTMASK = 'None'
-    print(PATH_PHOTSCI)
-    print(PATH_PHOTWHT)
+    if PHOT_NICKNAME != KRON_MATCH_BAND:
+        skyext = SKYEXT #'_skysubvar'
+        ext = ''
+        dir_weight = DIR_IMAGES
+        if KERNEL != 'None':
+            ext=f'_{KERNEL}-matched'
+            dir_weight = DIR_OUTPUT
+        print(DIR_OUTPUT)
+        PHOTSCI_NAME = f'*{PHOT_NICKNAME}*_sci{skyext}{ext}.fits'
+        PHOTWHT_NAME = f'*{PHOT_NICKNAME}*_wht{ext}.fits'
+        if IS_COMPRESSED:
+            PHOTSCI_NAME += '.gz'
+            PHOTWHT_NAME += '.gz'
+        print(PHOTSCI_NAME)
+        PATH_PHOTSCI = glob.glob(os.path.join(DIR_OUTPUT, PHOTSCI_NAME))[0]
+        PATH_PHOTHEAD = PATH_PHOTSCI
+        PATH_PHOTWHT = glob.glob(os.path.join(dir_weight, PHOTWHT_NAME))[0]
+        PATH_PHOTMASK = 'None'
+        print(PATH_PHOTSCI)
+        print(PATH_PHOTWHT)
 
-    PHOT_ZPT = PHOT_ZP[PHOT_NICKNAME.lower()] #calc_zpt(PHOT_NICKNAME)
-    print(f'Zeropoint for {PHOT_NICKNAME}: {PHOT_ZPT}')
+        PHOT_ZPT = PHOT_ZP[PHOT_NICKNAME.lower()] #calc_zpt(PHOT_NICKNAME)
+        print(f'Zeropoint for {PHOT_NICKNAME}: {PHOT_ZPT}')
 
-    # 2 FORCED PHOTOMETRY + measurements
-    # READ IN IMAGES
-    print('READING PHOTOMETRY IMAGES...')
-    photsci = fits.getdata(PATH_PHOTSCI).byteswap().newbyteorder()
-    print(PATH_PHOTSCI)
-    photwht = fits.getdata(PATH_PHOTWHT).byteswap().newbyteorder()
-    photsci[photwht<=0.] = 0. # double check!
-    print(PATH_PHOTWHT)
-    if PATH_PHOTMASK != 'None':
-        photmask = fits.getdata(PATH_PHOTMASK).byteswap().newbyteorder().astype(float)
-        print(PATH_PHOTMASK)
-        photsci[photmask==1.0] = 0
-    else:
-        photmask = None
-    phothead = fits.getheader(PATH_PHOTHEAD, 0)
-    photwcs = WCS(phothead)
-    print(photwcs)
+        # 2 FORCED PHOTOMETRY + measurements
+        # READ IN IMAGES
+        print('READING PHOTOMETRY IMAGES...')
+        photsci = fits.getdata(PATH_PHOTSCI).byteswap().newbyteorder()
+        print(PATH_PHOTSCI)
+        photwht = fits.getdata(PATH_PHOTWHT).byteswap().newbyteorder()
+        photsci[photwht<=0.] = 0. # double check!
+        print(PATH_PHOTWHT)
+        if PATH_PHOTMASK != 'None':
+            photmask = fits.getdata(PATH_PHOTMASK).byteswap().newbyteorder().astype(float)
+            print(PATH_PHOTMASK)
+            photsci[photmask==1.0] = 0
+        else:
+            photmask = None
+        phothead = fits.getheader(PATH_PHOTHEAD, 0)
+        photwcs = WCS(phothead)
+        print(photwcs)
 
-    photerr = np.where((photwht==0) | np.isnan(photwht), np.inf, 1./np.sqrt(photwht))
-    photerr[~np.isfinite(photerr)] = np.median(photerr[np.isfinite(photerr)]) # HACK fill in holes with median weight.
-    # fits.ImageHDU(photerr).writeto('PHOTERR.fits')
+        photerr = np.where((photwht==0) | np.isnan(photwht), np.inf, 1./np.sqrt(photwht))
+        photerr[~np.isfinite(photerr)] = np.median(photerr[np.isfinite(photerr)]) # HACK fill in holes with median weight.
+        # fits.ImageHDU(photerr).writeto('PHOTERR.fits')
 
     # IMAGE FOR KRON RADII 
     # We actually run AUTO fluxes on each band
     # So just do again for each band and take their coverage -- uber consistent this way.)
-    if USE_COMBINED_KRON_IMAGE:
-        kronsci = fits.getdata(PATH_KRONSCI).byteswap().newbyteorder()
-        kronerr = fits.getdata(PATH_KRONERR).byteswap().newbyteorder()
-        kronsci[kronerr<=0.] = 0. 
-        # if photmask is not None:
-        #     kronsci[photmask==1.0] = 0.
-    else:
-        kronsci = photsci
+    elif PHOT_NICKNAME == KRON_MATCH_BAND:
+            photsci = fits.getdata(PATH_KRONSCI).byteswap().newbyteorder()
+            photerr = fits.getdata(PATH_KRONERR).byteswap().newbyteorder()
+            photsci[photerr<=0.] = 0. 
+            photwht = np.where(photerr<=0., 0, 1/(photerr**2))
+            phothead = fits.getheader(PATH_KRONSCI, 0)
+            photwcs = WCS(phothead)
+            print(photwcs)
+            PHOT_ZPT = KRON_ZPT
+            # if photmask is not None:
+            #     photsci[photmask==1.0] = 0.
 
     # SOME BASIC INFO
     pixel_scale = utils.proj_plane_pixel_scales(photwcs)[0] * 3600
@@ -299,7 +309,7 @@ for ind, PHOT_NICKNAME in enumerate(FILTERS):
     for seg, seg_id, ext in ((None, None, ''), (segmap, catalog['ID'], '_masked')):
         # KRON RADII AND MAG_AUTO
         print(f"{PHOT_NICKNAME} :: MEASURING PHOTOMETRY in kron-corrected AUTO apertures...")
-        kronrad, krflag = sep.kron_radius(kronsci, xphot, yphot, #catalog['x'], catalog['y'],
+        kronrad, krflag = sep.kron_radius(photsci, xphot, yphot, #catalog['x'], catalog['y'],
                                             catalog['a'], catalog['b'], catalog['theta'], PHOT_KRONPARAM,
                                             segmap=seg, seg_id=seg_id) # SE uses 6
         kronrad[np.isnan(kronrad)] = 0.
@@ -307,9 +317,9 @@ for ind, PHOT_NICKNAME in enumerate(FILTERS):
         kronrad = np.maximum(kronrad, PHOT_AUTOPARAMS[1])
         # print(np.isnan(kronrad).sum(), np.max(kronrad), np.min(kronrad))
         catalog['theta'][catalog['theta'] > np.pi / 2.] = np.pi / 2. # numerical rounding correction!
-        flux, fluxerr, flag = sep.sum_ellipse(kronsci, xphot, yphot, #catalog['x'], catalog['y'],
+        flux, fluxerr, flag = sep.sum_ellipse(photsci, xphot, yphot, #catalog['x'], catalog['y'],
                                             catalog['a'], catalog['b'], catalog['theta'], kronrad,
-                                            err = kronerr,
+                                            err = photerr,
                                             subpix=0, segmap=seg, seg_id=seg_id)
 
         badflux = (flux == 0.) | ~np.isfinite(flux)
@@ -331,35 +341,7 @@ for ind, PHOT_NICKNAME in enumerate(FILTERS):
 
         flag |= krflag  # combine flags into 'flag'
 
-
-        # r_min = PHOT_AUTOPARAMS[1] / 2.  # minimum diameter = 3.5
         kronrad_circ = kronrad * np.sqrt(catalog['a'] * catalog['b'])
-        # use_circle = kronrad_circ < r_min
-        # cflux, cfluxerr, cflag = sep.sum_circle(kronsci, xphot[use_circle], yphot[use_circle],
-        #                                         r=r_min, subpix=0,
-        #                                         err = photerr, gain=1.0
-        #                                         )
-
-        # badflux = (cflux == 0.) |  np.isnan(cflux) | ~np.isfinite(cflux)
-        # badfluxerr = (cfluxerr <= 0.) | np.isnan(cfluxerr) | ~np.isfinite(cfluxerr)
-        # pc_badflux = np.sum(badflux) / len(cflux)
-        # pc_badfluxerr = np.sum(badfluxerr) / len(cflux)
-        # pc_ORbad = np.sum(badflux | badfluxerr) / len(cflux)
-        # pc_ANDbad = np.sum(badflux & badfluxerr) / len(cflux)
-        # print(f'{pc_badflux*100:2.5f}% have BAD fluxes')
-        # print(f'{pc_badfluxerr*100:2.5f}% have BAD fluxerrs')
-        # print(f'{pc_ORbad*100:2.5f}% have BAD fluxes OR fluxerrs')
-        # print(f'{pc_ANDbad*100:2.5f}% have BAD fluxes AND fluxerrs')
-
-        # bad = badflux | badfluxerr
-
-        # cflux[bad] = np.nan
-        # cfluxerr[bad] = np.nan
-        # cflag[bad] = 1
-
-        # flux[use_circle] = cflux
-        # fluxerr[use_circle] = cfluxerr
-        # flag[use_circle] = cflag
 
         catalog[f'FLUX_AUTO{ext}'] = flux * conv_flux(PHOT_ZPT)
         catalog[f'FLUXERR_AUTO{ext}'] = fluxerr * conv_flux(PHOT_ZPT)
@@ -372,7 +354,7 @@ for ind, PHOT_NICKNAME in enumerate(FILTERS):
         # FLUX RADIUS
         print(f"{PHOT_NICKNAME} :: MEASURING FLUX RADIUS...")
         """In Source Extractor, the FLUX_RADIUS parameter gives the radius of a circle enclosing a desired fraction of the total flux."""
-        r, flag = sep.flux_radius(kronsci,  xphot, yphot, 6.*catalog['a'],
+        r, flag = sep.flux_radius(photsci,  xphot, yphot, 6.*catalog['a'],
                                 PHOT_FLUXRADIUS, normflux=flux, subpix=5, segmap=seg, seg_id=seg_id)
         rt = r.T
         for i, fluxfrac in enumerate(PHOT_FLUXRADIUS):

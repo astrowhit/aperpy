@@ -16,7 +16,7 @@ PATH_CONFIG = sys.argv[1]
 sys.path.insert(0, PATH_CONFIG)
 
 from config import FILTERS, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, TARGET_ZP, SCI_APER, DIR_OUTPUT, \
-    REF_BAND, PIXEL_SCALE, PHOT_APER, DIR_PSFS, FIELD, ZSPEC, MAX_SEP, ZCONF, ZRA, ZDEC, ZCOL, FLUX_UNIT, \
+    MATCH_BAND, PIXEL_SCALE, PHOT_APER, DIR_PSFS, FIELD, ZSPEC, MAX_SEP, ZCONF, ZRA, ZDEC, ZCOL, FLUX_UNIT, \
     PS_WEBB_FLUXRATIO, PS_WEBB_FLUXRATIO_RANGE, PS_WEBB_FILT, PS_WEBB_MAGLIMIT, PS_WEBB_APERSIZE, \
     PS_HST_FLUXRATIO, PS_HST_FLUXRATIO_RANGE, PS_HST_FILT, PS_HST_MAGLIMIT, PS_HST_APERSIZE, \
     BP_FLUXRATIO, BP_FLUXRATIO_RANGE, BP_FILT, BP_MAGLIMIT, BP_APERSIZE, RA_RANGE, DEC_RANGE, \
@@ -293,8 +293,8 @@ fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_KNone_star_i
 
 
 # bad kron radius flag
-krc = maincat[f'{REF_BAND}_KRON_RADIUS_CIRC'] * PIXEL_SCALE
-snr = (maincat[f'{REF_BAND}_FLUX_APER{str_aper}_COLOR']/maincat[f'{REF_BAND}_FLUXERR_APER{str_aper}_COLOR'])
+krc = maincat[f'{MATCH_BAND}_KRON_RADIUS_CIRC'] * PIXEL_SCALE
+snr = (maincat[f'{MATCH_BAND}_FLUX_APER{str_aper}_COLOR']/maincat[f'{MATCH_BAND}_FLUXERR_APER{str_aper}_COLOR'])
 SEL_BADKRON = (snr < BK_SLOPE*(krc - BK_MINSIZE))  #| (krc > 9)
 print(f'Flagged {np.sum(SEL_BADKRON)} objects as having enormous kron radii for their SNR')
 maincat.add_column(Column(SEL_BADKRON.astype(int), name='badkron_flag'))
@@ -362,9 +362,9 @@ for colname in ztable.colnames:
 
 # use flag (minimum SNR cut + not a star)
 str_aper = str(SCI_APER).replace('.', '_')
-snr_ref = maincat[f'{REF_BAND}_FLUX_APER{str_aper}_COLOR'] / maincat[f'{REF_BAND}_FLUXERR_APER{str_aper}_COLOR']
-snr_ref[maincat[f'{REF_BAND}_FLUXERR_APER{str_aper}_COLOR']<=0] = -1
-SEL_LOWSNR = (snr_ref < 3) | np.isnan(maincat[f'{REF_BAND}_RELWHT'])
+snr_ref = maincat[f'{MATCH_BAND}_FLUX_APER{str_aper}_COLOR'] / maincat[f'{MATCH_BAND}_FLUXERR_APER{str_aper}_COLOR']
+snr_ref[maincat[f'{MATCH_BAND}_FLUXERR_APER{str_aper}_COLOR']<=0] = -1
+SEL_LOWSNR = (snr_ref < 3) | np.isnan(maincat[f'{MATCH_BAND}_RELWHT'])
 print(f'Flagged {np.sum(SEL_LOWSNR)} objects as having low SNR < 3')
 maincat.add_column(Column(SEL_LOWSNR.astype(int), name='lowsnr_flag'))
 use_phot = np.zeros(len(maincat)).astype(int)
@@ -417,8 +417,8 @@ for apersize in PHOT_APER:
     cols['RA'] = 'ra'
     cols['DEC'] = 'dec'
     cols['EBV'] = 'ebv_mw'
-    cols[f'{REF_BAND}_FLUX_APER{str_aper}_COLOR'] = f'faper_{REF_BAND}'
-    cols[f'{REF_BAND}_FLUXERR_APER{str_aper}_COLOR'] = f'eaper_{REF_BAND}'
+    cols[f'{MATCH_BAND}_FLUX_APER{str_aper}_COLOR'] = f'faper_{MATCH_BAND}'
+    cols[f'{MATCH_BAND}_FLUXERR_APER{str_aper}_COLOR'] = f'eaper_{MATCH_BAND}'
 
     for filter in FILTERS:
         cols[f'{filter}_FLUX_APER{str_aper}_PSF'] = f'f_{filter}'
@@ -427,12 +427,12 @@ for apersize in PHOT_APER:
         cols[f'{filter}_RELWHT'] = f'w_{filter}'
 
     # wmin?
-    cols[f'{REF_BAND}_KRON_RADIUS'] = 'kron_radius'
-    cols[f'{REF_BAND}_KRON_RADIUS_CIRC'] = 'kron_radius_circ'
+    cols[f'{MATCH_BAND}_KRON_RADIUS'] = 'kron_radius'
+    cols[f'{MATCH_BAND}_KRON_RADIUS_CIRC'] = 'kron_radius_circ'
     cols['a'] = 'a_image'
     cols['b'] = 'b_image'
     cols['theta'] = 'theta_J2000' # double check this!
-    cols[f'{REF_BAND}_FLUX_RADIUS_0_5'] = 'flux_radius' # arcsec
+    cols[f'{MATCH_BAND}_FLUX_RADIUS_0_5'] = 'flux_radius' # arcsec
     cols['use_phot'] = 'use_phot'
     cols['lowsnr_flag'] = 'flag_lowsnr'
     cols['star_flag'] = 'flag_star'
@@ -453,8 +453,8 @@ for apersize in PHOT_APER:
         subcat[coln].name = newcol
 
     # # use flag (minimum SNR cut + not a star)
-    # snr_ref = subcat[f'f_{REF_BAND}'] / subcat[f'e_{REF_BAND}']
-    # snr_ref[subcat[f'e_{REF_BAND}']<=0] = -1
+    # snr_ref = subcat[f'f_{MATCH_BAND}'] / subcat[f'e_{MATCH_BAND}']
+    # snr_ref[subcat[f'e_{MATCH_BAND}']<=0] = -1
     # use_phot = np.zeros(len(subcat))
     # use_phot[snr_ref >= 3] = 1
     # use_phot[SEL_STAR | SEL_BADPIX | SEL_EXTRABAD | SEL_BADOBJECT | SEL_BADGLASS | SEL_BADKRON] = 0

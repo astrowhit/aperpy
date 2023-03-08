@@ -7,11 +7,13 @@ import os, sys
 PATH_CONFIG = sys.argv[1]
 sys.path.insert(0, PATH_CONFIG)
 
-from config import WEBB_FILTERS, FIELD, ANGLE, DIR_PSFS, PIXEL_SCALE, PSF_FOV, HST_FILTERS, USE_NEAREST_DATE, FILTERS
+from config import WEBB_FILTERS, FIELD, ANGLE, DIR_PSFS, PIXEL_SCALE, PSF_FOV, HST_FILTERS, USE_DATE, USE_NEAREST_DATE, FILTERS
 
 
 if USE_NEAREST_DATE:
     date = get_date()
+elif USE_DATE is not None:
+    date = USE_DATE
 else:
     date = None
 
@@ -19,7 +21,7 @@ else:
 for filt in FILTERS:
     filt = filt.upper()
     if filt not in WEBB_FILTERS: continue
-    print(f'Fetching WebbPSF for {filt} at PA {ANGLE}deg...')
+    print(f'Fetching WebbPSF for {filt} at PA {ANGLE}deg for date {date}')
     get_psf(filt, FIELD, ANGLE, output=DIR_PSFS, date=date, pixscl=PIXEL_SCALE)
 
 
