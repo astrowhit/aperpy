@@ -154,7 +154,7 @@ for apersize in PHOT_APER:
     kronrad = maincat[f'{KRON_MATCH_BAND}_KRON_RADIUS{mask}'].copy()
     f_ref_aper = maincat[f'{KRON_MATCH_BAND}_FLUX_APER{str_aper}']
 
-    use_circle = kronrad_circ < (apersize / PIXEL_SCALE / 2.)
+    use_circle = (kronrad_circ < (apersize / PIXEL_SCALE / 2.)) | SEL_BADKRON # either too small OR not reliable.
     kronrad_circ[use_circle] = apersize / PIXEL_SCALE / 2.
     kronrad[use_circle] = np.nan
     # print(apersize, np.sum(use_circle), np.min(kronrad_circ), apersize / PIXEL_SCALE / 2.)
@@ -166,7 +166,7 @@ for apersize in PHOT_APER:
     if apersize == PHOT_APER[0]:
         newcoln =f'{KRON_MATCH_BAND}_FLUX_REF_AUTO'
         maincat.add_column(Column(f_ref_auto, newcoln))
-    newcoln =f'{KRON_MATCH_BAND}_USE_CIRCLE_{str_aper}'
+    newcoln =f'{KRON_MATCH_BAND}_USE_CIRCLE_APER{str_aper}'
     maincat.add_column(Column(use_circle.astype(int), newcoln))
     newcoln =f'{KRON_MATCH_BAND}_KRON_RADIUS_CIRC_APER{str_aper}'
     maincat.add_column(Column(kronrad_circ, newcoln))
@@ -184,7 +184,7 @@ for apersize in PHOT_APER:
     tot_corr[(f_ref_aper <= 0) | (f_ref_total <= 0)] = np.nan
     min_corr = 1. / psf_cog(conv_psfmodel, MATCH_BAND.upper(), nearrad=(apersize / PIXEL_SCALE / 2.)) # defaults to EE(<R_aper)
     tot_corr[tot_corr < min_corr] = min_corr 
-    tot_corr[SEL_BADKRON] = min_corr # if the detecton was iffy, you get the min_corr (i.e. PSF corr)
+    tot_corr[use_circle] = min_corr # if the detecton was iffy, you get the min_corr (i.e. PSF corr)
     maincat.add_column(MaskedColumn(tot_corr, f'TOTAL_CORR_APER{str_aper}', mask=np.isnan(tot_corr)))
     sig_ref_aper = sigma_aper(KRON_MATCH_BAND.upper(), wht_ref, apersize) # sig_aper,KRON_MATCH_BAND
     sig_total_ref = sigma_total(sig_ref_aper, tot_corr) # sig_total,KRON_MATCH_BAND
@@ -571,7 +571,7 @@ for apersize in PHOT_APER:
         # cols[f'{KRON_MATCH_BAND}_FLAG_AUTO{mask}'] = 'flag_auto'
         cols[f'{KRON_MATCH_BAND}_KRON_RADIUS_APER{str_aper}'] = 'kron_radius'   # this is the modified KR where KR = sci_aper/2 for small things.
         cols[f'{KRON_MATCH_BAND}_KRON_RADIUS_CIRC_APER{str_aper}'] = 'kron_radius_circ' # ditto
-        cols[f'{KRON_MATCH_BAND}_USE_CIRCLE_{str_aper}'] = 'use_circle' # where kron radius is not used.
+        cols[f'{KRON_MATCH_BAND}_USE_CIRCLE_APER{str_aper}'] = 'use_circle' # where kron radius is not used.
         cols['flag_kron'] = 'flag_kron'
         cols['iso_area'] = 'iso_area'
         cols['a'] = 'a_image'
