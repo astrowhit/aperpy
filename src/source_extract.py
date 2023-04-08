@@ -135,6 +135,8 @@ if (KERNEL != 'None') & (USE_COMBINED_KRON_IMAGE):
     print(f'Constructing a noise-equalized co-add for Kron measurements based on {KRON_COMBINED_BANDS}')
     outpath = os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_KRON_K{KERNEL}')
     trypath = f'{outpath}_optavg.fits'
+    if IS_COMPRESSED:
+        trypath += '.gz'
     if os.path.exists(trypath): 
         print('Kron image exists! I will use the existing one...')
         PATH_KRONSCI = f'{outpath}_optavg.fits' # inverse variance image!!!
@@ -176,6 +178,7 @@ if (KERNEL != 'None') & (USE_COMBINED_KRON_IMAGE):
 areas = {}
 stats = {}
 
+KRON_MATCH_BAND = None
 USE_FILTERS = FILTERS
 if (KERNEL != 'None') & (USE_COMBINED_KRON_IMAGE):
     KRON_MATCH_BAND = '+'.join(KRON_COMBINED_BANDS)
@@ -214,12 +217,12 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
         photsci = fits.getdata(PATH_PHOTSCI).byteswap().newbyteorder()
         print(PATH_PHOTSCI)
         photwht = fits.getdata(PATH_PHOTWHT).byteswap().newbyteorder()
-        photsci[photwht<=0.] = 0. # double check!
+        photsci[photwht<=0.] = np.nan # double check!
         print(PATH_PHOTWHT)
         if PATH_PHOTMASK != 'None':
             photmask = fits.getdata(PATH_PHOTMASK).byteswap().newbyteorder().astype(float)
             print(PATH_PHOTMASK)
-            photsci[photmask==1.0] = 0
+            photsci[photmask==1.0] = np.nan
         else:
             photmask = None
         phothead = fits.getheader(PATH_PHOTHEAD, 0)
@@ -236,7 +239,7 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
     elif PHOT_NICKNAME == KRON_MATCH_BAND:
             photsci = fits.getdata(PATH_KRONSCI).byteswap().newbyteorder()
             photerr = fits.getdata(PATH_KRONERR).byteswap().newbyteorder()
-            photsci[photerr<=0.] = 0. 
+            photsci[photerr<=0.] = np.nan 
             photwht = np.where(photerr<=0., 0, 1/(photerr**2))
             phothead = fits.getheader(PATH_KRONSCI, 0)
             photwcs = WCS(phothead)

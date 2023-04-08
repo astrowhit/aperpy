@@ -13,17 +13,24 @@ sys.path.insert(0, PATH_CONFIG)
 
 from config import DIR_IMAGES, SW_FILTERS, WEBB_FILTERS, WHT_REPLACE
 
+SW_HACK = '_f444w-matched'
 print(DIR_IMAGES)
-SCI_FILENAMES = list(glob.glob(DIR_IMAGES+'/*_sci.fits*'))
-
+SCI_FILENAMES = list(glob.glob(DIR_IMAGES+f'/*_sci{SW_HACK}.fits*'))
+print(SCI_FILENAMES)
 
 for filename in SCI_FILENAMES:
+    # if 'f090w' not in filename: continue
+    print(filename)
 
     for band in WEBB_FILTERS:
         if band.lower() in filename:
             break
     if band.upper() not in SW_FILTERS:
         continue
+    
+
+    # if 'f444w-matched' not in filename: continue
+    
     print(filename.split('/')[-1])
     # for region in ('ne', 'sw'):
     #     # get file
@@ -56,9 +63,13 @@ for filename in SCI_FILENAMES:
     header['LONPOLE'] =                180.0 # / [deg] Native longitude of celestial pole
     header['LATPOLE'] =          -30.3966667 # / [deg] Native latitude of celestial pole
 
-    print(filename.replace('_sci', '_block40_sci'))
-    fits.PrimaryHDU(block_sci, header=header).writeto(filename.replace('_sci', '_block40_sci'))
-    fits.PrimaryHDU(block_wht, header=header).writeto(filename.replace('_sci', '_block40_wht'))
+    if 'bcgs' in filename: # HACK to keep things working smoothly for uncover...
+        fits.PrimaryHDU(block_sci, header=header).writeto(filename.replace('_bcgs_sci', '_block40_bcgs_sci'))
+        fits.PrimaryHDU(block_wht, header=header).writeto(filename.replace('_bcgs_sci', '_block40_wht'))
+    else:
+        # print(filename.replace('_sci', '_block40_sci'))
+        fits.PrimaryHDU(block_sci, header=header).writeto(filename.replace('_sci', '_block40_sci'))
+        fits.PrimaryHDU(block_wht, header=header).writeto(filename.replace('_sci', '_block40_wht'))
 
     # # stitch together
     # for itype in ('sci', 'wht'):

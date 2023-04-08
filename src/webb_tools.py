@@ -419,7 +419,8 @@ def get_psf(filt, field='uncover', angle=None, fov=4, og_fov=10, pixscl=None, da
         return
 
     # Observed PA_V3 for fields
-    angles = {'ceers': 130.7889803307112, 'smacs': 144.6479834976019, 'glass': 251.2973235468314, 'uncover': 40.98680919}
+    angles = {'ceers': 130.7889803307112, 'smacs': 144.6479834976019, 
+              'glass': 251.2973235468314, 'uncover': 41.3} #40.98680919}
     if angle is None:
         angle = angles[field]
     nc = webbpsf.NIRCam()
