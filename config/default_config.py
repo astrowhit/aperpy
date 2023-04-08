@@ -73,6 +73,7 @@ PSF_FOV = 4 # arcsec
 FIELD = 'uncover'
 ANGLE = None # takes the default uncover PA
 USE_NEAREST_DATE = False
+USE_DATE = None
 
 ### BACKGROUNDS
 BACKPARAMS = dict(bw=32, bh=32, fw=8, fh=8, maskthresh=1, fthresh=0.)

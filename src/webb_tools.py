@@ -350,8 +350,8 @@ def psf_cog(psfmodel, filt, nearrad=None, fix_extrapolation=True):
     xv, yv = np.meshgrid(x, y)
     radius = np.sqrt(xv**2 + yv**2)
     cumcurve = np.array([np.sum(psfmodel[radius<i]) for i in px])
-    
-    
+
+
     if fix_extrapolation:
         from config import SW_FILTERS, LW_FILTERS, PATH_SW_ENERGY, PATH_LW_ENERGY, PIXEL_SCALE
         from astropy.io import ascii
@@ -367,10 +367,10 @@ def psf_cog(psfmodel, filt, nearrad=None, fix_extrapolation=True):
         max_rad = px[-1]
         large_rad = encircled['aperture_radius'] / PIXEL_SCALE
         large_ee =  encircled[filt]
-        
+
         px = np.array(list(px)+list(large_rad[large_rad>max_rad]))
         cumcurve = np.array(list(cumcurve)+list(large_ee[large_rad>max_rad]))
-    
+
     import scipy.interpolate
     modcumcurve = scipy.interpolate.interp1d(px, cumcurve, fill_value = 'extrapolate')
 
@@ -399,7 +399,7 @@ def get_psf(filt, field='uncover', angle=None, fov=4, og_fov=10, pixscl=None, da
     from astropy.io import ascii
 
     from config import SW_FILTERS, LW_FILTERS, PATH_SW_ENERGY, PATH_LW_ENERGY
-    
+
     if pixscl is None:
         from config import PIXEL_SCALE
         pixscl = PIXEL_SCALE
@@ -420,7 +420,8 @@ def get_psf(filt, field='uncover', angle=None, fov=4, og_fov=10, pixscl=None, da
 
     # Observed PA_V3 for fields
     angles = {'ceers': 130.7889803307112, 'smacs': 144.6479834976019, 
-              'glass': 251.2973235468314, 'uncover': 41.3} #40.98680919}
+              'primer-cosmos': 292., 
+              'glass': 251.2973235468314, 'uncover': 41.3}
     if angle is None:
         angle = angles[field]
     nc = webbpsf.NIRCam()
@@ -437,7 +438,6 @@ def get_psf(filt, field='uncover', angle=None, fov=4, og_fov=10, pixscl=None, da
     nc.filter = filt
     nc.pixelscale = pixscl
     psf = nc.calc_psf(oversample=1, fov_arcsec=og_fov)['DET_SAMP'].data
-    print(psf)
 
     # rotate and handle interpolation internally; keep k = 1 to avoid -ve pixels
     rotated = ndimage.rotate(psf, -angle, reshape=False, order=1, mode='constant', cval=0.0)
@@ -687,7 +687,7 @@ def get_gaia_radec_at_time(gaia_tbl, date=2015.5, format='decimalyear'):
 
 def crossmatch(cat1, cat2, thresh=[1*u.arcsec,], verbose=1, plot=False, col1=None, col2=None, return_idx=False, checkmask=True):
     """Quick crossmatching of catalogs, including debug plots.
-    
+
     Parameters
     ----------
     cat1 : Astropy Table
@@ -772,7 +772,7 @@ def crossmatch(cat1, cat2, thresh=[1*u.arcsec,], verbose=1, plot=False, col1=Non
         dra = np.median(mcoord_primary.ra - mcoord_match.ra)
         ddec = np.median(mcoord_primary.dec - mcoord_match.dec)
         dsky = np.hypot(dra, ddec)
-        
+
         coord_primary = SkyCoord(coord_primary.ra - dra, coord_primary.dec - ddec)
 
         if verbose > 0:
@@ -817,6 +817,6 @@ def crossmatch(cat1, cat2, thresh=[1*u.arcsec,], verbose=1, plot=False, col1=Non
     # print(np.sum(np.unique(idx2, return_counts=True)[1]==1))
 
     if return_idx:
-        return cat1[idx1], cat2[idx2], idx1, idx2 
-    
+        return cat1[idx1], cat2[idx2], idx1, idx2
+
     return cat1[idx1], cat2[idx2]
