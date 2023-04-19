@@ -78,10 +78,12 @@ def flux_total(flux_aper, tot_cor):
 
 
 # loop over filters
+KRON_MATCH_BAND = None
 USE_FILTERS = FILTERS
 if (KERNEL != 'None') & (USE_COMBINED_KRON_IMAGE):
     KRON_MATCH_BAND = '+'.join(KRON_COMBINED_BANDS)
     USE_FILTERS = [KRON_MATCH_BAND, ] + list(FILTERS)
+
 for filter in USE_FILTERS:
     filename = os.path.join(FULLDIR_CATALOGS, f'{filter}_{DET_NICKNAME}_K{KERNEL}_PHOT_CATALOG.fits')
     if not os.path.exists(filename):
@@ -156,7 +158,6 @@ for apersize in PHOT_APER:
 
     use_circle = (kronrad_circ < (apersize / PIXEL_SCALE / 2.)) | SEL_BADKRON # either too small OR not reliable.
     kronrad_circ[use_circle] = apersize / PIXEL_SCALE / 2.
-    kronrad[use_circle] = np.nan
     # print(apersize, np.sum(use_circle), np.min(kronrad_circ), apersize / PIXEL_SCALE / 2.)
     f_ref_auto[use_circle] = f_ref_aper[use_circle]
 
@@ -166,6 +167,8 @@ for apersize in PHOT_APER:
     if apersize == PHOT_APER[0]:
         newcoln =f'{KRON_MATCH_BAND}_FLUX_REF_AUTO'
         maincat.add_column(Column(f_ref_auto, newcoln))
+    kronrad[use_circle] = np.nan #
+    kronrad_circ[use_circle] = np.nan #
     newcoln =f'{KRON_MATCH_BAND}_USE_CIRCLE_APER{str_aper}'
     maincat.add_column(Column(use_circle.astype(int), newcoln))
     newcoln =f'{KRON_MATCH_BAND}_KRON_RADIUS_CIRC_APER{str_aper}'
@@ -314,8 +317,8 @@ if GAIA_USE:
         j = Gaia.cone_search_async(coord, radius)
         gaia = j.get_results()
         gaia.pprint()
-        tab = Table(gaia)['solution_id', 'source_id', 'ra', 'dec', 'ref_epoch', 'pmra', 'pmdec']
-        tab.write(os.path.join(DIR_OUTPUT, 'gaia.fits'), format='fits', overwrite=True)
+        tab_gaia = Table(gaia)['solution_id', 'source_id', 'ra', 'dec', 'ref_epoch', 'pmra', 'pmdec']
+        tab_gaia.write(os.path.join(DIR_OUTPUT, 'gaia.fits'), format='fits', overwrite=True)
 
     from webb_tools import crossmatch
     mCATALOG_gaia, mtab_gaia = crossmatch(maincat, tab_gaia, [GAIA_XMATCH_RADIUS,])
@@ -432,7 +435,7 @@ if PS_WEBB_USE or PS_HST_USE or BP_USE:
 # print(f'Flagged {np.sum(SEL_BADKRON)} objects as having enormous kron radii for their SNR')
 # maincat.add_column(Column(SEL_BADKRON.astype(int), name='badkron_flag'))
 
-# SEL_GEN |= SEL_BADKRON
+# SEL_GEN |= SEL_BADKRON # NO! leave this off. We want to use them still.
 # low-weight source flag -  TODO
 
 # HACK for glass
