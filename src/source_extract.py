@@ -6,7 +6,7 @@ from astropy.wcs import WCS, utils
 import astropy.units as u
 import sep
 import os, sys, glob
-from astropy.convolution import Gaussian2DKernel
+from astropy.convolution import Gaussian2DKernel, Tophat2DKernel
 from regions import EllipseSkyRegion, Regions, CircleSkyRegion
 from webb_tools import empty_apertures
 
@@ -74,9 +74,28 @@ print(f'Area of detection image: {area} deg2')
 
 # SOURCE DETECTION
 print('SOURCE DETECTION...')
-kernel = np.array(Gaussian2DKernel(DETECTION_PARAMS['kernelfwhm']/2.35, factor=1))
+kerneldict = {}
+if DETECTION_PARAMS['kerneltype'] == 'gauss' or 'kerneltype' not in DETECTION_PARAMS.keys():
+    kernel_func = Gaussian2DKernel
+    kerneldict['x_stddev'] = DETECTION_PARAMS['kernelfwhm']/2.35
+
+elif DETECTION_PARAMS['kerneltype'] == 'tophat':
+    kernel_func = Tophat2DKernel
+    kerneldict['radius'] = DETECTION_PARAMS['kernelfwhm']
+
+if 'kernelsize' in DETECTION_PARAMS.keys():
+    kerneldict['x_size'] = DETECTION_PARAMS['kernelsize']
+    kerneldict['y_size'] = DETECTION_PARAMS['kernelsize']
+
+kerneldict['factor']=1
+
+kernel = np.array(kernel_func(**kerneldict))
 sep.set_extract_pixstack(10000000) # big image...
 del DETECTION_PARAMS['kernelfwhm']
+if 'kerneltype' in DETECTION_PARAMS.keys():
+    del DETECTION_PARAMS['kerneltype']
+if 'kernelsize' in DETECTION_PARAMS.keys():
+    del DETECTION_PARAMS['kernelsize']
 objects, segmap = sep.extract(
                 detsci,
                 err=deterr,
@@ -129,24 +148,24 @@ if FILTERS is None:
         DETCATALOG_NAME += '.gz'
     catalog.write(os.path.join(FULLDIR_CATALOGS, DETCATALOG_NAME), overwrite=True)
     sys.exit()
-    
+
 PATH_KRONSCI = None
 if (KERNEL != 'None') & (USE_COMBINED_KRON_IMAGE):
     print(f'Constructing a noise-equalized co-add for Kron measurements based on {KRON_COMBINED_BANDS}')
     outpath = os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_KRON_K{KERNEL}')
     trypath = f'{outpath}_optavg.fits'
-    if os.path.exists(trypath): 
+    if os.path.exists(trypath):
         print('Kron image exists! I will use the existing one...')
         PATH_KRONSCI = f'{outpath}_optavg.fits' # inverse variance image!!!
         PATH_KRONERR = f'{outpath}_opterr.fits' # inverse variance image!!!
         if IS_COMPRESSED:
             PATH_KRONSCI += '.gz'
             PATH_KRONERR += '.gz'
-    else:    
+    else:
         from build_detection import noise_equalized
         science_fnames = {}
         weight_fnames = {}
-        
+
         # gather directories
         for PHOT_NICKNAME in KRON_COMBINED_BANDS:
             ext=f'_{KERNEL}-matched'
@@ -159,11 +178,11 @@ if (KERNEL != 'None') & (USE_COMBINED_KRON_IMAGE):
                 PHOTWHT_NAME += '.gz'
             science_fnames[PHOT_NICKNAME] = glob.glob(os.path.join(DIR_OUTPUT, PHOTSCI_NAME))[0]
             weight_fnames[PHOT_NICKNAME] = glob.glob(os.path.join(DIR_OUTPUT, PHOTWHT_NAME))[0]
-            
+
         # run it
         noise_equalized(KRON_COMBINED_BANDS, outpath,
                     science_fnames= science_fnames,
-                    weight_fnames= weight_fnames, 
+                    weight_fnames= weight_fnames,
                     is_compressed=IS_COMPRESSED)
         PATH_KRONSCI = f'{outpath}_optavg.fits' # inverse variance image!!!
         PATH_KRONERR = f'{outpath}_opterr.fits' # inverse variance image!!!
@@ -171,8 +190,8 @@ if (KERNEL != 'None') & (USE_COMBINED_KRON_IMAGE):
             PATH_KRONSCI += '.gz'
             PATH_KRONERR += '.gz'
         print(f'Wrote Kron image to {PATH_KRONSCI}')
-        
-            
+
+
 areas = {}
 stats = {}
 
@@ -180,7 +199,7 @@ USE_FILTERS = FILTERS
 if (KERNEL != 'None') & (USE_COMBINED_KRON_IMAGE):
     KRON_MATCH_BAND = '+'.join(KRON_COMBINED_BANDS)
     USE_FILTERS = [KRON_MATCH_BAND, ] + list(FILTERS)
-    
+
 for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
 
     print(PHOT_NICKNAME)
@@ -230,13 +249,13 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
         photerr[~np.isfinite(photerr)] = np.median(photerr[np.isfinite(photerr)]) # HACK fill in holes with median weight.
         # fits.ImageHDU(photerr).writeto('PHOTERR.fits')
 
-    # IMAGE FOR KRON RADII 
+    # IMAGE FOR KRON RADII
     # We actually run AUTO fluxes on each band
     # So just do again for each band and take their coverage -- uber consistent this way.)
     elif PHOT_NICKNAME == KRON_MATCH_BAND:
             photsci = fits.getdata(PATH_KRONSCI).byteswap().newbyteorder()
             photerr = fits.getdata(PATH_KRONERR).byteswap().newbyteorder()
-            photsci[photerr<=0.] = 0. 
+            photsci[photerr<=0.] = 0.
             photwht = np.where(photerr<=0., 0, 1/(photerr**2))
             phothead = fits.getheader(PATH_KRONSCI, 0)
             photwcs = WCS(phothead)

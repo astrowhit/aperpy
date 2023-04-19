@@ -117,7 +117,7 @@ if USE_COMBINED_KRON_IMAGE:
     KRON_MATCH_BAND = '+'.join(KRON_COMBINED_BANDS)
 else:
     KRON_MATCH_BAND = MATCH_BAND # behaves as usual with a single ref band
-    
+
 # grab MATCH_BAND PSF convolved to kernel
 psfmodel = fits.getdata(FNAME_REF_PSF)
 if KERNEL == MATCH_BAND:
@@ -125,7 +125,7 @@ if KERNEL == MATCH_BAND:
 else:
     kernel = fits.getdata(DIR_KERNEL(MATCH_BAND))
     conv_psfmodel = convolve(psfmodel, kernel)
-    
+
 mask = ''
 if PHOT_USEMASK:
     mask = '_masked'
@@ -183,7 +183,7 @@ for apersize in PHOT_APER:
     tot_corr = f_ref_total / f_ref_aper
     tot_corr[(f_ref_aper <= 0) | (f_ref_total <= 0)] = np.nan
     min_corr = 1. / psf_cog(conv_psfmodel, MATCH_BAND.upper(), nearrad=(apersize / PIXEL_SCALE / 2.)) # defaults to EE(<R_aper)
-    tot_corr[tot_corr < min_corr] = min_corr 
+    tot_corr[tot_corr < min_corr] = min_corr
     tot_corr[use_circle] = min_corr # if the detecton was iffy, you get the min_corr (i.e. PSF corr)
     maincat.add_column(MaskedColumn(tot_corr, f'TOTAL_CORR_APER{str_aper}', mask=np.isnan(tot_corr)))
     sig_ref_aper = sigma_aper(KRON_MATCH_BAND.upper(), wht_ref, apersize) # sig_aper,KRON_MATCH_BAND
@@ -432,7 +432,7 @@ if PS_WEBB_USE or PS_HST_USE or BP_USE:
 # print(f'Flagged {np.sum(SEL_BADKRON)} objects as having enormous kron radii for their SNR')
 # maincat.add_column(Column(SEL_BADKRON.astype(int), name='badkron_flag'))
 
-SEL_GEN |= SEL_BADKRON
+# SEL_GEN |= SEL_BADKRON
 # low-weight source flag -  TODO
 
 # HACK for glass
@@ -538,7 +538,7 @@ for i, colname in enumerate(maincat.colnames):
         maincat[colname].unit = u.deg
 
     print(i, colname)
-    
+
 
 
 maincat.write(outfilename, overwrite=True)

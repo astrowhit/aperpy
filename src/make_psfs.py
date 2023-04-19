@@ -7,7 +7,7 @@ import os, sys
 PATH_CONFIG = sys.argv[1]
 sys.path.insert(0, PATH_CONFIG)
 
-from config import WEBB_FILTERS, FIELD, ANGLE, DIR_PSFS, PIXEL_SCALE, PSF_FOV, HST_FILTERS, USE_DATE, USE_NEAREST_DATE, FILTERS
+from config import WEBB_FILTERS, FIELD, ANGLE, DIR_PSFS, PIXEL_SCALE, PSF_FOV, HST_FILTERS, USE_DATE, USE_NEAREST_DATE, FILTERS, USE_FILTERS
 
 
 if USE_NEAREST_DATE:
@@ -20,12 +20,12 @@ else:
 # Default behavior generates a 10" FOV PSF and clips down to 4" FOV; 0.04 "/px
 for filt in FILTERS:
     filt = filt.upper()
-    if filt not in WEBB_FILTERS: continue
+    if filt not in USE_FILTERS: continue
     print(f'Fetching WebbPSF for {filt} at PA {ANGLE}deg for date {date}')
     get_psf(filt, FIELD, ANGLE, output=DIR_PSFS, date=date, pixscl=PIXEL_SCALE)
 
 
-def renorm_hst_psf(filt, field, dir=DIR_PSFS, pixscl=PIXEL_SCALE, fov=PSF_FOV):
+def renorm_psf(filt, field, dir=DIR_PSFS, pixscl=PIXEL_SCALE, fov=PSF_FOV):
     psfmodel = fits.getdata(os.path.join(dir, f'{filt.lower()}_psf_unmatched.fits'))
 
     # encircled = {} # rounded to nearest 100nm, see hst docs
@@ -52,6 +52,14 @@ def renorm_hst_psf(filt, field, dir=DIR_PSFS, pixscl=PIXEL_SCALE, fov=PSF_FOV):
     encircled['F125W'] = 0.969
     encircled['F140W'] = 0.967
     encircled['F160W'] = 0.966
+    encircled['F090W'] = 0.9837
+    encircled['F115W'] = 0.9822
+    encircled['F150W'] = 0.9804
+    encircled['F200W'] = 0.9767
+    encircled['F277W'] = 0.9691
+    encircled['F356W'] = 0.9618
+    encircled['F410M'] = 0.9568
+    encircled['F444W'] = 0.9546
 
     # Normalize to correct for missing flux
     # Has to be done encircled! Ensquared were calibated to zero angle...
@@ -67,8 +75,8 @@ def renorm_hst_psf(filt, field, dir=DIR_PSFS, pixscl=PIXEL_SCALE, fov=PSF_FOV):
     newhdu = fits.PrimaryHDU(psfmodel)
     newhdu.writeto(os.path.join(DIR_PSFS, f'psf_{field}_{filt}_{fov}arcsec.fits'), overwrite=True)
 
-for filt in HST_FILTERS:
+for filt in FILTERS:
     filt = filt.upper()
-    if filt not in HST_FILTERS: continue
-    print(f'Normalizing HST PSF for {filt}...')
-    renorm_hst_psf(filt, FIELD)
+    if filt in USE_FILTERS: continue
+    print(f'Normalizing ePSF for {filt}...')
+    renorm_psf(filt, FIELD)
