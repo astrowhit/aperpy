@@ -139,7 +139,7 @@ p, pcov, sigma1 = fit_apercurve(stats[KRON_MATCH_BAND], plotname=plotname, stat_
 alpha, beta = p['fit_std']
 sig1 = sigma1['fit_std']
 wht_ref = maincat[f'{KRON_MATCH_BAND}_SRC_MEDWHT']
-SEL_BADKRON = (maincat['flag'] & 1) == 1  #| (maincat[f'{KRON_MATCH_BAND}_FLAG_AUTO{mask}'] != 0)
+SEL_BADKRON = (maincat['flag'] > 0)  #| (maincat[f'{KRON_MATCH_BAND}_FLAG_AUTO{mask}'] != 0)
 # ignore the auto mask as it's flagging a bunch of OK things based on "masked" pixels
 # medwht_ref = maincat[f'{KRON_MATCH_BAND}_MED_WHT']
 
