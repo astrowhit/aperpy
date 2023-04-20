@@ -75,13 +75,19 @@ print(f'Area of detection image: {area} deg2')
 # SOURCE DETECTION
 print('SOURCE DETECTION...')
 kerneldict = {}
-if DETECTION_PARAMS['kerneltype'] == 'gauss' or 'kerneltype' not in DETECTION_PARAMS.keys():
+if 'kerneltype' not in DETECTION_PARAMS.keys():
     kernel_func = Gaussian2DKernel
     kerneldict['x_stddev'] = DETECTION_PARAMS['kernelfwhm']/2.35
+else:
+    if DETECTION_PARAMS['kerneltype'] == 'gauss':
+        kernel_func = Gaussian2DKernel
+        kerneldict['x_stddev'] = DETECTION_PARAMS['kernelfwhm']/2.35
 
-elif DETECTION_PARAMS['kerneltype'] == 'tophat':
-    kernel_func = Tophat2DKernel
-    kerneldict['radius'] = DETECTION_PARAMS['kernelfwhm']
+    elif DETECTION_PARAMS['kerneltype'] == 'tophat':
+        kernel_func = Tophat2DKernel
+        kerneldict['radius'] = DETECTION_PARAMS['kernelfwhm']
+
+   
 
 if 'kernelsize' in DETECTION_PARAMS.keys():
     kerneldict['x_size'] = DETECTION_PARAMS['kernelsize']
@@ -343,8 +349,8 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
                                             err = photerr,
                                             subpix=0, segmap=seg, seg_id=seg_id)
 
-        badflux = (flux == 0.) | ~np.isfinite(flux)
-        badfluxerr = (fluxerr <= 0.) | ~np.isfinite(fluxerr)
+        badflux = (flux == 0.) | ~np.isfinite(flux) | (flag > 0)
+        badfluxerr = (fluxerr <= 0.) | ~np.isfinite(fluxerr) | (flag > 0)
         pc_badflux = np.sum(badflux) / len(flux)
         pc_badfluxerr = np.sum(badfluxerr) / len(flux)
         pc_ORbad = np.sum(badflux | badfluxerr) / len(flux)
@@ -370,6 +376,7 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
         catalog[f'KRON_RADIUS{ext}'] = kronrad
         catalog[f'KRON_RADIUS_CIRC{ext}'] = kronrad_circ
         catalog[f'FLAG_AUTO{ext}'] = flag
+        catalog[f'FLAG_KRON_RADIUS{ext}'] = krflag
 
         # FLUX RADIUS
         print(f"{PHOT_NICKNAME} :: MEASURING FLUX RADIUS...")

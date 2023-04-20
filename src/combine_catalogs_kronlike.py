@@ -139,9 +139,23 @@ p, pcov, sigma1 = fit_apercurve(stats[KRON_MATCH_BAND], plotname=plotname, stat_
 alpha, beta = p['fit_std']
 sig1 = sigma1['fit_std']
 wht_ref = maincat[f'{KRON_MATCH_BAND}_SRC_MEDWHT']
-SEL_BADKRON = (maincat['flag'] > 0)  #| (maincat[f'{KRON_MATCH_BAND}_FLAG_AUTO{mask}'] != 0)
+SEL_BADKRON = (maincat['flag'] > 0) #| (maincat[f'{KRON_MATCH_BAND}_FLAG_AUTO{mask}'] != 0)
 # ignore the auto mask as it's flagging a bunch of OK things based on "masked" pixels
 # medwht_ref = maincat[f'{KRON_MATCH_BAND}_MED_WHT']
+
+# some extra columns
+maincat['iso_area'] = maincat['tnpix'] * PIXEL_SCALE**2
+maincat['iso_area'].unit = u.arcsec**2
+
+
+# check isoarea vs. kronrad_circ and REVUJINATE
+kronrad_area = np.pi * (maincat[f'{KRON_MATCH_BAND}_KRON_RADIUS_CIRC{mask}'] * PIXEL_SCALE)**2
+SEL_GOODKRON = maincat[f'iso_area'] > kronrad_area
+SEL_BADKRON[SEL_GOODKRON] = False
+
+# Check if object is really bright in its group, if so then SEL_BADKRON = False
+
+maincat['flag_kron'] = np.where(SEL_BADKRON, 1, 0)
 
 for filter in USE_FILTERS:
     relwht = maincat[f'{filter}_SRC_MEDWHT'] / maincat[f'{filter}_MAX_WHT']
@@ -499,11 +513,6 @@ for colname in ztable.colnames:
     else:
         colname = f'z_spec_{colname}'
     maincat.add_column(Column(filler, name=colname))
-
-# some extra columns
-maincat['iso_area'] = maincat['tnpix'] * PIXEL_SCALE**2
-maincat['iso_area'].unit = u.arcsec**2
-maincat['flag_kron'] = np.where(SEL_BADKRON, 1, 0)
 
 # use flag (minimum SNR cut + not a star)
 use_phot = np.zeros(len(maincat)).astype(int)
