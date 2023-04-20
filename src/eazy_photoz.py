@@ -11,7 +11,10 @@ if envpath is None:
     envpath = os.path.join(eazy.utils.path_to_eazy_data(), 'eazy-photoz')
 print('EAZYCODE = '+envpath)
 
-eazy.symlink_eazy_inputs()
+try:
+    eazy.symlink_eazy_inputs()
+except:
+    Warning('Could not add symlinks...might be OK.')
 
 # quiet numpy/astropy warnings
 import warnings
@@ -53,13 +56,15 @@ params['USE_ZSPEC_FOR_REST'] = 'n'
 params['SYS_ERR'] = 0.05
 
 
-params['Z_MAX'] = 30
-params['Z_STEP'] = 0.005
+params['Z_MAX'] = 15  # 30.
+params['Z_STEP'] = 0.01 # 0.005
 
 if TEMPLATES == 'fsps_full':
     params['TEMPLATES_FILE'] = 'templates/fsps_full/tweak_fsps_QSF_12_v3.param'
 elif TEMPLATES == 'sfhz':
     params['TEMPLATES_FILE'] = 'templates/sfhz/carnall_sfhz_13.param'
+elif TEMPLATES == 'sfhz_blue':
+    params['TEMPLATES_FILE'] = 'templates/sfhz/blue_sfhz_13.param'
 
 params['VERBOSITY'] = 1
 
@@ -72,7 +77,7 @@ ez = eazy.photoz.PhotoZ(param_file=None,  #cosmology=WMAP9,
 
 print(ez.cosmology)
 
-NITER = 10
+NITER = 5
 NBIN = np.minimum(ez.NOBJ//100, 180)
 
 ez.cat = ez.cat.filled(-99)
@@ -84,7 +89,7 @@ if ITERATE_ZP:
         print('Iteration: ', iter)
 
         sn = ez.fnu/ez.efnu
-        clip = (sn > 5).sum(axis=1) > 5 # Generally make this higher to ensure reasonable fits
+        clip = (sn > 10).sum(axis=1) > 6 # Generally make this higher to ensure reasonable fits
         clip &= ez.cat['use_phot'] == 1
         ez.iterate_zp_templates(idx=ez.idx[clip], update_templates=False,
                                 update_zeropoints=True, iter=iter, n_proc=8,
@@ -92,20 +97,22 @@ if ITERATE_ZP:
                                 NBIN=NBIN, get_spatial_offset=False)
 
 
-    # Turn off error corrections derived above
-    ez.efnu = ez.efnu_orig
+# Turn off error corrections derived above
+# ez.efnu = ez.efnu_orig
+ez.set_sys_err(positive=True)
 
 # Full catalog
 sample = ez.idx # all
+# sample = np.isfinite(ez.ZSPEC)
 
-ez.fit_parallel(sample, n_proc=4, prior=False, beta_prior=False)
+ez.fit_parallel(sample, n_proc=8, prior=False, beta_prior=False)
 
 ez.zphot_zspec(include_errors=True, zmax=6.5, selection=ez.cat['use_phot']==1)
 fig = plt.gcf()
 fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{PROJECT}_v{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_D{str_aper}_CATALOG_{TEMPLATES}.photoz-specz.pdf'))
 
 
-zout, hdu = ez.standard_output(rf_pad_width=0.5, rf_max_err=2,
+zout, hdu = ez.standard_output(rf_pad_width=0.5, rf_max_err=2, n_proc=2,
                                  prior=False, beta_prior=False)
 
 ez.fit_phoenix_stars()

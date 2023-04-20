@@ -1,6 +1,5 @@
 # Compute background
 import enum
-from turtle import position
 from typing import OrderedDict
 from astropy.stats import sigma_clipped_stats
 import numpy as np
@@ -483,7 +482,7 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, precomp=None, row=
 
     if plot:
         if len(filters) > 7:
-            fig, axes = plt.subplots(ncols=7, nrows=2, figsize=(3*8, 3*2))
+            fig, axes = plt.subplots(ncols=8, nrows=2, figsize=(3*10, 3*3))
         else:
             fig, axes = plt.subplots(ncols=len(filters), figsize=(3*len(filters), 3))
 
@@ -519,7 +518,7 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, precomp=None, row=
         if plot: # get these from the big mosaic!
             img = cutout.data
             mean, median, rms = sigma_clipped_stats(img[img!=0], sigma=3)
-            img -= median
+            img -= median * 0
             if np.isnan(rms):
                 rms = 0.002
 
@@ -542,7 +541,11 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, precomp=None, row=
                 flux, fluxerr = -99, -99
                 mag, magerr = -99, -99
                 snr = -99
-            if f'f_{filt}' not in row.colnames:
+            
+            if f'faper_{filt}' in row.colnames:
+                flux, fluxerr = row[f'faper_{filt}'], row[f'eaper_{filt}']
+                snr = flux / fluxerr
+            elif f'f_{filt}' not in row.colnames:
                 mag, magerr = -99, -99
                 flux, fluxerr = -99, -99
                 snr = -99

@@ -25,7 +25,8 @@ from config import FILTERS, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, DIR_OUTPUT, \
     GAIA_ROW_LIMIT, GAIA_XMATCH_RADIUS, FN_BADWHT, SATURATEDSTAR_MAGLIMIT, SATURATEDSTAR_FILT, \
     FN_EXTRABAD, EXTRABAD_XMATCH_RADIUS, EXTRABAD_LABEL, BK_MINSIZE, BK_SLOPE, PATH_BADOBJECT, \
     GLASS_MASK, SATURATEDSTAR_APERSIZE, PS_WEBB_USE, PS_HST_USE, GAIA_USE, BADWHT_USE, EXTRABAD_USE, \
-    BP_USE, BADOBJECT_USE, PHOT_USEMASK, PROJECT, VERSION, PSF_FOV, USE_COMBINED_KRON_IMAGE, KRON_COMBINED_BANDS
+    BP_USE, BADOBJECT_USE, PHOT_USEMASK, PROJECT, VERSION, PSF_FOV, USE_COMBINED_KRON_IMAGE, KRON_COMBINED_BANDS, \
+    XCAT_FILENAME, XCAT_NAME
 
 
 DET_NICKNAME =  sys.argv[2] #'LW_f277w-f356w-f444w'
@@ -138,7 +139,7 @@ p, pcov, sigma1 = fit_apercurve(stats[KRON_MATCH_BAND], plotname=plotname, stat_
 alpha, beta = p['fit_std']
 sig1 = sigma1['fit_std']
 wht_ref = maincat[f'{KRON_MATCH_BAND}_SRC_MEDWHT']
-SEL_BADKRON = (maincat['flag'] != 0)  #| (maincat[f'{KRON_MATCH_BAND}_FLAG_AUTO{mask}'] != 0)
+SEL_BADKRON = (maincat['flag'] & 1) == 1  #| (maincat[f'{KRON_MATCH_BAND}_FLAG_AUTO{mask}'] != 0)
 # ignore the auto mask as it's flagging a bunch of OK things based on "masked" pixels
 # medwht_ref = maincat[f'{KRON_MATCH_BAND}_MED_WHT']
 
@@ -603,6 +604,19 @@ for apersize in PHOT_APER:
             newcol = cols[coln]
             print(f'   {subcat[coln].name} --> {newcol}')
             subcat[coln].name = newcol
+
+        if XCAT_FILENAME is not None:
+            # Crossmatch to DR1 and make a new column (ID + radius)
+            from catalog_tools import crossmatch
+            from astropy.table import Table, Column, MaskedColumn
+            cat_old = Table.read(XCAT_FILENAME)
+            mcat_new, mcat_old, idx1, idx2, dsky  = crossmatch(subcat, cat_old, thresh=[0.08*u.arcsec], plot=True, return_idx=True)
+            ids = np.zeros(len(subcat))
+            ids[idx1] = cat_old['id'][idx2]
+            matchrad = np.zeros(len(subcat))
+            matchrad[idx1] = dsky[idx1]
+            subcat.add_column(MaskedColumn(ids, name=f'id_{XCAT_NAME}', mask=ids<=0, dtype='i4'))
+            subcat.add_column(MaskedColumn(matchrad*u.arcsec, name=f'match_radius_{XCAT_NAME}', mask=ids<=0))
 
         # # use flag (minimum SNR cut + not a star)
         # snr_ref = subcat[f'f_{KRON_MATCH_BAND}'] / subcat[f'e_{KRON_MATCH_BAND}']
