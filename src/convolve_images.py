@@ -49,13 +49,13 @@ for filename in SCI_FILENAMES:
 
         weight = hdul_wht[0].data
 
-        # # print(np.shape(hdul[0].data))
-        # print('Running convolution...')
-        # hdul[0].data = convolve_func(hdul[0].data, kernel, **convolve_kwargs).astype(np.float32)
-        # hdul[0].data[weight==0] = 0.
-        # outfilename = filename.replace(DIR_IMAGES, DIR_OUTPUT).replace(f'{SKYEXT}.fits', f'{SKYEXT}_{KERNEL}-matched.fits')
-        # hdul.writeto(outfilename, overwrite=True)
-        # print('Wrote file to ', outfilename)
+        # print(np.shape(hdul[0].data))
+        print('Running convolution...')
+        hdul[0].data = convolve_func(hdul[0].data, kernel, **convolve_kwargs).astype(np.float32)
+        hdul[0].data[weight==0] = 0.
+        outfilename = filename.replace(DIR_IMAGES, DIR_OUTPUT).replace(f'{SKYEXT}.fits', f'{SKYEXT}_{KERNEL}-matched.fits')
+        hdul.writeto(outfilename, overwrite=True)
+        print('Wrote file to ', outfilename)
 
         err = np.where(weight==0, 0, 1/np.sqrt(weight))
         err_conv = convolve_func(err, kernel, **convolve_kwargs).astype(np.float32)

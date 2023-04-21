@@ -87,7 +87,7 @@ else:
         kernel_func = Tophat2DKernel
         kerneldict['radius'] = DETECTION_PARAMS['kernelfwhm']
 
-   
+
 
 if 'kernelsize' in DETECTION_PARAMS.keys():
     kerneldict['x_size'] = DETECTION_PARAMS['kernelsize']
@@ -242,14 +242,13 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
         photsci = fits.getdata(PATH_PHOTSCI).byteswap().newbyteorder()
         print(PATH_PHOTSCI)
         photwht = fits.getdata(PATH_PHOTWHT).byteswap().newbyteorder()
-        photsci[photwht<=0.] = np.nan # double check!
+        photmask = np.where((photwht<=0.)|~np.isfinite(photwht), 1., 0.)
         print(PATH_PHOTWHT)
         if PATH_PHOTMASK != 'None':
-            photmask = fits.getdata(PATH_PHOTMASK).byteswap().newbyteorder().astype(float)
+            photmask_user = fits.getdata(PATH_PHOTMASK).byteswap().newbyteorder().astype(float)
             print(PATH_PHOTMASK)
-            photsci[photmask==1.0] = np.nan
-        else:
-            photmask = None
+            photmask[photmask_user] = 1.
+
         phothead = fits.getheader(PATH_PHOTHEAD, 0)
         photwcs = WCS(phothead)
         print(photwcs)
@@ -264,14 +263,13 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
     elif PHOT_NICKNAME == KRON_MATCH_BAND:
             photsci = fits.getdata(PATH_KRONSCI).byteswap().newbyteorder()
             photerr = fits.getdata(PATH_KRONERR).byteswap().newbyteorder()
-            photsci[photerr<=0.] = np.nan
             photwht = np.where(photerr<=0., 0, 1/(photerr**2))
             phothead = fits.getheader(PATH_KRONSCI, 0)
             photwcs = WCS(phothead)
             print(photwcs)
             PHOT_ZPT = KRON_ZPT
-            # if photmask is not None:
-            #     photsci[photmask==1.0] = 0.
+            photmask = np.where((photerr<=0.)|~np.isfinite(photerr), 1., 0.)
+
 
     # SOME BASIC INFO
     pixel_scale = utils.proj_plane_pixel_scales(photwcs)[0] * 3600
@@ -289,7 +287,7 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
         rad = diam / 2. / pixel_scale
         print(f"{PHOT_NICKNAME} :: MEASURING PHOTOMETRY in {diam:2.2f}\" apertures... ({2*rad:2.1f} px)")
         flux, fluxerr, flag = sep.sum_circle(photsci, xphot, yphot, #objects['x'], objects['y'],
-                                            # mask = photmask,
+                                            mask = photmask,
                                             err = photerr, subpix=0,
                                             r=rad, gain=1.0)
 
@@ -338,6 +336,7 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
         print(f"{PHOT_NICKNAME} :: MEASURING PHOTOMETRY in kron-corrected AUTO apertures...")
         kronrad, krflag = sep.kron_radius(photsci, xphot, yphot, #catalog['x'], catalog['y'],
                                             catalog['a'], catalog['b'], catalog['theta'], PHOT_KRONPARAM,
+                                            mask=photmask,
                                             segmap=seg, seg_id=seg_id) # SE uses 6
         kronrad[np.isnan(kronrad)] = 0.
         kronrad *= PHOT_AUTOPARAMS[0]
@@ -346,7 +345,7 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
         catalog['theta'][catalog['theta'] > np.pi / 2.] = np.pi / 2. # numerical rounding correction!
         flux, fluxerr, flag = sep.sum_ellipse(photsci, xphot, yphot, #catalog['x'], catalog['y'],
                                             catalog['a'], catalog['b'], catalog['theta'], kronrad,
-                                            err = photerr,
+                                            err = photerr, mask=photmask,
                                             subpix=0, segmap=seg, seg_id=seg_id)
 
         badflux = (flux == 0.) | ~np.isfinite(flux) | (flag > 0)
@@ -382,7 +381,8 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
         print(f"{PHOT_NICKNAME} :: MEASURING FLUX RADIUS...")
         """In Source Extractor, the FLUX_RADIUS parameter gives the radius of a circle enclosing a desired fraction of the total flux."""
         r, flag = sep.flux_radius(photsci,  xphot, yphot, 6.*catalog['a'],
-                                PHOT_FLUXRADIUS, normflux=flux, subpix=5, segmap=seg, seg_id=seg_id)
+                                PHOT_FLUXRADIUS, mask=photmask,
+                                normflux=flux, subpix=5, segmap=seg, seg_id=seg_id)
         rt = r.T
         for i, fluxfrac in enumerate(PHOT_FLUXRADIUS):
             catalog[f'FLUX_RADIUS_FRAC{fluxfrac}{ext}'] = rt[i]
