@@ -215,6 +215,7 @@ for apersize in PHOT_APER:
 
         # get the flux uncertainty in the aperture for this band
         sig_aper = sigma_aper(filter, wht, apersize)
+        sig_aper[np.isnan(f_aper)] = np.nan
         # do again for each aperture
         sig_total = sigma_total(sig_aper, tot_corr)
         # sig_full = sigma_full(sig_total, sig_ref_total, sig_total_ref)
@@ -281,7 +282,7 @@ if APPLY_MWDUST is not None:
             elif 'MAG' in coln:
                 maincat[coln] -= atten_mag[np.array(FILTERS) == filtname][0]
 
-# low-snr flag
+# low-snr flagf
 for coln in maincat.colnames: print(coln)
 str_aper = str(SCI_APER).replace('.', '_')
 snr_ref = maincat[f'{KRON_MATCH_BAND}_FLUX_APER{str_aper}_COLOR'] / maincat[f'{KRON_MATCH_BAND}_FLUXERR_APER{str_aper}_COLOR']

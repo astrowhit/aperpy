@@ -290,7 +290,7 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
                                             mask = photmask,
                                             err = photerr, subpix=0,
                                             r=rad, gain=1.0)
-
+        
         badflux = (flux == 0.) | ~np.isfinite(flux) | (flag > 0)
         badfluxerr = (fluxerr <= 0.) | ~np.isfinite(fluxerr) | (flag > 0)
         pc_badflux = np.sum(badflux) / len(flux)
