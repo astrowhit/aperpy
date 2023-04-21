@@ -36,7 +36,7 @@ for filename in SCI_FILENAMES:
     print(band)
     print('  science image: ', filename)
     print('  weight image: ', fn_weight)
-    # hdul = fits.open(filename)
+    hdul = fits.open(filename)
     hdul_wht = fits.open(fn_weight)
 
     if band != KERNEL:
