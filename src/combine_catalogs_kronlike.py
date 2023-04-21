@@ -159,6 +159,7 @@ maincat['flag_kron'] = np.where(SEL_BADKRON, 1, 0)
 
 for filter in USE_FILTERS:
     relwht = maincat[f'{filter}_SRC_MEDWHT'] / maincat[f'{filter}_MAX_WHT']
+    # relwht[~np.isfinite(wht_ref) | np.isnan(wht_ref)] = np.nan
     newcoln = f'{filter}_RELWHT'
     maincat.add_column(Column(relwht, newcoln))
 
@@ -198,11 +199,10 @@ for apersize in PHOT_APER:
     newcoln =f'{KRON_MATCH_BAND}_FLUXERR_REFTOTAL_MINDIAM{str_aper}'
     maincat.add_column(Column(sig_ref_total, newcoln))
 
-    tot_corr = f_ref_total / f_ref_aper
-    tot_corr[(f_ref_aper <= 0) | (f_ref_total <= 0)] = np.nan
     min_corr = 1. / psf_cog(conv_psfmodel, MATCH_BAND.upper(), nearrad=(apersize / PIXEL_SCALE / 2.)) # defaults to EE(<R_aper)
-    tot_corr[tot_corr < min_corr] = min_corr
-    tot_corr[use_circle] = min_corr # if the detecton was iffy, you get the min_corr (i.e. PSF corr)
+    tot_corr = f_ref_total / f_ref_aper
+    tot_corr[np.isnan(f_ref_total) | (tot_corr < min_corr) | use_circle] = min_corr
+    tot_corr[(f_ref_aper <= 0) | ~np.isfinite(wht_ref)] = np.nan
     maincat.add_column(MaskedColumn(tot_corr, f'TOTAL_CORR_APER{str_aper}', mask=np.isnan(tot_corr)))
     sig_ref_aper = sigma_aper(KRON_MATCH_BAND.upper(), wht_ref, apersize) # sig_aper,KRON_MATCH_BAND
     sig_total_ref = sigma_total(sig_ref_aper, tot_corr) # sig_total,KRON_MATCH_BAND
@@ -216,6 +216,7 @@ for apersize in PHOT_APER:
         # get the flux uncertainty in the aperture for this band
         sig_aper = sigma_aper(filter, wht, apersize)
         sig_aper[np.isnan(f_aper)] = np.nan
+        f_aper[np.isnan(sig_aper)] = np.nan
         # do again for each aperture
         sig_total = sigma_total(sig_aper, tot_corr)
         # sig_full = sigma_full(sig_total, sig_ref_total, sig_total_ref)
@@ -282,7 +283,7 @@ if APPLY_MWDUST is not None:
             elif 'MAG' in coln:
                 maincat[coln] -= atten_mag[np.array(FILTERS) == filtname][0]
 
-# low-snr flagf
+# low-snr flag
 for coln in maincat.colnames: print(coln)
 str_aper = str(SCI_APER).replace('.', '_')
 snr_ref = maincat[f'{KRON_MATCH_BAND}_FLUX_APER{str_aper}_COLOR'] / maincat[f'{KRON_MATCH_BAND}_FLUXERR_APER{str_aper}_COLOR']
@@ -510,7 +511,7 @@ for colname in ztable.colnames:
     filler[sep_constraint] = ztable[idx[sep_constraint]][colname]
     if colname == ZCOL:
         colname = 'z_spec'
-        filler[filler<=0] = -1
+        filler[filler<=0] = np.nan
     else:
         colname = f'z_spec_{colname}'
     maincat.add_column(Column(filler, name=colname))
@@ -627,6 +628,22 @@ for apersize in PHOT_APER:
             matchrad[idx1] = dsky[idx1]
             subcat.add_column(MaskedColumn(ids, name=f'id_{XCAT_NAME}', mask=ids<=0, dtype='i4'))
             subcat.add_column(MaskedColumn(matchrad*u.arcsec, name=f'match_radius_{XCAT_NAME}', mask=ids<=0))
+
+        # Kill any weight that has no flux
+        for coln in subcat.colnames:
+            if 'f_' in coln:
+                badsel = np.isnan(subcat[coln]) | ~np.isfinite(subcat[coln])
+                subcat[coln.replace('f_', 'w_')][badsel] = np.nan
+                
+        fluxes = np.array([subcat[coln] for coln in subcat.colnames if 'f_' in coln])
+        badsel = np.nansum(np.isfinite(fluxes), 0) == 0
+        print(f'Found {np.sum(badsel)} objects with NO viable photometry whatsoever. {np.sum(badsel & (subcat["use_phot"]==0))} already flagged. Flagging rest.')
+        subcat['use_phot'][badsel] = 0
+        # subcat['flag_nophot'] = np.where(badsel, 1, 0)
+        for coln in subcat.colnames:
+            if 'radius' in coln:
+                subcat[coln][badsel] = np.nan
+        print(np.sum(subcat['use_phot']==0))
 
         # # use flag (minimum SNR cut + not a star)
         # snr_ref = subcat[f'f_{KRON_MATCH_BAND}'] / subcat[f'e_{KRON_MATCH_BAND}']

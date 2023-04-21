@@ -56,8 +56,8 @@ params['USE_ZSPEC_FOR_REST'] = 'n'
 params['SYS_ERR'] = 0.05
 
 
-params['Z_MAX'] = 30.
-params['Z_STEP'] = 0.005
+params['Z_MAX'] = 20. #30.
+params['Z_STEP'] = 0.01 #005
 
 if TEMPLATES == 'fsps_full':
     params['TEMPLATES_FILE'] = 'templates/fsps_full/tweak_fsps_QSF_12_v3.param'

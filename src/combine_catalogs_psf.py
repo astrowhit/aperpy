@@ -354,7 +354,7 @@ for colname in ztable.colnames:
     filler[sep_constraint] = ztable[idx[sep_constraint]][colname]
     if colname == ZCOL:
         colname = 'z_spec'
-        filler[filler<=0] = -1
+        filler[filler<=0] = np.nan
     else:
         colname = f'z_spec_{colname}'
     maincat.add_column(Column(filler, name=colname))
