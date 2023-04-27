@@ -367,6 +367,10 @@ def psf_cog(psfmodel, filt, nearrad=None, fix_extrapolation=True):
         large_rad = encircled['aperture_radius'] / PIXEL_SCALE
         large_ee =  encircled[filt]
 
+        # renormalize stamp
+        # This is a little sketchy but should work so long as the SW/LW radial sampling is decent.
+        cumcurve *= large_ee[np.argmin(np.abs(large_rad-max_rad))] / cumcurve[-1]
+
         px = np.array(list(px)+list(large_rad[large_rad>max_rad]))
         cumcurve = np.array(list(cumcurve)+list(large_ee[large_rad>max_rad]))
 
@@ -822,3 +826,13 @@ def crossmatch(cat1, cat2, thresh=[1*u.arcsec,], verbose=1, plot=False, col1=Non
         return cat1[idx1], cat2[idx2], idx1, idx2
 
     return cat1[idx1], cat2[idx2]
+
+
+def randomize_segments(fn, ext=0):
+    hdul = fits.open(fn)
+    seg = hdul[ext].data
+
+
+
+    hdul.writeto(fn.replace('.fits', '_rand.fits'))
+    

@@ -13,10 +13,6 @@ from config import DIR_OUTPUT, DIR_IMAGES, DIR_KERNELS, DIR_OUTPUT, FILTERS, USE
 
 KERNEL = sys.argv[2]
 SCI_FILENAMES = list(glob.glob(DIR_OUTPUT+f'/*_sci{SKYEXT}.fits*'))
-# KERNEL = 'f444w'
-# DIR_KERNELS = '/Volumes/Weaver_2TB/Projects/Current/UNCOVER/notebooks/tests/SW_PSF/'
-# SCI_FILENAMES = ['/Volumes/Weaver_2TB/Projects/Current/UNCOVER/notebooks/tests/SW_PSF/uncover_v6.0_abell2744clu_f115w_bcgs_sci.fits.gz']
-# SKYEXT = ''
 
 if USE_FFT_CONV:
     convolve_func = convolve_fft

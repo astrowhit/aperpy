@@ -348,8 +348,8 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
                                             err = photerr, mask=photmask,
                                             subpix=0, segmap=seg, seg_id=seg_id)
 
-        badflux = (flux == 0.) | ~np.isfinite(flux) | (flag > 0)
-        badfluxerr = (fluxerr <= 0.) | ~np.isfinite(fluxerr) | (flag > 0)
+        badflux = (flux == 0.) | ~np.isfinite(flux) #| (flag > 0)
+        badfluxerr = (fluxerr <= 0.) | ~np.isfinite(fluxerr) #| (flag > 0)
         pc_badflux = np.sum(badflux) / len(flux)
         pc_badfluxerr = np.sum(badfluxerr) / len(flux)
         pc_ORbad = np.sum(badflux | badfluxerr) / len(flux)
@@ -405,7 +405,7 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
     catalog['SRC_MEDWHT'] = srcmedwht
     catalog['SRC_MEANWHT'] = srcmeanwht
     catalog['MED_WHT'] = np.nanmedian(photwht_corr[photwht_corr>0])
-    catalog['MAX_WHT'] = np.nanmax(photwht_corr[photwht_corr>0])
+    catalog['MAX_WHT'] = np.nanpercentile(photwht_corr[photwht_corr>0], 99)
 
     # COMPUTE EMPTY APERTURE ERRORS + SAVE TO MASTER FILE
     empty_aper = list(PHOT_APER)+list(np.linspace(PHOT_APER[0], PHOT_APER[-1], 30))

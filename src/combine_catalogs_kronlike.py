@@ -92,19 +92,19 @@ for filter in USE_FILTERS:
         sys.exit()
 
     cat = Table.read(filename)
-    print(filter)
+    # print(filter)
 
     # rename columns if needed:
     for coln in cat.colnames:
         if 'RADIUS' in coln or 'APER' in coln or 'FLAG' in coln or 'AUTO' in coln or 'WHT' in coln:
 
             newcol = f'{filter}_{coln}'.replace('.', '_')
-            print(f'   {cat[coln].name} --> {newcol}')
+            # print(f'   {cat[coln].name} --> {newcol}')
             cat[coln].name = newcol
 
             try:
                 cat[newcol] = cat[newcol].filled(np.nan)
-                print('Filled with NaN!')
+                # print('Filled with NaN!')
             except:
                 pass
 
@@ -139,23 +139,20 @@ p, pcov, sigma1 = fit_apercurve(stats[KRON_MATCH_BAND], plotname=plotname, stat_
 alpha, beta = p['fit_std']
 sig1 = sigma1['fit_std']
 wht_ref = maincat[f'{KRON_MATCH_BAND}_SRC_MEDWHT']
-SEL_BADKRON = (maincat['flag'] > 0) #| (maincat[f'{KRON_MATCH_BAND}_FLAG_AUTO{mask}'] != 0)
-# ignore the auto mask as it's flagging a bunch of OK things based on "masked" pixels
-# medwht_ref = maincat[f'{KRON_MATCH_BAND}_MED_WHT']
+f_ref_auto = maincat[f'{KRON_MATCH_BAND}_FLUX_AUTO{mask}'].copy()
+sel_badkron = (f_ref_auto <= 0) | ~np.isfinite(f_ref_auto)
+sel_badkron |= ~np.isfinite(wht_ref) | (wht_ref <= 0) 
+# sel_badkron |= (maincat['flag'] > 0) 
 
 # some extra columns
 maincat['iso_area'] = maincat['tnpix'] * PIXEL_SCALE**2
 maincat['iso_area'].unit = u.arcsec**2
 
-
-# check isoarea vs. kronrad_circ and REVUJINATE
+# Check if object is really bright in its group, if so then sel_badkron = False
 kronrad_area = np.pi * (maincat[f'{KRON_MATCH_BAND}_KRON_RADIUS_CIRC{mask}'] * PIXEL_SCALE)**2
-SEL_GOODKRON = maincat[f'iso_area'] > kronrad_area
-SEL_BADKRON[SEL_GOODKRON] = False
-
-# Check if object is really bright in its group, if so then SEL_BADKRON = False
-
-maincat['flag_kron'] = np.where(SEL_BADKRON, 1, 0)
+sel_badkron[(maincat['flag'] > 0) & ((1.5*maincat[f'iso_area']) < kronrad_area)] = True
+# print('!!!!!!!!!', np.sum(sel_badkron), np.unique(maincat['flag'], return_counts=True))
+# raise
 
 for filter in USE_FILTERS:
     relwht = maincat[f'{filter}_SRC_MEDWHT'] / maincat[f'{filter}_MAX_WHT']
@@ -170,9 +167,12 @@ for apersize in PHOT_APER:
     f_ref_auto = maincat[f'{KRON_MATCH_BAND}_FLUX_AUTO{mask}'].copy()
     kronrad_circ = maincat[f'{KRON_MATCH_BAND}_KRON_RADIUS_CIRC{mask}'].copy()
     kronrad = maincat[f'{KRON_MATCH_BAND}_KRON_RADIUS{mask}'].copy()
-    f_ref_aper = maincat[f'{KRON_MATCH_BAND}_FLUX_APER{str_aper}']
 
-    use_circle = (kronrad_circ < (apersize / PIXEL_SCALE / 2.)) | SEL_BADKRON # either too small OR not reliable.
+    f_ref_aper = maincat[f'{KRON_MATCH_BAND}_FLUX_APER{str_aper}'].copy()
+
+    sel_badkron |= np.isnan(f_ref_aper)
+    use_circle = (kronrad_circ < (apersize / PIXEL_SCALE / 2.)) | (f_ref_auto <= f_ref_aper) | sel_badkron # either too small (not flagged) OR not reliable.    
+
     kronrad_circ[use_circle] = apersize / PIXEL_SCALE / 2.
     # print(apersize, np.sum(use_circle), np.min(kronrad_circ), apersize / PIXEL_SCALE / 2.)
     f_ref_auto[use_circle] = f_ref_aper[use_circle]
@@ -180,13 +180,41 @@ for apersize in PHOT_APER:
     psffrac_ref_auto = psf_cog(conv_psfmodel, MATCH_BAND.upper(), nearrad = kronrad_circ) # in pixels
     # F160W kernel convolved MATCH_BAND PSF + missing flux from F160W beyond 2" radius
     f_ref_total = f_ref_auto / psffrac_ref_auto # equation 9
-    if apersize == PHOT_APER[0]:
-        newcoln =f'{KRON_MATCH_BAND}_FLUX_REF_AUTO'
-        maincat.add_column(Column(f_ref_auto, newcoln))
+    # if apersize == PHOT_APER[0]:
+    newcoln =f'{KRON_MATCH_BAND}_FLUX_REF_AUTO_APER{str_aper}'
+    maincat.add_column(Column(f_ref_auto, newcoln))
+
+    min_corr = 1. / psf_cog(conv_psfmodel, MATCH_BAND.upper(), nearrad=(apersize / PIXEL_SCALE / 2.)) # defaults to EE(<R_aper)
+    tot_corr = f_ref_total / f_ref_aper
+
+    use_circle |= tot_corr < min_corr
+    use_circle |= ~np.isfinite(tot_corr)
+    sel_badkron |= ~np.isfinite(tot_corr)
+    tot_corr[use_circle] = min_corr
+
     kronrad[use_circle] = np.nan #
     kronrad_circ[use_circle] = np.nan #
+
+    # idx = np.argwhere(tot_corr < min_corr)
+    # for i in idx:
+    #     print(i[0], min_corr, np.array(tot_corr[i]), np.array(f_ref_auto / f_ref_aper / psffrac_ref_auto)[i], np.array(1/ psffrac_ref_auto)[i])
+    #           #np.array(f_ref_total[i]), np.array(f_ref_auto[i]), np.array(f_ref_aper[i]), psffrac_ref_auto[i], np.array(kronrad_circ*2*PIXEL_SCALE)[i])
+    # print(np.sum(tot_corr < min_corr))
+    # # print(min_corr, np.nanmin(tot_corr), f_ref_total[np.argmin(tot_corr)], f_ref_aper[np.argmin(tot_corr)])
+    if np.any(tot_corr < min_corr):
+        print(f'ERROR: A TOTAL CORRECTION IS LESS THAN THE MINIMUM POSSIBLE AT {apersize}')
+        raise
+
+    maincat.add_column(MaskedColumn(tot_corr, f'TOTAL_CORR_APER{str_aper}', mask=np.isnan(tot_corr)))
+
+    sig_ref_aper = sigma_aper(KRON_MATCH_BAND.upper(), wht_ref, apersize) # sig_aper,KRON_MATCH_BAND
+    sig_total_ref = sigma_total(sig_ref_aper, tot_corr) # sig_total,KRON_MATCH_BAND
+    sig_ref_total = sigma_ref_total(sig1, alpha, beta, kronrad_circ, wht_ref)
+
     newcoln =f'{KRON_MATCH_BAND}_USE_CIRCLE_APER{str_aper}'
     maincat.add_column(Column(use_circle.astype(int), newcoln))
+    newcoln =f'{KRON_MATCH_BAND}_FLAG_KRON_APER{str_aper}'
+    maincat.add_column(Column(sel_badkron.astype(int), newcoln))
     newcoln =f'{KRON_MATCH_BAND}_KRON_RADIUS_CIRC_APER{str_aper}'
     maincat.add_column(Column(kronrad_circ, newcoln))
     newcoln =f'{KRON_MATCH_BAND}_KRON_RADIUS_APER{str_aper}'
@@ -195,17 +223,8 @@ for apersize in PHOT_APER:
     maincat.add_column(Column(psffrac_ref_auto, newcoln))
     newcoln =f'{KRON_MATCH_BAND}_FLUX_REFTOTAL_APER{str_aper}'
     maincat.add_column(Column(f_ref_total, newcoln))
-    sig_ref_total = sigma_ref_total(sig1, alpha, beta, kronrad_circ, wht_ref)
     newcoln =f'{KRON_MATCH_BAND}_FLUXERR_REFTOTAL_MINDIAM{str_aper}'
     maincat.add_column(Column(sig_ref_total, newcoln))
-
-    min_corr = 1. / psf_cog(conv_psfmodel, MATCH_BAND.upper(), nearrad=(apersize / PIXEL_SCALE / 2.)) # defaults to EE(<R_aper)
-    tot_corr = f_ref_total / f_ref_aper
-    tot_corr[np.isnan(f_ref_total) | (tot_corr < min_corr) | use_circle] = min_corr
-    tot_corr[(f_ref_aper <= 0) | ~np.isfinite(wht_ref)] = np.nan
-    maincat.add_column(MaskedColumn(tot_corr, f'TOTAL_CORR_APER{str_aper}', mask=np.isnan(tot_corr)))
-    sig_ref_aper = sigma_aper(KRON_MATCH_BAND.upper(), wht_ref, apersize) # sig_aper,KRON_MATCH_BAND
-    sig_total_ref = sigma_total(sig_ref_aper, tot_corr) # sig_total,KRON_MATCH_BAND
 
     for filter in USE_FILTERS:
         f_aper =maincat[f'{filter}_FLUX_APER{str_aper}']
@@ -284,7 +303,7 @@ if APPLY_MWDUST is not None:
                 maincat[coln] -= atten_mag[np.array(FILTERS) == filtname][0]
 
 # low-snr flag
-for coln in maincat.colnames: print(coln)
+# for coln in maincat.colnames: print(coln)
 str_aper = str(SCI_APER).replace('.', '_')
 snr_ref = maincat[f'{KRON_MATCH_BAND}_FLUX_APER{str_aper}_COLOR'] / maincat[f'{KRON_MATCH_BAND}_FLUXERR_APER{str_aper}_COLOR']
 snr_ref[maincat[f'{KRON_MATCH_BAND}_FLUXERR_APER{str_aper}_COLOR']<=0] = -1
@@ -330,10 +349,9 @@ if GAIA_USE:
         cra, cdec = np.mean(RA_RANGE)*u.deg, np.mean(DEC_RANGE)*u.deg
         coord = SkyCoord(ra=cra, dec=cdec, unit=(u.degree, u.degree), frame='icrs')
         radius = u.Quantity(0.15, u.deg)
-        print(coord)
         j = Gaia.cone_search_async(coord, radius)
         gaia = j.get_results()
-        gaia.pprint()
+        # gaia.pprint()
         tab_gaia = Table(gaia)['solution_id', 'source_id', 'ra', 'dec', 'ref_epoch', 'pmra', 'pmdec']
         tab_gaia.write(os.path.join(DIR_OUTPUT, 'gaia.fits'), format='fits', overwrite=True)
 
@@ -448,11 +466,11 @@ if PS_WEBB_USE or PS_HST_USE or BP_USE:
 # # bad kron radius flag
 # krc = maincat[f'{KRON_MATCH_BAND}_KRON_RADIUS_CIRC{mask}'] * PIXEL_SCALE
 # snr = (maincat[f'{KRON_MATCH_BAND}_FLUX_APER{str_aper}_COLOR']/maincat[f'{KRON_MATCH_BAND}_FLUXERR_APER{str_aper}_COLOR'])
-# SEL_BADKRON = (snr < BK_SLOPE*(krc - BK_MINSIZE))  #| (krc > 9)
-# print(f'Flagged {np.sum(SEL_BADKRON)} objects as having enormous kron radii for their SNR')
-# maincat.add_column(Column(SEL_BADKRON.astype(int), name='badkron_flag'))
+# sel_badkron = (snr < BK_SLOPE*(krc - BK_MINSIZE))  #| (krc > 9)
+# print(f'Flagged {np.sum(sel_badkron)} objects as having enormous kron radii for their SNR')
+# maincat.add_column(Column(sel_badkron.astype(int), name='badkron_flag'))
 
-# SEL_GEN |= SEL_BADKRON # NO! leave this off. We want to use them still.
+# SEL_GEN |= sel_badkron # NO! leave this off. We want to use them still.
 # low-weight source flag -  TODO
 
 # HACK for glass
@@ -552,13 +570,15 @@ for i, colname in enumerate(maincat.colnames):
     elif colname == 'theta':
         maincat[colname].unit = u.deg
 
-    print(i, colname)
+    # print(i, colname)
 
 
-
-maincat.write(outfilename, overwrite=True)
-print(f'Added date stamp! ({today})')
-print('Wrote first-pass combined catalog to ', outfilename)
+try:
+    maincat.write(outfilename, overwrite=True)
+    print(f'Added date stamp! ({today})')
+    print('Wrote first-pass combined catalog to ', outfilename)
+except:
+    print('WARNING: Could not make combined file. It may be too large!')
 
 
 for apersize in PHOT_APER:
@@ -572,8 +592,10 @@ for apersize in PHOT_APER:
         cols['RA'] = 'ra'
         cols['DEC'] = 'dec'
         cols['EBV'] = 'ebv_mw'
-        cols[f'{KRON_MATCH_BAND}_FLUX_APER{str_aper}_COLOR'] = f'faper_{KRON_MATCH_BAND}'
-        cols[f'{KRON_MATCH_BAND}_FLUXERR_APER{str_aper}_COLOR'] = f'eaper_{KRON_MATCH_BAND}'
+        cols[f'{KRON_MATCH_BAND}_FLUX_APER{str_aper}'] = f'faper_{KRON_MATCH_BAND}'
+        cols[f'{KRON_MATCH_BAND}_FLUXERR_APER{str_aper}'] = f'eaper_{KRON_MATCH_BAND}'
+        cols[f'{KRON_MATCH_BAND}_FLUX_REF_AUTO_APER{str_aper}'] = f'fauto_{KRON_MATCH_BAND}'
+        cols[f'{KRON_MATCH_BAND}_RELWHT'] = f'w_{KRON_MATCH_BAND}'
 
         for filter in FILTERS:
             cols[f'{filter}_FLUX_APER{str_aper}_TOTAL'] = f'f_{filter}'
@@ -581,13 +603,12 @@ for apersize in PHOT_APER:
             cols[f'{filter}_RELWHT'] = f'w_{filter}'
 
         cols[f'TOTAL_CORR_APER{str_aper}'] = 'tot_cor'
-        # cols[f'{KRON_MATCH_BAND}_FLUXERR_REFTOTAL'] = 'tot_ekron_f444w'
-
+    
         # cols[f'{KRON_MATCH_BAND}_FLAG_AUTO{mask}'] = 'flag_auto'
         cols[f'{KRON_MATCH_BAND}_KRON_RADIUS_APER{str_aper}'] = 'kron_radius'   # this is the modified KR where KR = sci_aper/2 for small things.
         cols[f'{KRON_MATCH_BAND}_KRON_RADIUS_CIRC_APER{str_aper}'] = 'kron_radius_circ' # ditto
         cols[f'{KRON_MATCH_BAND}_USE_CIRCLE_APER{str_aper}'] = 'use_circle' # where kron radius is not used.
-        cols['flag_kron'] = 'flag_kron'
+        cols[f'{KRON_MATCH_BAND}_FLAG_KRON_APER{str_aper}'] = 'flag_kron'
         cols['iso_area'] = 'iso_area'
         cols['a'] = 'a_image'
         cols['b'] = 'b_image'
@@ -639,18 +660,18 @@ for apersize in PHOT_APER:
         badsel = np.nansum(np.isfinite(fluxes), 0) == 0
         print(f'Found {np.sum(badsel)} objects with NO viable photometry whatsoever. {np.sum(badsel & (subcat["use_phot"]==0))} already flagged. Flagging rest.')
         subcat['use_phot'][badsel] = 0
-        # subcat['flag_nophot'] = np.where(badsel, 1, 0)
+        subcat['flag_nophot'] = np.where(badsel, 1, 0)
         for coln in subcat.colnames:
             if 'radius' in coln:
                 subcat[coln][badsel] = np.nan
-        print(np.sum(subcat['use_phot']==0))
+        # print(np.sum(subcat['use_phot']==0))
 
         # # use flag (minimum SNR cut + not a star)
         # snr_ref = subcat[f'f_{KRON_MATCH_BAND}'] / subcat[f'e_{KRON_MATCH_BAND}']
         # snr_ref[subcat[f'e_{KRON_MATCH_BAND}']<=0] = -1
         # use_phot = np.zeros(len(subcat))
         # use_phot[snr_ref >= 3] = 1
-        # use_phot[SEL_STAR | SEL_BADPIX | SEL_EXTRABAD | SEL_BADOBJECT | SEL_BADGLASS | SEL_BADKRON] = 0
+        # use_phot[SEL_STAR | SEL_BADPIX | SEL_EXTRABAD | SEL_BADOBJECT | SEL_BADGLASS | sel_badkron] = 0
         # subcat['use_phot'] = use_phot
         str_aper = str_aper.replace('_', '')
         if len(str_aper) == 2:
