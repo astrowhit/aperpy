@@ -183,12 +183,13 @@ for apersize in PHOT_APER:
 
     f_ref_aper = maincat[f'{KRON_MATCH_BAND}_FLUX_APER{str_aper}'].copy()
 
-    sel_badkron |= np.isnan(f_ref_aper)
+    sel_badkron |= np.isnan(f_ref_aper) 
     use_circle = (kronrad_circ < (apersize / PIXEL_SCALE / 2.)) | (f_ref_auto <= f_ref_aper) | sel_badkron # either too small (not flagged) OR not reliable.    
 
     kronrad_circ[use_circle] = apersize / PIXEL_SCALE / 2.
     # print(apersize, np.sum(use_circle), np.min(kronrad_circ), apersize / PIXEL_SCALE / 2.)
     f_ref_auto[use_circle] = f_ref_aper[use_circle]
+    f_ref_auto[~np.isfinite(maincat[f'{KRON_MATCH_BAND}_RELWHT'])] = np.nan # if you don't have a weight then you don't have a flux_err, so you don't have flux, and so you shouldn't show auto either.
 
     psffrac_ref_auto = psf_cog(conv_psfmodel, MATCH_BAND.upper(), nearrad = kronrad_circ) # in pixels
     # F160W kernel convolved MATCH_BAND PSF + missing flux from F160W beyond 2" radius
@@ -249,6 +250,7 @@ for apersize in PHOT_APER:
         sig_aper = sigma_aper(filter, wht, apersize)
         sig_aper[np.isnan(f_aper)] = np.nan
         f_aper[np.isnan(sig_aper)] = np.nan
+        f_total[np.isnan(sig_aper) | np.isnan(f_aper)] = np.nan
         # do again for each aperture
         sig_total = sigma_total(sig_aper, tot_corr)
         # sig_full = sigma_full(sig_total, sig_ref_total, sig_total_ref)
@@ -605,8 +607,8 @@ for apersize in PHOT_APER:
         cols['RA'] = 'ra'
         cols['DEC'] = 'dec'
         cols['EBV'] = 'ebv_mw'
-        cols[f'{KRON_MATCH_BAND}_FLUX_APER{str_aper}'] = f'faper_{KRON_MATCH_BAND}'
-        cols[f'{KRON_MATCH_BAND}_FLUXERR_APER{str_aper}'] = f'eaper_{KRON_MATCH_BAND}'
+        cols[f'{KRON_MATCH_BAND}_FLUX_APER{str_aper}_COLOR'] = f'faper_{KRON_MATCH_BAND}'
+        cols[f'{KRON_MATCH_BAND}_FLUXERR_APER{str_aper}_COLOR'] = f'eaper_{KRON_MATCH_BAND}'
         cols[f'{KRON_MATCH_BAND}_FLUX_REF_AUTO_APER{str_aper}'] = f'fauto_{KRON_MATCH_BAND}'
         cols[f'{KRON_MATCH_BAND}_RELWHT'] = f'w_{KRON_MATCH_BAND}'
 

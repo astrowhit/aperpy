@@ -43,15 +43,15 @@ translate_file = os.path.join(DIR_CONFIG, TRANSLATE_FNAME)
 params = {}
 
 if APERSIZE != 'SUPER':
-    str_aper = APERSIZE.replace('_', '')
-    if len(str_aper) == 2:
-        str_aper += '0' # 07 -> 070
-
-    params['CATALOG_FILE'] = os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_D{str_aper}_CATALOG.fits")
-    params['MAIN_OUTPUT_FILE'] = os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_D{str_aper}_CATALOG.{TEMPLATES}.eazypy")
+    nickname = APERSIZE.replace('_', '')
+    if len(nickname) == 2:
+        nickname += '0' # 07 -> 070
+    nickname = 'D'+nickname
 else:
-    params['CATALOG_FILE'] = os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_SUPER_CATALOG.fits")
-    params['MAIN_OUTPUT_FILE'] = os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_SUPER_CATALOG.{TEMPLATES}.eazypy")
+    nickname = 'SUPER'
+
+params['CATALOG_FILE'] = os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_{nickname}_CATALOG.fits")
+params['MAIN_OUTPUT_FILE'] = os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_{nickname}_CATALOG.{TEMPLATES}.eazypy")
 
 
 params['APPLY_PRIOR'] = 'n'
@@ -117,7 +117,7 @@ ez.fit_parallel(sample, n_proc=8, prior=False, beta_prior=False)
 
 ez.zphot_zspec(include_errors=True, zmax=6.5, selection=ez.cat['use_phot']==1)
 fig = plt.gcf()
-fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{PROJECT}_v{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_D{str_aper}_CATALOG_{TEMPLATES}.photoz-specz.pdf'))
+fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{PROJECT}_v{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_{nickname}_CATALOG_{TEMPLATES}.photoz-specz.pdf'))
 
 
 zout, hdu = ez.standard_output(rf_pad_width=0.5, rf_max_err=2, n_proc=2,
@@ -152,7 +152,7 @@ zout['uvj_class'] = clas
 
 zout['flag_eazy'] = np.where(np.isnan(zout['mass']) | (zout['z_phot_chi2'] > 300), 1, 0)
 
-zout.write(os.path.join(FULLDIR_CATALOGS, f'{PROJECT}_v{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_D{str_aper}_CATALOG_{TEMPLATES}.zout.fits'), overwrite=True)
+zout.write(os.path.join(FULLDIR_CATALOGS, f'{PROJECT}_v{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_{nickname}_CATALOG_{TEMPLATES}.zout.fits'), overwrite=True)
 
 import eazy.hdf5
 eazy.hdf5.write_hdf5(ez, h5file=ez.param['MAIN_OUTPUT_FILE'] + '.h5')
@@ -203,7 +203,7 @@ for test, ylabel, fname in zip((rel_diff, ztest, dmag),
     ax.set(xlim=(0.1, 5), xlabel='Observed Wavelength ($\mu$m)', ylabel=ylabel)
 
     fig.tight_layout()
-    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{PROJECT}_v{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_D{str_aper}_CATALOG_{TEMPLATES}_{fname}.pdf'))
+    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{PROJECT}_v{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_{nickname}_CATALOG_{TEMPLATES}_{fname}.pdf'))
 
 
 # 2. mod - obs vs. z, per band
@@ -260,7 +260,7 @@ for test, ylabel, fname in zip((rel_diff, ztest, dmag),
         ax.text(0.65, 0.8, f'$\Delta={delta:2.3f}$', transform=ax.transAxes, fontsize=15)
 
     fig.tight_layout()
-    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{PROJECT}_v{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_D{str_aper}_CATALOG_{TEMPLATES}_{fname}.pdf'))
+    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{PROJECT}_v{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_{nickname}_CATALOG_{TEMPLATES}_{fname}.pdf'))
 
 
 
@@ -320,7 +320,7 @@ for test, ylabel, fname in zip((rel_diff, ztest, dmag),
         ax.text(0.65, 0.8, f'$\Delta={delta:2.3f}$', transform=ax.transAxes, fontsize=15)
 
     fig.tight_layout()
-    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{PROJECT}_v{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_D{str_aper}_CATALOG_{TEMPLATES}_{fname}.pdf'))
+    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{PROJECT}_v{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_{nickname}_CATALOG_{TEMPLATES}_{fname}.pdf'))
 
 # Basic properties
 
@@ -354,4 +354,4 @@ axes[3].set(xlabel=MATCH_BAND.upper())
 axes[3].semilogy()
 
 fig.tight_layout()
-fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{PROJECT}_v{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_D{str_aper}_CATALOG_{TEMPLATES}_properties_scatter.pdf'))
+fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{PROJECT}_v{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_{nickname}_CATALOG_{TEMPLATES}_properties_scatter.pdf'))
