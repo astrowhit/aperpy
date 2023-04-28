@@ -8,7 +8,7 @@ from astropy.table import hstack
 import astropy.units as u
 from astropy.table import Table
 
-from config import DIR_CATALOGS, PHOT_APER, VERSION, PROJECT, BLEND_SHRINK_FACTOR
+from config import DIR_CATALOGS, PHOT_APER, VERSION, PROJECT, BLEND_SHRINK_FACTOR, PIXEL_SCALE
 
 DET_NICKNAME =  sys.argv[2]
 KERNEL = sys.argv[3]
@@ -57,5 +57,42 @@ for col in RELEASE.colnames:
 RELEASE.meta['APER_DIAM'] = 'ADAPTIVE'
 RELEASE.meta['SHRINK_FACTOR'] = str(BLEND_SHRINK_FACTOR)
 
-RELEASE.write(os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_SUPERCATALOG.fits"), overwrite=True)
+RELEASE.write(os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_SUPER_CATALOG.fits"), overwrite=True)
     
+
+from regions import EllipseSkyRegion, Regions, CircleSkyRegion
+from astropy.coordinates import SkyCoord
+import astropy.units as u
+import numpy as np
+
+detcoords = SkyCoord(RELEASE['ra'], RELEASE['dec'])
+pixel_scale = PIXEL_SCALE
+# mag = TARGET_ZPT - 2.5*np.log10(RELEASE['f_f444w'])
+
+print('BUILDING REGION FILE...')
+regs = []
+i = 0
+for coord, obj in zip(detcoords, RELEASE):
+    
+    objid = str(obj['id'])
+
+    if obj['use_phot'] == 0: continue
+    
+    if obj['use_circle'] == 0:
+        ellip = obj['b_image'] / obj['a_image']
+        kr = obj['kron_radius']
+        krcirc = kr * np.sqrt(obj['a_image'] * obj['b_image'])
+
+        width = 2* kr * obj['a_image'] * pixel_scale / 3600. * u.deg
+        height = 2* kr * obj['b_image'] * pixel_scale / 3600. * u.deg
+        angle = np.rad2deg(obj['theta_J2000']) * u.deg
+        regs.append(CircleSkyRegion(coord, obj['use_aper']/2.*u.arcsec))
+        regs.append(EllipseSkyRegion(coord, width, height, angle, meta={'text':objid}))
+
+        
+    else:
+        regs.append(CircleSkyRegion(coord, obj['use_aper']/2.*u.arcsec, meta={'text':objid}))
+        
+regs = np.array(regs)
+bigreg = Regions(regs)
+bigreg.write(os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_SUPER_CATALOG.reg"), overwrite=True, format='ds9')

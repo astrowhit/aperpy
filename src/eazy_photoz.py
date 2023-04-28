@@ -28,7 +28,10 @@ sys.path.insert(0, DIR_CONFIG)
 
 DET_NICKNAME =  sys.argv[2] #'LW_f277w-f356w-f444w'
 KERNEL = sys.argv[3] #'f444w'
-APERSIZE = str(sys.argv[4]).replace('.', '_')
+if 'SUPER' not in sys.argv[4]:
+    APERSIZE = str(sys.argv[4]).replace('.', '_')
+else:
+    APERSIZE = 'SUPER'
 TEMPLATES = sys.argv[5]
 
 from config import DIR_CATALOGS, DET_TYPE, TRANSLATE_FNAME, TARGET_ZP, ITERATE_ZP, FILTERS, MATCH_BAND, PROJECT, VERSION
@@ -39,12 +42,17 @@ translate_file = os.path.join(DIR_CONFIG, TRANSLATE_FNAME)
 
 params = {}
 
-str_aper = APERSIZE.replace('_', '')
-if len(str_aper) == 2:
-    str_aper += '0' # 07 -> 070
+if APERSIZE != 'SUPER':
+    str_aper = APERSIZE.replace('_', '')
+    if len(str_aper) == 2:
+        str_aper += '0' # 07 -> 070
 
-params['CATALOG_FILE'] = os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_D{str_aper}_CATALOG.fits")
-params['MAIN_OUTPUT_FILE'] = os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_D{str_aper}_CATALOG.{TEMPLATES}.eazypy")
+    params['CATALOG_FILE'] = os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_D{str_aper}_CATALOG.fits")
+    params['MAIN_OUTPUT_FILE'] = os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_D{str_aper}_CATALOG.{TEMPLATES}.eazypy")
+else:
+    params['CATALOG_FILE'] = os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_SUPER_CATALOG.fits")
+    params['MAIN_OUTPUT_FILE'] = os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_SUPER_CATALOG.{TEMPLATES}.eazypy")
+
 
 params['APPLY_PRIOR'] = 'n'
 params['PRIOR_ABZP'] = TARGET_ZP

@@ -8,7 +8,7 @@ import sep
 import os, sys, glob
 from astropy.convolution import Gaussian2DKernel, Tophat2DKernel
 from regions import EllipseSkyRegion, Regions, CircleSkyRegion
-from webb_tools import empty_apertures
+from webb_tools import empty_apertures, compute_isofluxes, find_friends
 
 import sys
 PATH_CONFIG = sys.argv[1]
@@ -126,6 +126,12 @@ catalog.add_column(Column(1+np.arange(len(catalog)), name='ID'), 0)
 detcoords = detwcs.pixel_to_world(catalog['x'], catalog['y'])
 catalog['RA'] = [c.ra for c in detcoords]
 catalog['DEC'] = [c.dec for c in detcoords]
+
+print('CONSTRUCTING ASSOCIATION TABLE OF NEIGHBORS...')
+friends = find_friends(segmap)
+import pickle
+with open(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_friends.pickle'), 'wb') as handle:
+    pickle.dump(friends, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 print('BUILDING REGION FILE...')
 regs = []
@@ -277,6 +283,12 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
     area = np.sum(np.isfinite(photwht) & (photwht > 0.) & ~np.isnan(detsci)) * (pixel_scale  / 3600)**2
     print(f'Usable area of photometry image: {area} deg2')
     areas[PHOT_NICKNAME] = area
+
+
+    # Compute isophotal fluxes based on segmentation
+    print(f"{PHOT_NICKNAME} :: MEASURING PHOTOMETRY in isophotal segments...")
+    isofluxes = compute_isofluxes(segmap.ravel().astype(np.int64), photsci.ravel().astype(np.float64))
+    catalog[f'FLUX_ISO'] = isofluxes * conv_flux(PHOT_ZPT)
 
     # Hack the x,y coords
     xphot,yphot = photwcs.wcs_world2pix(catalog['RA'], catalog['DEC'],1)

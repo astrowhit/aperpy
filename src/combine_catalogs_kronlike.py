@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from astropy.io import fits, ascii
+from astropy.io import fits
 from astropy.table import Table, hstack, Column, vstack, MaskedColumn
 import numpy as np
 import os, sys, glob
@@ -96,7 +96,7 @@ for filter in USE_FILTERS:
 
     # rename columns if needed:
     for coln in cat.colnames:
-        if 'RADIUS' in coln or 'APER' in coln or 'FLAG' in coln or 'AUTO' in coln or 'WHT' in coln:
+        if 'RADIUS' in coln or 'APER' in coln or 'FLAG' in coln or 'AUTO' in coln or 'WHT' in coln or 'ISO' in coln:
 
             newcol = f'{filter}_{coln}'.replace('.', '_')
             # print(f'   {cat[coln].name} --> {newcol}')
@@ -148,11 +148,24 @@ sel_badkron |= ~np.isfinite(wht_ref) | (wht_ref <= 0)
 maincat['iso_area'] = maincat['tnpix'] * PIXEL_SCALE**2
 maincat['iso_area'].unit = u.arcsec**2
 
+
 # Check if object is really bright in its group, if so then sel_badkron = False
+isofluxes = maincat[f'{KRON_MATCH_BAND}_FLUX_ISO']
+is_dominant = np.ones(len(isofluxes), dtype=bool) # assume dominance. Things without friends should not be flagged as blends.
+import pickle
+assoc = pickle.load(open(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_friends.pickle'), 'rb'))
+for i, id in enumerate(maincat['ID']):
+    if len(assoc[id]) == 0: continue # it has no friends :(
+    friends = np.isin(maincat['ID'], assoc[id])
+    is_dominant[i] = np.all(isofluxes[i] > isofluxes[friends])
 kronrad_area = np.pi * (maincat[f'{KRON_MATCH_BAND}_KRON_RADIUS_CIRC{mask}'] * PIXEL_SCALE)**2
-sel_badkron[(maincat['flag'] > 0) & ((1.5*maincat[f'iso_area']) < kronrad_area)] = True
-# print('!!!!!!!!!', np.sum(sel_badkron), np.unique(maincat['flag'], return_counts=True))
-# raise
+
+# is_dominant = np.zeros(len(is_dominant), dtype=bool) # !!!!!!!!!!!!!
+
+sel_badkron[(maincat['flag'] > 0)] = True
+sel_badkron[sel_badkron & (kronrad_area < maincat[f'iso_area'])] = False
+sel_badkron[sel_badkron & (is_dominant & (kronrad_area < 1.5*maincat[f'iso_area']))] = False
+print(f'Found {np.sum(sel_badkron)} objects with unreliable kron radii (e.g. blends)')
 
 for filter in USE_FILTERS:
     relwht = maincat[f'{filter}_SRC_MEDWHT'] / maincat[f'{filter}_MAX_WHT']

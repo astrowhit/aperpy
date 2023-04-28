@@ -385,6 +385,30 @@ def psf_cog(psfmodel, filt, nearrad=None, fix_extrapolation=True):
         output[output>1] = 1.0
         return output
 
+from numba import njit
+@njit
+def compute_isofluxes(seg_flat, sci_flat):
+    isofluxes = np.zeros(np.max(seg_flat))
+    for idx, val in zip(seg_flat, sci_flat):
+        if idx == 0: continue
+        isofluxes[idx-1] += val
+    return isofluxes
+
+def find_friends(seg):
+    from scipy.ndimage import label
+    segmask = np.where(seg > 0, 1, 0)
+    groups, ngroups = label(segmask)
+    ids, idx = np.unique(seg.ravel(), return_index=True)
+    idx = idx[ids>0]
+    ids = ids[ids>0]
+    group_assoc = groups.ravel()[idx]
+    friends = {}
+    for id in ids:
+        group_id = group_assoc[ids==id]
+        fr = ids[group_assoc==group_id]
+        friends[id] = fr[fr!=id]
+    return friends
+
 def get_date():
     from datetime import datetime
     now = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
