@@ -385,8 +385,8 @@ def psf_cog(psfmodel, filt, nearrad=None, fix_extrapolation=True):
         output[output>1] = 1.0
         return output
 
-from numba import njit
-@njit
+# from numba import njit
+# @njit
 def compute_isofluxes(seg_flat, sci_flat):
     isofluxes = np.zeros(np.max(seg_flat))
     for idx, val in zip(seg_flat, sci_flat):

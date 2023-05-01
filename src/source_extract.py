@@ -22,6 +22,7 @@ from config import TARGET_ZP, PHOT_APER, PHOT_AUTOPARAMS, PHOT_FLUXRADIUS, DETEC
 DET_NICKNAME = sys.argv[2] #'LW_f277w-f356w-f444w'
 KERNEL = sys.argv[3] # f444w or f160w or None
 
+
 DET_TYPE = 'noise-equal'
 FULLDIR_CATALOGS = os.path.join(DIR_CATALOGS, f'{DET_NICKNAME}_{DET_TYPE}/{KERNEL}/')
 if not os.path.exists(FULLDIR_CATALOGS):
@@ -163,7 +164,7 @@ if FILTERS is None:
 
 PATH_KRONSCI = None
 if (KERNEL != 'None') & (USE_COMBINED_KRON_IMAGE):
-    print(f'Constructing a noise-equalized co-add for Kron measurements based on {KRON_COMBINED_BANDS}')
+    print(f"Constructing a noise-equalized co-add for Kron measurements based on {KRON_COMBINED_BANDS[DET_NICKNAME.split('_')[0]]}")
     outpath = os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_KRON_K{KERNEL}')
     trypath = f'{outpath}_optavg.fits'
     if IS_COMPRESSED:
@@ -181,7 +182,7 @@ if (KERNEL != 'None') & (USE_COMBINED_KRON_IMAGE):
         weight_fnames = {}
 
         # gather directories
-        for PHOT_NICKNAME in KRON_COMBINED_BANDS:
+        for PHOT_NICKNAME in KRON_COMBINED_BANDS[DET_NICKNAME.split('_')[0]]:
             ext=f'_{KERNEL}-matched'
             dir_weight = DIR_OUTPUT
             print(DIR_OUTPUT)
@@ -193,8 +194,10 @@ if (KERNEL != 'None') & (USE_COMBINED_KRON_IMAGE):
             science_fnames[PHOT_NICKNAME] = glob.glob(os.path.join(DIR_OUTPUT, PHOTSCI_NAME))[0]
             weight_fnames[PHOT_NICKNAME] = glob.glob(os.path.join(DIR_OUTPUT, PHOTWHT_NAME))[0]
 
+        print(science_fnames)
+
         # run it
-        noise_equalized(KRON_COMBINED_BANDS, outpath,
+        noise_equalized(KRON_COMBINED_BANDS[DET_NICKNAME.split('_')[0]], outpath,
                     science_fnames= science_fnames,
                     weight_fnames= weight_fnames,
                     is_compressed=IS_COMPRESSED)
@@ -212,7 +215,7 @@ stats = {}
 KRON_MATCH_BAND = None
 USE_FILTERS = FILTERS
 if (KERNEL != 'None') & (USE_COMBINED_KRON_IMAGE):
-    KRON_MATCH_BAND = '+'.join(KRON_COMBINED_BANDS)
+    KRON_MATCH_BAND = '+'.join(KRON_COMBINED_BANDS[DET_NICKNAME.split('_')[0]])
     USE_FILTERS = [KRON_MATCH_BAND, ] + list(FILTERS)
 
 for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):

@@ -11,11 +11,13 @@ import sys
 PATH_CONFIG = sys.argv[1]
 sys.path.insert(0, PATH_CONFIG)
 
-from config import DIR_IMAGES, SW_FILTERS, WEBB_FILTERS, WHT_REPLACE
+from config import DIR_IMAGES, SW_FILTERS, WEBB_FILTERS, WHT_REPLACE, BORROW_HEADER_FILE
 
 print(DIR_IMAGES)
 SCI_FILENAMES = list(glob.glob(DIR_IMAGES+f'/*_sci.fits*'))
 print(SCI_FILENAMES)
+
+BORROW_HEADER = fits.getheader(BORROW_HEADER_FILE)
 
 for filename in SCI_FILENAMES:
     # if 'f090w' not in filename: continue
@@ -45,22 +47,23 @@ for filename in SCI_FILENAMES:
     block_wht = block_reduce(wht, 2, func=np.sum) / 4**2
     block_sci = block_reduce(sci*wht, 2, func=np.sum) / block_wht / 4
 
+    cols = ['CRPIX1',
+    'CRPIX2',
+    'CD1_1',
+    'CD2_2',
+    'CDELT1',
+    'CDELT2',
+    'CUNIT1',
+    'CUNIT2',
+    'CTYPE1',
+    'CTYPE2',
+    'CRVAL1',
+    'CRVAL2',
+    'LONPOLE',
+    'LATPOLE']
 
-    # update CD matrix for 40 mas + CRPIX
-    header['CRPIX1']  =               6529.0 # / Pixel coordinate of reference point
-    header['CRPIX2']  =               4570.0 # / Pixel coordinate of reference point
-    header['CD1_1']   = -1.1111111111111E-05 # / Coordinate transformation matrix element
-    header['CD2_2']   =  1.1111111111111E-05 # / Coordinate transformation matrix element
-    header['CDELT1']  =                  1.0 # / [deg] Coordinate increment at reference point
-    header['CDELT2']  =                  1.0 # / [deg] Coordinate increment at reference point
-    header['CUNIT1']  = 'deg'                # / Units of coordinate increment and value
-    header['CUNIT2']  = 'deg'                # / Units of coordinate increment and value
-    header['CTYPE1']  = 'RA---TAN'           # / Right ascension, gnomonic projection
-    header['CTYPE2']  = 'DEC--TAN'           # / Declination, gnomonic projection
-    header['CRVAL1']  =               3.5875 # / [deg] Coordinate value at reference point
-    header['CRVAL2']  =          -30.3966667 # / [deg] Coordinate value at reference point
-    header['LONPOLE'] =                180.0 # / [deg] Native longitude of celestial pole
-    header['LATPOLE'] =          -30.3966667 # / [deg] Native latitude of celestial pole
+    for coln in cols:
+        header[coln] = BORROW_HEADER[coln]
 
     if 'bcgs' in filename: # HACK to keep things working smoothly for uncover...
         fits.PrimaryHDU(block_sci, header=header).writeto(filename.replace('_bcgs_sci', '_block40_bcgs_sci'))

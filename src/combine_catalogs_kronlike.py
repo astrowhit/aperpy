@@ -82,7 +82,7 @@ def flux_total(flux_aper, tot_cor):
 KRON_MATCH_BAND = None
 USE_FILTERS = FILTERS
 if (KERNEL != 'None') & (USE_COMBINED_KRON_IMAGE):
-    KRON_MATCH_BAND = '+'.join(KRON_COMBINED_BANDS)
+    KRON_MATCH_BAND = '+'.join(KRON_COMBINED_BANDS[DET_NICKNAME.split('_')[0]])
     USE_FILTERS = [KRON_MATCH_BAND, ] + list(FILTERS)
 
 for filter in USE_FILTERS:
@@ -117,7 +117,7 @@ for filter in USE_FILTERS:
 outfilename = os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_COMBINED_CATALOG.fits')
 
 if USE_COMBINED_KRON_IMAGE:
-    KRON_MATCH_BAND = '+'.join(KRON_COMBINED_BANDS)
+    KRON_MATCH_BAND = '+'.join(KRON_COMBINED_BANDS[DET_NICKNAME.split('_')[0]])
 else:
     KRON_MATCH_BAND = MATCH_BAND # behaves as usual with a single ref band
 
@@ -675,7 +675,7 @@ for apersize in PHOT_APER:
         badsel = np.nansum(np.isfinite(fluxes), 0) == 0
         print(f'Found {np.sum(badsel)} objects with NO viable photometry whatsoever. {np.sum(badsel & (subcat["use_phot"]==0))} already flagged. Flagging rest.')
         subcat['use_phot'][badsel] = 0
-        subcat['flag_nophot'] = np.where(badsel, 1, 0)
+        subcat.add_column(Column(np.where(badsel, 1, 0), name='flag_nophot', dtype='i4'), 1+subcat.colnames.index('use_phot'))
         for coln in subcat.colnames:
             if 'radius' in coln:
                 subcat[coln][badsel] = np.nan
