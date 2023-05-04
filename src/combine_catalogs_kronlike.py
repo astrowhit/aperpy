@@ -39,7 +39,7 @@ def DIR_KERNEL(band):
     return glob.glob(os.path.join(DIR_KERNELS, f'{KERNEL}*/{band.lower()}_kernel.fits'))[0]
 stats = np.load(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_emptyaper_stats.npy'), allow_pickle=True).item()
 
-FNAME_REF_PSF = f'{DIR_PSFS}/psf_{FIELD}_{MATCH_BAND.upper()}_{PSF_FOV}arcsec.fits'
+FNAME_REF_PSF = f'{DIR_PSFS}/{MATCH_BAND.lower()}_psf_unmatched.fits'
 
 def sigma_aper(filter, weight, apersize=0.7):
     # Equation 5
@@ -141,8 +141,8 @@ sig1 = sigma1['fit_std']
 wht_ref = maincat[f'{KRON_MATCH_BAND}_SRC_MEDWHT']
 f_ref_auto = maincat[f'{KRON_MATCH_BAND}_FLUX_AUTO{mask}'].copy()
 sel_badkron = (f_ref_auto <= 0) | ~np.isfinite(f_ref_auto)
-sel_badkron |= ~np.isfinite(wht_ref) | (wht_ref <= 0) 
-# sel_badkron |= (maincat['flag'] > 0) 
+sel_badkron |= ~np.isfinite(wht_ref) | (wht_ref <= 0)
+# sel_badkron |= (maincat['flag'] > 0)
 
 # some extra columns
 maincat['iso_area'] = maincat['tnpix'] * PIXEL_SCALE**2
@@ -183,8 +183,8 @@ for apersize in PHOT_APER:
 
     f_ref_aper = maincat[f'{KRON_MATCH_BAND}_FLUX_APER{str_aper}'].copy()
 
-    sel_badkron |= np.isnan(f_ref_aper) 
-    use_circle = (kronrad_circ < (apersize / PIXEL_SCALE / 2.)) | (f_ref_auto <= f_ref_aper) | sel_badkron # either too small (not flagged) OR not reliable.    
+    sel_badkron |= np.isnan(f_ref_aper)
+    use_circle = (kronrad_circ < (apersize / PIXEL_SCALE / 2.)) | (f_ref_auto <= f_ref_aper) | sel_badkron # either too small (not flagged) OR not reliable.
 
     kronrad_circ[use_circle] = apersize / PIXEL_SCALE / 2.
     # print(apersize, np.sum(use_circle), np.min(kronrad_circ), apersize / PIXEL_SCALE / 2.)
@@ -618,7 +618,7 @@ for apersize in PHOT_APER:
             cols[f'{filter}_RELWHT'] = f'w_{filter}'
 
         cols[f'TOTAL_CORR_APER{str_aper}'] = 'tot_cor'
-    
+
         # cols[f'{KRON_MATCH_BAND}_FLAG_AUTO{mask}'] = 'flag_auto'
         cols[f'{KRON_MATCH_BAND}_KRON_RADIUS_APER{str_aper}'] = 'kron_radius'   # this is the modified KR where KR = sci_aper/2 for small things.
         cols[f'{KRON_MATCH_BAND}_KRON_RADIUS_CIRC_APER{str_aper}'] = 'kron_radius_circ' # ditto
@@ -670,7 +670,7 @@ for apersize in PHOT_APER:
             if 'f_' in coln:
                 badsel = np.isnan(subcat[coln]) | ~np.isfinite(subcat[coln])
                 subcat[coln.replace('f_', 'w_')][badsel] = np.nan
-                
+
         fluxes = np.array([subcat[coln] for coln in subcat.colnames if 'f_' in coln])
         badsel = np.nansum(np.isfinite(fluxes), 0) == 0
         print(f'Found {np.sum(badsel)} objects with NO viable photometry whatsoever. {np.sum(badsel & (subcat["use_phot"]==0))} already flagged. Flagging rest.')

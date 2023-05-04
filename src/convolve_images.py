@@ -60,7 +60,7 @@ for filename in SCI_FILENAMES:
             hdul.close()
         else:
             print(outsciname)
-            print(f'{band.upper} convolved science image exists, I will not overwrite')
+            print(f'{band.upper()} convolved science image exists, I will not overwrite')
 
         if not os.path.exists(outwhtname):
             print('Running weight image convolution...')
@@ -72,7 +72,7 @@ for filename in SCI_FILENAMES:
             print('Wrote weight file to ', outwhtname)
         else:
             print(outwhtname)
-            print(f'{band.upper} convolved weight image exists, I will not overwrite')
+            print(f'{band.upper()} convolved weight image exists, I will not overwrite')
 
 
         print(f'Finished in {time.time()-tstart:2.2f}s')
