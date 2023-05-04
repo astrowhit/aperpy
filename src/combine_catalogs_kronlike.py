@@ -83,6 +83,8 @@ KRON_MATCH_BAND = None
 USE_FILTERS = FILTERS
 if (KERNEL != 'None') & (USE_COMBINED_KRON_IMAGE):
     KRON_MATCH_BAND = '+'.join(KRON_COMBINED_BANDS[DET_NICKNAME.split('_')[0]])
+    if '+' not in KRON_MATCH_BAND:
+        KRON_MATCH_BAND = 'sb-' + KRON_MATCH_BAND
     USE_FILTERS = [KRON_MATCH_BAND, ] + list(FILTERS)
 
 for filter in USE_FILTERS:
@@ -116,8 +118,12 @@ for filter in USE_FILTERS:
 
 outfilename = os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_COMBINED_CATALOG.fits')
 
+# print(maincat.colnames)
+
 if USE_COMBINED_KRON_IMAGE:
     KRON_MATCH_BAND = '+'.join(KRON_COMBINED_BANDS[DET_NICKNAME.split('_')[0]])
+    if '+' not in KRON_MATCH_BAND:
+        KRON_MATCH_BAND = 'sb-' + KRON_MATCH_BAND
 else:
     KRON_MATCH_BAND = MATCH_BAND # behaves as usual with a single ref band
 
@@ -132,6 +138,7 @@ else:
 mask = ''
 if PHOT_USEMASK:
     mask = '_masked'
+
 
 # Get some static refband stuff
 plotname = os.path.join(FULLDIR_CATALOGS, f'figures/aper_{KRON_MATCH_BAND}_nmad.pdf')
@@ -475,7 +482,7 @@ if PS_WEBB_USE or PS_HST_USE or BP_USE:
 
     axes[0].legend(loc='upper left', ncol=1, fontsize=11, markerscale=1.5)
     fig.tight_layout()
-    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_K{KERNEL}_star_id.pdf'))
+    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_K{KERNEL}_star_id.png'))
 
 
 # # bad kron radius flag

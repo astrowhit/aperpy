@@ -16,7 +16,7 @@ sys.path.insert(0, PATH_CONFIG)
 
 from config import TARGET_ZP, PHOT_APER, PHOT_AUTOPARAMS, PHOT_FLUXRADIUS, DETECTION_PARAMS, SKYEXT,\
          DIR_IMAGES, PHOT_ZP, FILTERS, DIR_OUTPUT, DIR_CATALOGS, IS_COMPRESSED, PIXEL_SCALE, PHOT_KRONPARAM,\
-             USE_COMBINED_KRON_IMAGE, KRON_COMBINED_BANDS, KRON_ZPT
+             USE_COMBINED_KRON_IMAGE, KRON_COMBINED_BANDS, KRON_ZPT, PHOT_EMPTYAPER_DIAMS
 
 # MAIN PARAMETERS
 DET_NICKNAME = sys.argv[2] #'LW_f277w-f356w-f444w'
@@ -216,6 +216,8 @@ KRON_MATCH_BAND = None
 USE_FILTERS = FILTERS
 if (KERNEL != 'None') & (USE_COMBINED_KRON_IMAGE):
     KRON_MATCH_BAND = '+'.join(KRON_COMBINED_BANDS[DET_NICKNAME.split('_')[0]])
+    if '+' not in KRON_MATCH_BAND:
+        KRON_MATCH_BAND = 'sb-' + KRON_MATCH_BAND
     USE_FILTERS = [KRON_MATCH_BAND, ] + list(FILTERS)
 
 for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
@@ -423,7 +425,7 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
     catalog['MAX_WHT'] = np.nanpercentile(photwht_corr[photwht_corr>0], 99)
 
     # COMPUTE EMPTY APERTURE ERRORS + SAVE TO MASTER FILE
-    empty_aper = list(PHOT_APER)+list(np.linspace(PHOT_APER[0], PHOT_APER[-1], 30))
+    empty_aper = list(PHOT_APER)+list(PHOT_EMPTYAPER_DIAMS)
     empty_aper = np.sort(empty_aper)
     plotname = os.path.join(FULLDIR_CATALOGS, f'figures/{PHOT_NICKNAME}_K{KERNEL}_emptyaper.pdf')
     # zpt_factor = conv_flux(PHOT_ZPT)
