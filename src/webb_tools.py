@@ -499,10 +499,10 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, precomp=None, row=
     import matplotlib.pyplot as plt
     import glob, sys
 
+    import numpy as np
+    np.seterr(all="ignore")
+
     coord = SkyCoord(ra=ra*u.deg, dec=dec*u.deg)
-    print(coord)
-
-
     hdul = fits.HDUList()
 
     if include_rgb:
@@ -516,7 +516,6 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, precomp=None, row=
 
     for filt, ax in zip(filters, axes.flatten()):
 
-        # print(filt)
         if precomp is None:
             fn = glob.glob(os.path.join(dir_images, f'*{filt}*_sci*.fits.gz'))[0]
             if not os.path.exists(fn):
@@ -535,7 +534,7 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, precomp=None, row=
 
         if not wcs.footprint_contains(coord):
             print(f'CRITICAL -- {coord} is not within the image footprint!')
-            sys.exit()
+            # sys.exit()
         try:
             cutout = Cutout2D(img, position=coord, size=size*u.arcsec, wcs=wcs, copy=True)
         except:

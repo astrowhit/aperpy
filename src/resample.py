@@ -13,20 +13,21 @@ sys.path.insert(0, PATH_CONFIG)
 
 from config import DIR_IMAGES, SW_FILTERS, WEBB_FILTERS, WHT_REPLACE, BORROW_HEADER_FILE
 
-print(DIR_IMAGES)
+# print(DIR_IMAGES)
 SCI_FILENAMES = list(glob.glob(DIR_IMAGES+f'/*_sci.fits*'))
-print(SCI_FILENAMES)
+# print(SCI_FILENAMES)
 
 BORROW_HEADER = fits.getheader(BORROW_HEADER_FILE)
 
 for filename in SCI_FILENAMES:
     # if 'f090w' not in filename: continue
-    print(filename)
+    # print(filename)
 
-    for band in WEBB_FILTERS:
+    is_ok = False
+    for band in SW_FILTERS:
         if band.lower() in filename:
-            break
-    if band.upper() not in SW_FILTERS:
+            is_ok = True
+    if not is_ok:
         continue
 
 
@@ -63,15 +64,19 @@ for filename in SCI_FILENAMES:
     'LATPOLE']
 
     for coln in cols:
+        # print(header[coln], BORROW_HEADER[coln])
         header[coln] = BORROW_HEADER[coln]
+        # print(header[coln])
 
     if 'bcgs' in filename: # HACK to keep things working smoothly for uncover...
         fits.PrimaryHDU(block_sci, header=header).writeto(filename.replace('_bcgs_sci', '_block40_bcgs_sci'))
         fits.PrimaryHDU(block_wht, header=header).writeto(filename.replace('_bcgs_sci', '_block40_wht'))
+        print(filename.replace('_bcgs_sci', '_block40_bcgs_sci'))
     else:
         # print(filename.replace('_sci', '_block40_sci'))
         fits.PrimaryHDU(block_sci, header=header).writeto(filename.replace('_sci', '_block40_sci'))
         fits.PrimaryHDU(block_wht, header=header).writeto(filename.replace('_sci', '_block40_wht'))
+        print(filename.replace('_sci', '_block40_sci'))
 
     # # stitch together
     # for itype in ('sci', 'wht'):
