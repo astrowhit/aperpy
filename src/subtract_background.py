@@ -29,6 +29,7 @@ def round_up_to_odd(f):
 
 # 150, 200, 356, 444
 for filename in SCI_FILENAMES:
+    # if 'f160w' not in filename: continue
     if np.sum([(filt in filename) for filt in FILTERS]) == 0: continue
     fn_sci = filename
     fn_wht = filename.replace('sci', 'wht')

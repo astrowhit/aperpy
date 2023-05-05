@@ -118,6 +118,37 @@ for filter in USE_FILTERS:
 
 outfilename = os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_COMBINED_CATALOG.fits')
 
+for filter in USE_FILTERS:
+    filename = os.path.join(FULLDIR_CATALOGS, f'{filter}_{DET_NICKNAME}_KNone_PHOT_CATALOG.fits')
+    if not os.path.exists(filename):
+        print(f'ERROR :: {filename} not found!')
+        sys.exit()
+
+    cat = Table.read(filename)
+    # print(filter)
+
+    # rename columns if needed:
+    for coln in cat.colnames:
+        if 'RADIUS' in coln or 'APER' in coln or 'FLAG' in coln or 'AUTO' in coln or 'WHT' in coln or 'ISO' in coln:
+
+            newcol = f'{filter}_{coln}'.replace('.', '_')
+            # print(f'   {cat[coln].name} --> {newcol}')
+            cat[coln].name = newcol
+
+            try:
+                cat[newcol] = cat[newcol].filled(np.nan)
+                # print('Filled with NaN!')
+            except:
+                pass
+
+    if filter == USE_FILTERS[0]:
+        maincat_unmatched = cat
+    else:
+        newcols = [coln for coln in cat.colnames if coln not in maincat_unmatched.colnames]
+        maincat_unmatched = hstack([maincat_unmatched, cat[newcols]])
+
+outfilename = os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_COMBINED_CATALOG.fits')
+
 # print(maincat.colnames)
 
 if USE_COMBINED_KRON_IMAGE:
@@ -339,8 +370,8 @@ SEL_STAR = np.zeros(len(maincat),dtype=bool)
 if PS_HST_USE:
     str_aper = str(PS_HST_APERSIZE).replace('.', '_')
     mag_hst = TARGET_ZP - 2.5*np.log10(maincat[f'{PS_HST_FILT}_FLUX_APER{str_aper}_TOTAL'])
-    size_hst = maincat[f'{PS_HST_FILT}_FLUX_APER{str(PS_HST_FLUXRATIO[0]).replace(".", "_")}_COLOR']  \
-                    / maincat[f'{PS_HST_FILT}_FLUX_APER{str(PS_HST_FLUXRATIO[1]).replace(".", "_")}_COLOR']
+    size_hst = maincat_unmatched[f'{PS_HST_FILT}_FLUX_APER{str(PS_HST_FLUXRATIO[0]).replace(".", "_")}']  \
+                    / maincat_unmatched[f'{PS_HST_FILT}_FLUX_APER{str(PS_HST_FLUXRATIO[1]).replace(".", "_")}']
 
     SEL_HST = (size_hst > PS_HST_FLUXRATIO_RANGE[0]) & (size_hst < PS_HST_FLUXRATIO_RANGE[1]) & (mag_hst < PS_HST_MAGLIMIT)
     print(f'Flagged {np.sum(SEL_HST)} objects as point-like (stars) from {PS_HST_FILT}')
@@ -352,8 +383,8 @@ if PS_HST_USE:
 if PS_WEBB_USE:
     str_aper = str(PS_WEBB_APERSIZE).replace('.', '_')
     mag = TARGET_ZP - 2.5*np.log10(maincat[f'{PS_WEBB_FILT}_FLUX_APER{str_aper}_TOTAL'])
-    size = maincat[f'{PS_WEBB_FILT}_FLUX_APER{str(PS_WEBB_FLUXRATIO[0]).replace(".", "_")}_COLOR']  \
-                    / maincat[f'{PS_WEBB_FILT}_FLUX_APER{str(PS_WEBB_FLUXRATIO[1]).replace(".", "_")}_COLOR']
+    size = maincat_unmatched[f'{PS_WEBB_FILT}_FLUX_APER{str(PS_WEBB_FLUXRATIO[0]).replace(".", "_")}']  \
+                    / maincat_unmatched[f'{PS_WEBB_FILT}_FLUX_APER{str(PS_WEBB_FLUXRATIO[1]).replace(".", "_")}']
     SEL_WEBB = (size > PS_WEBB_FLUXRATIO_RANGE[0]) & (size < PS_WEBB_FLUXRATIO_RANGE[1]) & (mag < PS_WEBB_MAGLIMIT)
     print(f'Flagged {np.sum(SEL_WEBB)} objects as point-like (stars) from {PS_WEBB_FILT}')
     maincat.add_column(Column(SEL_WEBB.astype(int), name='star_webb_flag'))
@@ -411,8 +442,8 @@ if BP_USE:
     str_aper = str(BP_APERSIZE).replace('.', '_')
     BP_FILT_SEL = BP_FILT[DET_NICKNAME.split('_')[0]]
     mag_bp = TARGET_ZP - 2.5*np.log10(maincat[f'{BP_FILT_SEL}_FLUX_APER{str_aper}_TOTAL'])
-    size_bp = maincat[f'{BP_FILT_SEL}_FLUX_APER{str(BP_FLUXRATIO[0]).replace(".", "_")}_COLOR']  \
-                    / maincat[f'{BP_FILT_SEL}_FLUX_APER{str(BP_FLUXRATIO[1]).replace(".", "_")}_COLOR']
+    size_bp = maincat_unmatched[f'{BP_FILT_SEL}_FLUX_APER{str(BP_FLUXRATIO[0]).replace(".", "_")}']  \
+                    / maincat_unmatched[f'{BP_FILT_SEL}_FLUX_APER{str(BP_FLUXRATIO[1]).replace(".", "_")}']
     SEL_LWBADPIXEL = (size_bp > BP_FLUXRATIO_RANGE[0]) & (size_bp < BP_FLUXRATIO_RANGE[1])
     SEL_LWBADPIXEL &= (mag_bp < BP_MAGLIMIT)
     print(f'Flagged {np.sum(SEL_LWBADPIXEL)} objects as bad pixels')
