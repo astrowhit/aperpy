@@ -26,7 +26,7 @@ from config import FILTERS, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, DIR_OUTPUT, \
     FN_EXTRABAD, EXTRABAD_XMATCH_RADIUS, EXTRABAD_LABEL, BK_MINSIZE, BK_SLOPE, PATH_BADOBJECT, \
     GLASS_MASK, SATURATEDSTAR_APERSIZE, PS_WEBB_USE, PS_HST_USE, GAIA_USE, BADWHT_USE, EXTRABAD_USE, \
     BP_USE, BADOBJECT_USE, PHOT_USEMASK, PROJECT, VERSION, PSF_FOV, USE_COMBINED_KRON_IMAGE, KRON_COMBINED_BANDS, \
-    XCAT_FILENAME, XCAT_NAME
+    XCAT_FILENAME, XCAT_NAME, ANBP_USE, ANBP_XMATCH_RADIUS, IS_COMPRESSED
 
 
 DET_NICKNAME =  sys.argv[2] #'LW_f277w-f356w-f444w'
@@ -421,7 +421,7 @@ if BADWHT_USE:
     weightmap = fits.getdata(FN_BADWHT) # this is lazy, but OK.
     str_aper = str(SATURATEDSTAR_APERSIZE).replace('.', '_')
     mag_sat = TARGET_ZP - 2.5*np.log10(maincat[f'{SATURATEDSTAR_FILT}_FLUX_APER{str_aper}_TOTAL'])
-    SEL_BADWHT = (weightmap[maincat['y'].astype(int).value, maincat['x'].astype(int).value] == 0)
+    SEL_BADWHT = (weightmap[maincat['y'].astype(int).value, maincat['x'].astype(int).value] == 1)
     sw_wht = maincat[f'{SATURATEDSTAR_FILT}_SRC_MEDWHT'].copy()
     sw_wht[np.isnan(sw_wht)] = 0
     SEL_BADWHT[sw_wht <= 0] = 0
@@ -436,6 +436,35 @@ maincat.add_column(Column(SEL_STAR.astype(int), name='star_flag'))
 
 SEL_GEN = SEL_LOWSNR | SEL_STAR
 
+maincat.add_column(Column(np.zeros(len(maincat)).astype(np.int8), name='combined_artifact_flag'))
+# artifacts near saturated objects
+if ANBP_USE:
+    DETERR_NAME = f'{DET_NICKNAME}_{DET_TYPE}/{DET_NICKNAME}_opterr.fits'
+    if IS_COMPRESSED:
+        DETERR_NAME +='.gz'
+    from astropy.wcs import WCS
+    wcs = WCS(fits.getheader(os.path.join(DIR_CATALOGS, DETERR_NAME)))
+    det_err = fits.getdata(os.path.join(DIR_CATALOGS, DETERR_NAME))
+    badmap = np.where(det_err == 0, 1, 0)
+    from scipy.ndimage import label, center_of_mass
+    labels, __ = label(badmap)
+    ulabels, npix = np.unique(labels, return_counts=True)
+    ulabels = ulabels[(npix<1000) & (npix>10)]
+    npix = npix[npix<1000] # gets rid of anything too big (e.g. background)
+    coms = np.array(center_of_mass(badmap.T, labels.T, ulabels))
+    tab = Table([ulabels, npix], names=['label', 'npix'])
+    coords = wcs.all_pix2world(coms, 1)
+    tab['ra'] = coords.T[0]
+    tab['dec'] = coords.T[1]
+    from webb_tools import crossmatch
+    mCATALOG_anbp, mtab_anbp = crossmatch(maincat, tab, [ANBP_XMATCH_RADIUS,])
+    # tab.write('labels_table.fits', format='fits')
+    SEL_ANBP = np.isin(maincat['ID'], mCATALOG_anbp['ID'])
+    maincat.add_column(Column(SEL_ANBP.astype(int), name='artifacts_near_badpixels_flag'))
+    maincat['combined_artifact_flag'][SEL_ANBP] = 1
+    print(f'Flagged {np.sum(SEL_ANBP)} objects as being artifacts near staturated pixels (stars) or edges')
+    SEL_GEN |= SEL_ANBP
+    del det_err, labels, badmap
 
 # bad pixel flag
 if BP_USE:
@@ -448,6 +477,7 @@ if BP_USE:
     SEL_LWBADPIXEL &= (mag_bp < BP_MAGLIMIT)
     print(f'Flagged {np.sum(SEL_LWBADPIXEL)} objects as bad pixels')
     maincat.add_column(Column(SEL_LWBADPIXEL.astype(int), name='bad_pixel_lw_flag'))
+    maincat['combined_artifact_flag'][SEL_LWBADPIXEL] = 1
     # SEL_BADPIX = SEL_LWBADPIXEL | SEL_BADWHT
     SEL_GEN |= SEL_LWBADPIXEL
 
@@ -672,7 +702,7 @@ for apersize in PHOT_APER:
         cols['star_flag'] = 'flag_star'
         # cols['bad_wht_flag'] = 'flag_badwht'
         if BP_USE:
-            cols['bad_pixel_lw_flag'] = 'flag_artifact'
+            cols['combined_artifact_flag'] = 'flag_artifact'
         if EXTRABAD_USE:
             cols['extrabad_flag'] = 'flag_nearbcg'
         if PATH_BADOBJECT is not None:

@@ -488,7 +488,19 @@ def get_psf(filt, field='uncover', angle=None, fov=4, og_fov=10, pixscl=None, da
 
     return rotated
 
+def create_circular_mask(h, w, center=None, radius=None):
 
+    if center is None: # use the middle of the image
+        center = [int(w/2), int(h/2)]
+    if radius is None: # use the smallest distance between the center and image walls
+        radius = min(center[0], center[1], w-center[0], h-center[1])
+
+    Y, X = np.ogrid[:h, :w]
+    dist_from_center = np.sqrt((X - center[0])**2 + (Y-center[1])**2)
+
+    mask = np.zeros((h, w), dtype=int)
+    mask[dist_from_center <= radius] = 1
+    return mask
 
 def make_cutout(ra, dec, size, nickname, filters, dir_images, precomp=None, row=None, plot=True, write=True, target_zp=28.9, include_rgb=False, rgb=['f444w', 'f277w', 'f115w'], redshift=-99, matched_pattern='', dir='.'):
     import astropy.units as u

@@ -95,4 +95,21 @@ for coord, obj in zip(detcoords, RELEASE):
         
 regs = np.array(regs)
 bigreg = Regions(regs)
-bigreg.write(os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_SUPER_CATALOG.reg"), overwrite=True, format='ds9')
+bigreg.write(os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_SUPER_OBJECTS.reg"), overwrite=True, format='ds9')
+
+print('BUILDING REGION FILE...')
+minaper = np.nanmin(obj['use_aper'][obj['use_aper']>0])
+regs = []
+i = 0
+for coord, obj in zip(detcoords, RELEASE):
+    
+    objid = str(obj['id'])
+    
+    if obj['use_aper'] > 0:
+        regs.append(CircleSkyRegion(coord, obj['use_aper']/2.*u.arcsec))
+    else:
+        regs.append(CircleSkyRegion(coord, minaper/2.*u.arcsec, meta={'text':objid}))
+        
+regs = np.array(regs)
+bigreg = Regions(regs)
+bigreg.write(os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_ALL_OBJECTS.reg"), overwrite=True, format='ds9')
