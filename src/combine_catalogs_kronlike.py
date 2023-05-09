@@ -26,7 +26,7 @@ from config import FILTERS, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, DIR_OUTPUT, \
     FN_EXTRABAD, EXTRABAD_XMATCH_RADIUS, EXTRABAD_LABEL, BK_MINSIZE, BK_SLOPE, PATH_BADOBJECT, \
     GLASS_MASK, SATURATEDSTAR_APERSIZE, PS_WEBB_USE, PS_HST_USE, GAIA_USE, BADWHT_USE, EXTRABAD_USE, \
     BP_USE, BADOBJECT_USE, PHOT_USEMASK, PROJECT, VERSION, PSF_FOV, USE_COMBINED_KRON_IMAGE, KRON_COMBINED_BANDS, \
-    XCAT_FILENAME, XCAT_NAME, ANBP_USE, ANBP_XMATCH_RADIUS, IS_COMPRESSED
+    XCAT_FILENAME, XCAT_NAME, ANBP_USE, ANBP_XMATCH_RADIUS, IS_COMPRESSED, ANBP_MIN_NPIX, ANBP_MAX_NPIX
 
 
 DET_NICKNAME =  sys.argv[2] #'LW_f277w-f356w-f444w'
@@ -449,8 +449,8 @@ if ANBP_USE:
     from scipy.ndimage import label, center_of_mass
     labels, __ = label(badmap)
     ulabels, npix = np.unique(labels, return_counts=True)
-    ulabels = ulabels[(npix<1000) & (npix>10)]
-    npix = npix[npix<1000] # gets rid of anything too big (e.g. background)
+    ulabels = ulabels[(npix<ANBP_MAX_NPIX) & (npix>ANBP_MIN_NPIX)]
+    npix = npix[(npix<ANBP_MAX_NPIX) & (npix>ANBP_MIN_NPIX)] # gets rid of anything too big (e.g. background)
     coms = np.array(center_of_mass(badmap.T, labels.T, ulabels))
     tab = Table([ulabels, npix], names=['label', 'npix'])
     coords = wcs.all_pix2world(coms, 1)
