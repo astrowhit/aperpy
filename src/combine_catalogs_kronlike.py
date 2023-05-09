@@ -456,7 +456,7 @@ if PS_WEBB_USE or PS_HST_USE or BP_USE:
     fig, axes = plt.subplots(ncols=4, figsize=(20, 5))
     plot_elts = []
     if PS_WEBB_USE:
-        axes[0].text(16, 0.9, f'{PS_WEBB_FILT}-selected stars', fontsize=15, color='royalblue')
+        axes[0].text(16, 0.8, f'{PS_WEBB_FILT}-selected stars', fontsize=15, color='royalblue')
         axes[0].hlines(PS_WEBB_FLUXRATIO_RANGE[0], 0, PS_WEBB_MAGLIMIT, alpha=0.5, color='royalblue')
         axes[0].hlines(PS_WEBB_FLUXRATIO_RANGE[1], 0, PS_WEBB_MAGLIMIT, alpha=0.5, color='royalblue')
         axes[0].vlines(PS_WEBB_MAGLIMIT, PS_WEBB_FLUXRATIO_RANGE[0], PS_WEBB_FLUXRATIO_RANGE[1], alpha=0.5, color='royalblue')
@@ -466,7 +466,7 @@ if PS_WEBB_USE or PS_HST_USE or BP_USE:
         plot_elts.append((SEL_WEBB, 'royalblue', None))
 
     if PS_HST_USE:
-        axes[1].text(16, 0.9, 'f160w-selected stars', fontsize=15, color='orange')
+        axes[1].text(16, 0.8, 'f160w-selected stars', fontsize=15, color='orange')
         axes[1].hlines(PS_HST_FLUXRATIO_RANGE[0], 0, PS_HST_MAGLIMIT, alpha=0.5, color='orange')
         axes[1].hlines(PS_HST_FLUXRATIO_RANGE[1], 0, PS_HST_MAGLIMIT, alpha=0.5, color='orange')
         axes[1].vlines(PS_HST_MAGLIMIT, PS_HST_FLUXRATIO_RANGE[0], PS_HST_FLUXRATIO_RANGE[1], alpha=0.5, color='orange')
