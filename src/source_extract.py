@@ -347,8 +347,8 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
             catalog[f'FLAG_APER{diam}'] = flag
 
         # Compute Kron, flux radii with and without segmap masking
-        if use_kernel == KERNEL:
-            for seg, seg_id, ext in ((None, None, ''), (segmap, catalog['ID'], '_masked')):
+        for seg, seg_id, ext in ((None, None, ''), (segmap, catalog['ID'], '_masked')):
+            if use_kernel == KERNEL:
                 # KRON RADII AND MAG_AUTO
                 print(f"{PHOT_NICKNAME} :: MEASURING PHOTOMETRY in kron-corrected AUTO apertures...")
                 kronrad, krflag = sep.kron_radius(photsci, xphot, yphot, #catalog['x'], catalog['y'],
@@ -394,16 +394,17 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
                 catalog[f'FLAG_AUTO{ext}'] = flag
                 catalog[f'FLAG_KRON_RADIUS{ext}'] = krflag
 
-                # FLUX RADIUS
-                print(f"{PHOT_NICKNAME} :: MEASURING FLUX RADIUS...")
-                """In Source Extractor, the FLUX_RADIUS parameter gives the radius of a circle enclosing a desired fraction of the total flux."""
-                r, flag = sep.flux_radius(photsci,  xphot, yphot, 6.*catalog['a'],
-                                        PHOT_FLUXRADIUS, mask=photmask,
-                                        normflux=flux, subpix=5, segmap=seg, seg_id=seg_id)
-                rt = r.T
-                for i, fluxfrac in enumerate(PHOT_FLUXRADIUS):
-                    catalog[f'FLUX_RADIUS_FRAC{fluxfrac}{ext}'] = rt[i]
-                catalog[f'FLAG_FLUX_RADIUS{ext}'] = flag
+
+            # FLUX RADIUS
+            print(f"{PHOT_NICKNAME} :: MEASURING FLUX RADIUS...")
+            """In Source Extractor, the FLUX_RADIUS parameter gives the radius of a circle enclosing a desired fraction of the total flux."""
+            r, flag = sep.flux_radius(photsci,  xphot, yphot, 6.*catalog['a'],
+                                    PHOT_FLUXRADIUS, mask=photmask,
+                                    normflux=flux, subpix=5, segmap=seg, seg_id=seg_id)
+            rt = r.T
+            for i, fluxfrac in enumerate(PHOT_FLUXRADIUS):
+                catalog[f'FLUX_RADIUS_FRAC{fluxfrac}{ext}'] = rt[i]
+            catalog[f'FLAG_FLUX_RADIUS{ext}'] = flag
 
 
         # SOURCE WEIGHT + MEDIAN WEIGHT

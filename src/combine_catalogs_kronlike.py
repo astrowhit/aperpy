@@ -27,7 +27,7 @@ from config import FILTERS, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, DIR_OUTPUT, \
     GLASS_MASK, SATURATEDSTAR_APERSIZE, PS_WEBB_USE, PS_HST_USE, GAIA_USE, BADWHT_USE, EXTRABAD_USE, \
     BP_USE, BADOBJECT_USE, PHOT_USEMASK, PROJECT, VERSION, PSF_FOV, USE_COMBINED_KRON_IMAGE, KRON_COMBINED_BANDS, \
     XCAT_FILENAME, XCAT_NAME, ANBP_USE, ANBP_XMATCH_RADIUS, IS_COMPRESSED, ANBP_MIN_NPIX, ANBP_MAX_NPIX, \
-    PSF_REF_NAME
+    PSF_REF_NAME, EXTERNALSTARS_USE, FN_EXTERNALSTARS, EXTERNALSTARS_XMATCH_RADIUS, REGMASK_USE, FN_REGMASK
 
 
 DET_NICKNAME =  sys.argv[2] #'LW_f277w-f356w-f444w'
@@ -392,8 +392,19 @@ if PS_WEBB_USE:
     SEL_WEBB = (size > PS_WEBB_FLUXRATIO_RANGE[0]) & (size < PS_WEBB_FLUXRATIO_RANGE[1]) & (mag < PS_WEBB_MAGLIMIT)
     print(f'Flagged {np.sum(SEL_WEBB)} objects as point-like (stars) from {PS_WEBB_FILT}')
     maincat.add_column(Column(SEL_WEBB.astype(int), name='star_webb_flag'))
-    fsize = maincat[f'{PS_WEBB_FILT}_FLUX_RADIUS_FRAC0_5'] * PIXEL_SCALE
+    fsize = maincat[f'{PS_WEBB_FILT}_FLUX_RADIUS_FRAC0_5{mask}'] * PIXEL_SCALE
     SEL_STAR |= SEL_WEBB
+
+# external stars
+if EXTERNALSTARS_USE:
+    SEL_EXTERNALSTARS = np.zeros(len(maincat), dtype=bool)
+    tab_badobj = Table.read(FN_EXTERNALSTARS)
+    from webb_tools import crossmatch
+    mCATALOG_badobj, mtab_badobj = crossmatch(maincat, tab_badobj, [EXTERNALSTARS_XMATCH_RADIUS], plot=True)
+    SEL_EXTERNALSTARS = np.isin(maincat['ID'], mCATALOG_badobj['ID'])
+    print(f'Flagged {np.sum(SEL_EXTERNALSTARS)} objects as bad from the external star table')
+    maincat.add_column(Column(SEL_EXTERNALSTARS.astype(int), name='external_stars_flag'))
+    SEL_STAR |= SEL_EXTERNALSTARS
 
 # GAIA selection
 if GAIA_USE:
@@ -435,12 +446,8 @@ if BADWHT_USE:
     print(f'Flagged {np.sum(SEL_SATSTAR)} objects as saturated bright sources (stars) from {FN_BADWHT}')
     SEL_STAR |= SEL_BADWHT
 
-print(f'Flagged {np.sum(SEL_STAR)} total objects as stars ({np.sum(SEL_STAR)/len(SEL_STAR)*100:2.2f}%)')
-maincat.add_column(Column(SEL_STAR.astype(int), name='star_flag'))
-
-SEL_GEN = SEL_LOWSNR | SEL_STAR
-
-maincat.add_column(Column(np.zeros(len(maincat)).astype(np.int8), name='combined_artifact_flag'))
+# Stars shouldn't also be artifacts (or artifacts be classed as stars)
+maincat.add_column(Column(np.zeros(len(maincat)).astype(int), name='combined_artifact_flag'))
 # artifacts near saturated objects
 if ANBP_USE:
     DETERR_NAME = f'{DET_NICKNAME}_{DET_TYPE}/{DET_NICKNAME}_opterr.fits'
@@ -467,8 +474,11 @@ if ANBP_USE:
     maincat.add_column(Column(SEL_ANBP.astype(int), name='artifacts_near_badpixels_flag'))
     maincat['combined_artifact_flag'][SEL_ANBP] = 1
     print(f'Flagged {np.sum(SEL_ANBP)} objects as being artifacts near staturated pixels (stars) or edges')
-    SEL_GEN |= SEL_ANBP
     del det_err, labels, badmap
+
+SEL_GEN = SEL_LOWSNR | SEL_STAR
+if ANBP_USE:
+    SEL_GEN |= SEL_ANBP
 
 # bad pixel flag
 if BP_USE:
@@ -500,7 +510,7 @@ if PS_WEBB_USE or PS_HST_USE or BP_USE:
         plot_elts.append((SEL_WEBB, 'royalblue', None))
 
     if PS_HST_USE:
-        axes[1].text(16, 0.8, 'f160w-selected stars', fontsize=15, color='orange')
+        axes[1].text(16, 0.8, f'{PS_HST_FILT}-selected stars', fontsize=15, color='orange')
         axes[1].hlines(PS_HST_FLUXRATIO_RANGE[0], 0, PS_HST_MAGLIMIT, alpha=0.5, color='orange')
         axes[1].hlines(PS_HST_FLUXRATIO_RANGE[1], 0, PS_HST_MAGLIMIT, alpha=0.5, color='orange')
         axes[1].vlines(PS_HST_MAGLIMIT, PS_HST_FLUXRATIO_RANGE[0], PS_HST_FLUXRATIO_RANGE[1], alpha=0.5, color='orange')
@@ -512,8 +522,11 @@ if PS_WEBB_USE or PS_HST_USE or BP_USE:
     if GAIA_USE:
         plot_elts.append((SEL_GAIA, 'green', 'GAIA stars'))
 
-    if BADWHT_USE:
-        plot_elts.append((SEL_SATSTAR, 'purple', f'{SATURATEDSTAR_FILT} saturated stars'))
+    if EXTERNALSTARS_USE:
+        plot_elts.append((SEL_EXTERNALSTARS, 'purple', 'External stars'))
+
+    if BADWHT_USE: # plz don't use this.
+        plot_elts.append((SEL_SATSTAR, 'pink', f'{SATURATEDSTAR_FILT} saturated stars'))
 
     if BP_USE:
         axes[0].scatter(mag[SEL_LWBADPIXEL], size[SEL_LWBADPIXEL], s=12, alpha=0.8, c='firebrick', label='Bad LW pixel')
@@ -571,6 +584,7 @@ if GLASS_MASK is not None:
     SEL_BADGLASS = (((sw_snr < 3) & (sw_wht > 0)) | (sw_wht <= 0)) & in_glass
     print(f'Flagged {np.sum(SEL_BADGLASS)} objects as bad in the GLASS region')
     maincat.add_column(Column(SEL_BADGLASS.astype(int), name='badglass_flag'))
+    maincat['combined_artifact_flag'][SEL_BADGLASS] = 1
     SEL_GEN |= SEL_BADGLASS
 
 # user supplied bad objects
@@ -581,7 +595,24 @@ if BADOBJECT_USE:
     print(f'Flagged {np.sum(SEL_BADOBJECT)} objects as bad based on user-supplied ID')
     print(f'   based on file {PATH_BADOBJECT}')
     maincat.add_column(Column(SEL_BADOBJECT.astype(int), name='badobject_flag'))
+    maincat['combined_artifact_flag'][SEL_BADOBJECT] = 1
     SEL_GEN |= SEL_BADOBJECT
+
+# masked stuff
+if REGMASK_USE:
+    from regions import Regions
+    regs = Regions.read(FN_REGMASK)
+    SEL_REGMASK = np.zeros(len(maincat), dtype=bool)
+    catcoords = SkyCoord(maincat['RA'], maincat['DEC'])
+    DETERR_NAME = f'{DET_NICKNAME}_{DET_TYPE}/{DET_NICKNAME}_opterr.fits'
+    if IS_COMPRESSED:
+        DETERR_NAME +='.gz'
+    from astropy.wcs import WCS
+    wcs = WCS(fits.getheader(os.path.join(DIR_CATALOGS, DETERR_NAME)))
+    for reg in regs:
+        SEL_REGMASK |= reg.contains(catcoords, wcs=wcs)
+    maincat['combined_artifact_flag'][SEL_REGMASK] = 1 # this one is more debatable since bright stars will get caught.
+    SEL_GEN |= SEL_REGMASK
 
 # extra bad flag (e.g. bCG)
 if EXTRABAD_USE:
@@ -591,7 +622,14 @@ if EXTRABAD_USE:
     SEL_EXTRABAD = np.isin(maincat['ID'], mCATALOG_badobj['ID'])
     print(f'Flagged {np.sum(SEL_EXTRABAD)} objects as bad from the extra table ({EXTRABAD_LABEL})')
     maincat.add_column(Column(SEL_EXTRABAD.astype(int), name='extrabad_flag'))
+    maincat['combined_artifact_flag'][SEL_EXTRABAD] = 1
     SEL_GEN |= SEL_EXTRABAD
+
+
+SEL_STAR &= maincat['combined_artifact_flag'] == 0 
+print(f'Flagged {np.sum(SEL_STAR)} total objects as stars ({np.sum(SEL_STAR)/len(SEL_STAR)*100:2.2f}%)')
+maincat.add_column(Column(SEL_STAR.astype(int), name='star_flag'))
+
 
 # z-spec
 ztable = Table.read(ZSPEC)
@@ -665,7 +703,18 @@ try:
     print(f'Added date stamp! ({today})')
     print('Wrote first-pass combined catalog to ', outfilename)
 except:
-    print('WARNING: Could not make combined file. It may be too large!')
+    print('WARNING: Could not make combined file. Saving only ancillary info (e.g. flags)')
+    outfilecols = []
+    for coln in maincat.colnames:
+        skip = False
+        for filt in FILTERS:
+            if filt in coln:
+                skip = True
+        if not skip:
+            outfilecols.append(coln)
+    smallfilename = outfilename.replace('.fits', '_small.fits')
+    maincat[outfilecols].write(smallfilename, overwrite=True)
+    print('Wrote first-pass small combined catalog to ', smallfilename)
 
 
 for apersize in PHOT_APER:
@@ -705,15 +754,14 @@ for apersize in PHOT_APER:
         cols['lowsnr_flag'] = 'flag_lowsnr'
         cols['star_flag'] = 'flag_star'
         # cols['bad_wht_flag'] = 'flag_badwht'
-        if BP_USE:
-            cols['combined_artifact_flag'] = 'flag_artifact'
+        cols['combined_artifact_flag'] = 'flag_artifact'
         if EXTRABAD_USE:
             cols['extrabad_flag'] = 'flag_nearbcg'
-        if PATH_BADOBJECT is not None:
-            cols['badobject_flag'] = 'flag_badobject'
+        # if PATH_BADOBJECT is not None:
+        #     cols['badobject_flag'] = 'flag_badobject'
         # cols['badkron_flag'] = 'flag_badkron'
-        if GLASS_MASK is not None:
-            cols['badglass_flag'] = 'flag_badflat'
+        # if GLASS_MASK is not None:
+        #     cols['badglass_flag'] = 'flag_badflat'
         cols['z_spec'] = 'z_spec'
 
         subcat = maincat[list(cols.keys())].copy()
