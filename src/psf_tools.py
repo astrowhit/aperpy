@@ -24,6 +24,21 @@ import astropy.units as u
 import os
 import glob
 
+import numpy as np
+
+import matplotlib.pyplot as plt
+
+from math import atan2,degrees
+from scipy.stats import loglaplace, chi2
+
+from astropy.visualization import ImageNormalize
+from astropy.stats import mad_std
+
+import matplotlib.scale as mscale
+import matplotlib.transforms as mtransforms
+import matplotlib.ticker as ticker
+
+
 def plot_profile(psf, target):
     shape = psf.shape
     center = (shape[1]//2, shape[0]//2)
@@ -35,8 +50,7 @@ def plot_profile(psf, target):
 
     phot_table = aperture_photometry(target, apertures)
     flux_target = np.array([phot_table[0][3+i] for i in range(len(radii_pix))])
-
-    plt.plot(radii_pix[:-1]*0.04, (flux_psf/flux_target)[0:-1])
+    
     return radii_pix[:-1], (flux_psf)[0:-1], (flux_target)[0:-1]
 
 
@@ -152,7 +166,7 @@ pixscale = (40<<u.mas)/1000
 def show_cogs(*args, title='', linear=False, pixscale=0.04, label=None, outname=''):
     npsfs = len(args)
     nfilts = len(args[0])
-    print(npsfs, 'psfs', nfilts, 'filters')
+    # print(npsfs, 'psfs', nfilts, 'filters')
     # psf_ee = Table.read('PSF_EE/JWST_PSF_ee.fits')
 
     xtick = [0.1,0.2,0.3,0.5,0.7,1.0,1.5,2.0]
@@ -301,13 +315,9 @@ def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,
     img, hdr = fits.getdata(filename, header=True)
     wcs = WCS(hdr)
     
-    print(filename, np.size(img))
-    print(np.nanpercentile(img.flatten(), q=(10, 50, 90)))
     imgb = block_reduce(img, block_size, func=np.sum)
     sig = mad_std(imgb[imgb>0], ignore_nan=True)/block_size
-    print(f'rms: {sig}')
-    
-    print('peaks')
+
 #    img[~np.isfinite(img)] = 0.0
     peaks = find_peaks(img, threshold=10*sig, npeaks=npeaks)
     peaks.rename_column('x_peak','x')
@@ -320,8 +330,6 @@ def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,
     peaks['minv'] = 0.0
     for ir in np.arange(len(radii)): peaks['r'+str(ir)] = 0.
     for ir in np.arange(len(radii)): peaks['p'+str(ir)] = 0.
-    print(len(peaks))        
-    print('cutout2d')
     
     t0 = time.time()
     stars = []
@@ -353,22 +361,12 @@ def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,
     ok_shift = (np.sqrt(peaks['x0']**2 + peaks['y0']**2) < shift_lim) & \
                (np.abs(peaks['x0']) < shift_lim_root) & (np.abs(peaks['y0']) < shift_lim_root)
 
-    print('threshold mode ', threshold_mode)
-    print('shift_lim', shift_lim)
-
     # ratio apertures @@@ hardcoded 
     h = np.histogram(r[r>1.2], bins=range[1]*20,range=range)
     ih = np.argmax(h[0])
     rmode = h[1][ih]
     ok_mode =  ((r/rmode-1) > threshold_mode[0]) & ((r/rmode-1) < threshold_mode[1])
     ok = ok_phot & ok_mode & ok_min & ok_shift & ok_mag
-    print('total', np.sum(ok))
-    print('phot', np.sum(ok_phot))
-    print('mode', np.sum(ok_mode))
-    print('min', np.sum(ok_min))
-    print('shift', np.sum(ok_shift))
-    print('mag', np.sum(ok_mag))
-
         
     # sigma clip around linear relation
     try:        
@@ -392,7 +390,7 @@ def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,
         plt.subplot(231)
         mags = peaks['mag']
         mlim_plot = np.nanpercentile(mags,[5,95]) + np.array([-2,1])
-        print(mlim_plot)
+        # print(mlim_plot)
         plt.scatter(mags,r,10)
         plt.scatter(mags[~ok_shift],r[~ok_shift],10,label='bad shift',c='C2')
         plt.scatter(mags[ok],r[ok],10,label='ok',c='C1')
@@ -602,7 +600,7 @@ class PSF():
             title = f"{self.cat['id']}, {self.cat['ok']}"
             fig, ax = imshow(self.data, title=title,**kwargs)
             fig.savefig('test.pdf',dpi=300)
-            self.cat.pprint_all()
+            # self.cat.pprint_all()
             
             
     def stack(self,sigma=3,maxiters=2):
@@ -616,7 +614,7 @@ class PSF():
         self.clipped = clipped
        # self.clipped[~np.isfinite(self.clipped)] = 0
         
-        print('-',len(self.ok[self.ok]))
+        # print('-',len(self.ok[self.ok]))
 
         for i in np.arange(len(data)): 
             self.ok[iok[i]] = self.ok[iok[i]] and ~self.clipped[i].mask[50,50]
@@ -685,24 +683,6 @@ class PSF():
         fig, ax = imshow(self.data, nsig=30, title=title)
         fig.savefig('_'.join([outname, 'psf_stamps.pdf']),dpi=300)
 
-
-
-
-
-import numpy as np
-
-import matplotlib.pyplot as plt
-
-from math import atan2,degrees
-from scipy.stats import loglaplace, chi2
-
-from astropy.visualization import ImageNormalize
-from astropy.visualization import PercentileInterval
-from astropy.stats import mad_std
-
-import matplotlib.scale as mscale
-import matplotlib.transforms as mtransforms
-import matplotlib.ticker as ticker
 
 #Label line with line2D label data
 def labelLine(line,x,label=None,align=True,**kwargs):
@@ -834,7 +814,7 @@ def cutout_by_list(images, cat, size=2.4, scale=5, diam_aper=1/6.0, zout=None,
     w=1.44
     fs = 12
     lw = 1
-    print('width',w*nstamps,nstamps, nobj)
+    # print('width',w*nstamps,nstamps, nobj)
     fig, ax = plt.subplots(figsize=(w*nstamps,w*nobj))
     
     for ipage,p in enumerate(position):
@@ -845,7 +825,7 @@ def cutout_by_list(images, cat, size=2.4, scale=5, diam_aper=1/6.0, zout=None,
         else:
             textid = str(id[ipage])
 
-        print(len(obj_stamps),obj_stamps.shape, nstamps)    
+        # print(len(obj_stamps),obj_stamps.shape, nstamps)    
         for istamp,stamp in enumerate(obj_stamps):
             v = mad(stamp.data)
             npix = stamp.data.shape[0]
@@ -866,13 +846,13 @@ def cutout_by_list(images, cat, size=2.4, scale=5, diam_aper=1/6.0, zout=None,
             
         if  any(rgbindex):
             plt.subplot(nobj, nstamps, nstamps + ipage*nstamps)
-            print(images[rgbindex[0]],images[rgbindex[1]],images[rgbindex[2]])
+            # print(images[rgbindex[0]],images[rgbindex[1]],images[rgbindex[2]])
             rgbscale = 0.3
             rgboff = 0.2
             r = obj_stamps[rgbindex[0]].data/scale*rgbscale/v   + rgboff
             g = obj_stamps[rgbindex[1]].data/scale*rgbscale/v*1.3 + rgboff
             b = obj_stamps[rgbindex[2]].data/scale*rgbscale/v*1.6 + rgboff
-            print(r.min(),r.max())
+            # print(r.min(),r.max())
             norm = ImageNormalize(vmin=-scale*v, vmax=scale*v, stretch=SqrtStretch())            
             img = lupton_rgb.make_lupton_rgb(r,g,b, **lupton_kw)
      #       plt.imshow(img, origin='lower',norm=norm)
@@ -910,8 +890,6 @@ def imshow(args, cross_hairs=False, log=False, **kwargs):
     if not (ncol := kwargs.get('ncol')): ncol = int(np.ceil(np.sqrt(nargs)))+1
     if not (nsig := kwargs.get('nsig')): nsig = 5
     if not (stretch := kwargs.get('stretch')): stretch = LinearStretch()
-
- #   print('kwargs blabla', kwargs.get('blabla'))
 
     nrow = int(np.ceil(nargs/ncol))
     panel_width = width/ncol

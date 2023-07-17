@@ -1,5 +1,5 @@
 # This is just a wrapper around the webb_tool
-from webb_tools import get_webbpsf, get_date
+# from webb_tools import get_webbpsf, get_date
 from astropy.io import fits
 import numpy as np
 import os, sys
@@ -7,18 +7,21 @@ from astropy.nddata import block_reduce
 from photutils.psf import create_matching_kernel, SplitCosineBellWindow
 from scipy.ndimage import zoom
 from astropy.visualization import simple_norm
+from photutils.centroids import centroid_2dg
+from astropy.convolution import convolve_fft
 
 
 PATH_CONFIG = sys.argv[1]
 sys.path.insert(0, PATH_CONFIG)
 
-from config import DIR_PSFS, PIXEL_SCALE, DIR_OUTPUT, PSF_FOV, FILTERS, MATCH_BAND, SKYEXT, DIR_KERNELS
+from config import DIR_PSFS, PIXEL_SCALE, DIR_OUTPUT, PSF_FOV, FILTERS, \
+                MATCH_BAND, SKYEXT, DIR_KERNELS, OVERSAMPLE, ALPHA, BETA, PYPHER_R, MAGLIM
 from psf_tools import *
 
 method = 'pypher'
-pypher_r = 3e-3
+pypher_r = PYPHER_R
 
-oversample = 3
+oversample = OVERSAMPLE
 outdir = DIR_PSFS
 
 target_filter = MATCH_BAND
@@ -26,9 +29,7 @@ image_dir = DIR_OUTPUT
 print('target filter',target_filter)
 hdr = fits.getheader(glob.glob(os.path.join(DIR_OUTPUT, f'*{target_filter}*sci*{SKYEXT}.fits.gz'))[0])
 
-alpha = 0.3
-beta = 0.15
-window = SplitCosineBellWindow(alpha=alpha, beta=beta)
+window = SplitCosineBellWindow(alpha=ALPHA, beta=BETA)
 
 use_filters = [MATCH_BAND] + [f for f in FILTERS if f != MATCH_BAND]
 for pfilt in use_filters:
@@ -36,9 +37,11 @@ for pfilt in use_filters:
     starname = filename.replace('.fits', '_star_cat.fits').replace(DIR_OUTPUT, DIR_PSFS)
     outname = os.path.join(DIR_PSFS, f'{pfilt}.fits')
 
+    print(pfilt, filename)
+
     peaks, stars = find_stars(filename, outdir=DIR_PSFS, label=pfilt)
 
-    print(len(peaks))
+    print(f'Found {len(peaks)} bright sources')
     # if f != 'f090w': continue
 
     snr_lim = 1000
@@ -46,12 +49,11 @@ for pfilt in use_filters:
     #snr_lim = 500 if f in ['f435w','f606w','f814w','f105w','f125w','f140w','f160w'] else 800
     showme=False
 
-    maglim = [18.,24.0]
+    maglim = MAGLIM
     ok = (peaks['mag'] > maglim[0]) & ( peaks['mag'] < maglim[1] )
     ra, dec, ids = peaks['ra'][ok], peaks['dec'][ok], peaks['id'][ok]
 
-    print(filename, starname)
-
+    print(f'Processing PSF...')
     psf = PSF(image=filename, x=ra, y=dec, ids=ids, pixsize=101)
     psf.center()
     psf.measure()
@@ -71,19 +73,26 @@ for pfilt in use_filters:
         target_psf = filt_psf
     psfname = glob.glob(DIR_PSFS+'*'+pfilt.lower()+'*'+'psf.fits')[0]
     outname = DIR_KERNELS+os.path.basename(psfname).replace('psf','kernel')
-    print(pfilt,psfname,outname)
     
 #    if pfilt in ['f105w','f125w','f140w','f160w','f410m','f444w']: pypher_r = 3e-3
     
     filt_psf = fits.getdata(psfname)
-    if oversample > 1:  filt_psf = zoom(filt_psf,3.0)
+    if oversample > 1:  
+        print(f'Oversampling PSF by {oversample}x...')
+        filt_psf = zoom(filt_psf, oversample)
+        if pfilt == MATCH_BAND:
+            target_psf = zoom(target_psf, oversample)
 
+    print(f'Normalizing PSF to unity...')
     filt_psf /= filt_psf.sum()
+    target_psf /= target_psf.sum()
+
+    print(f'Building {pfilt}-->{MATCH_BAND} kernel...')
     if method == 'pypher':
         fits.writeto(DIR_KERNELS+'psf_a.fits',filt_psf,header=hdr,overwrite=True)
         fits.writeto(DIR_KERNELS+'psf_b.fits',target_psf,header=hdr,overwrite=True)
         os.system(f'pypher {DIR_KERNELS}psf_a.fits {DIR_KERNELS}psf_b.fits {DIR_KERNELS}kernel_a_to_b.fits -r {pypher_r:.3g}')
-        kernel = fits.getdata('kernel_a_to_b.fits')
+        kernel = fits.getdata(DIR_KERNELS+'kernel_a_to_b.fits')
         os.remove(DIR_KERNELS+'psf_a.fits')
         os.remove(DIR_KERNELS+'psf_b.fits')
         os.remove(DIR_KERNELS+'kernel_a_to_b.fits')
@@ -91,40 +100,48 @@ for pfilt in use_filters:
     else:
         kernel =  create_matching_kernel(filt_psf, target_psf, window=window)
         
-    simple = simple_norm(kernel,stretch='linear',power=1, min_cut=-5e-4/oversample**2, max_cut=5e-4/oversample**2)
-
     if oversample > 1:
-        if 1:
-            kernel = block_reduce(kernel,block_size=oversample, func=np.sum) 
-            filt_psf = block_reduce(filt_psf,block_size=oversample, func=np.sum) 
-            target_psf_bin = block_reduce(target_psf,block_size=oversample, func=np.sum) 
-            kernel /= kernel.sum()
-            filt_psf /= filt_psf.sum()
-            target_psf_bin /= target_psf_bin.sum()
-    else:
-        target_psf_bin = target_psf
+        kernel = block_reduce(kernel,block_size=oversample, func=np.sum) 
+        kernel /= kernel.sum()
 
+    print(f'Writing {pfilt}-->{MATCH_BAND} kernel to {outname.lower()}')
     fits.writeto(outname.lower(), np.float32(np.array(kernel/kernel.sum())),overwrite=True)
 
-nfilt = len(use_filters)
+nfilt = len(use_filters[1:])
 plt.figure(figsize=(30,nfilt*4))
 npanel = 7
-for pfilt in use_filters:
+
+target_psf = fits.getdata(glob.glob(DIR_PSFS+'*'+MATCH_BAND.lower()+'*'+'psf.fits')[0])
+# if oversample > 1:  target_psf = zoom(target_psf,oversample)
+target_psf /= target_psf.sum()
+
+print(f'Plotting kernel checkfile...')
+for i, pfilt in enumerate(use_filters[1:]):
 
     psfname = glob.glob(DIR_PSFS+'*'+pfilt.lower()+'*'+'psf.fits')[0]
     outname = DIR_KERNELS+os.path.basename(psfname).replace('psf','kernel')
 
     filt_psf = fits.getdata(psfname)
-    if oversample > 1:  filt_psf = zoom(filt_psf,3.0)
+    # if oversample > 1:  filt_psf = zoom(filt_psf,oversample)
     filt_psf /= filt_psf.sum()
+
     kernel = fits.getdata(outname.lower())
 
     simple = simple_norm(kernel,stretch='linear',power=1, min_cut=-5e-4, max_cut=5e-4)
+
+    plt.subplot(nfilt,npanel,1+i*npanel)
+    plt.title('psf '+pfilt)
+    plt.imshow(filt_psf, norm=simple, interpolation='antialiased',origin='lower')
+    plt.subplot(nfilt,npanel,2+i*npanel)
+    plt.title('target psf '+target_filter)
+    plt.imshow(target_psf, norm=simple, interpolation='antialiased',origin='lower')
+    plt.subplot(nfilt,npanel,3+i*npanel)
+    plt.title("kernel "+pfilt)
+
     plt.imshow(kernel, norm=simple, interpolation='antialiased',origin='lower')
 
-    print('centroid psf,target,kernel', centroid_2dg(filt_psf), centroid_2dg(target_psf_bin), centroid_2dg(kernel))
+    # print('centroid psf,target,kernel', centroid_2dg(filt_psf), centroid_2dg(target_psf), centroid_2dg(kernel))
     filt_psf_conv = convolve_fft(filt_psf, kernel)
-    print(np.max(filt_psf),filt_psf.shape)
 
     plt.subplot(nfilt,npanel,4+i*npanel)
     plt.title("convolved "+pfilt)
@@ -132,56 +149,35 @@ for pfilt in use_filters:
 
     plt.subplot(nfilt,npanel,5+i*npanel)
     plt.title("residual "+pfilt)
-    res = filt_psf_conv-target_psf_bin
+    res = filt_psf_conv-target_psf
     plt.imshow(res, norm=simple, interpolation='antialiased',origin='lower')
 
     plt.subplot(nfilt,npanel,7+i*npanel)
-    r,pf,pt = plot_profile(filt_psf_conv,target_psf_bin)
+    r,pf,pt = plot_profile(filt_psf_conv,target_psf)
+    plt.plot(r*PIXEL_SCALE, pf/pt)
     plt.ylim(0.95,1.05)
     if method == 'pypher': 
         plt.title('pypher r={}'.format(pypher_r))
     else:
-        plt.title('alpha={}, beta={}'.format(alpha,beta))
+        plt.title('alpha={}, beta={}'.format(ALPHA, BETA))
     plt.axvline(x=0.16,ls=':')
     plt.xlabel('radius arcsec')
     plt.ylabel('ee_psf_conv / ee_psf_target')
 
     plt.subplot(nfilt,npanel,6+i*npanel)
     plt.title('COG / COG_target')
-    plt.plot(r*0.04,pf,lw=3)
-    plt.plot(r*0.04,pt,'--',alpha=0.7,lw=3)
+    plt.plot(r*PIXEL_SCALE,pf,lw=3)
+    plt.plot(r*PIXEL_SCALE,pt,'--',alpha=0.7,lw=3)
     plt.xlabel('radius arcsec')
     plt.ylabel('ee')
 
-    plt.tight_layout()
-    plt.savefig(DIR_PSFS+'kernels.pdf',dpi=300)
+plt.tight_layout()
+plt.savefig(DIR_KERNELS+'kernels.pdf',dpi=300)
 
 # ----------------
 
-import os
-import glob
-import numpy as np
-import matplotlib.pyplot as plt
-from astropy.visualization import (imshow_norm, MinMaxInterval, simple_norm,
-                                   SqrtStretch, SinhStretch, LogStretch)
 
-from photutils import CircularAperture
-from photutils import aperture_photometry
-from photutils.psf import create_matching_kernel, TukeyWindow, TopHatWindow, SplitCosineBellWindow
-from photutils.centroids import centroid_com, centroid_quadratic
-from photutils.centroids import centroid_1dg, centroid_2dg
-from astropy.io import fits
-from astropy.convolution import convolve, convolve_fft
-#import webbpsf
-#from PIL import Image
-from astropy.io import fits
-
-#ht = Table.read('HST_PSF_ee.fits')
-
-
-
-
-# Default behavior generates a 10" FOV PSF and clips down to 4" FOV; 0.04 "/px
+# Default behavior generates a 10" FOV PSF and clips down to 4" FOV; PIXEL_SCALE "/px
 # for filt in FILTERS:
 #     filt = filt.upper()
 #     if filt not in USE_FILTERS: continue
