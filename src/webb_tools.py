@@ -341,18 +341,33 @@ def new_workingspace(version, path='.'):
         os.mkdir(os.path.join(path, f'{version}/{dirname}'))
 
 
-# Compute COG for PSF
-def psf_cog(psfmodel, filt, nearrad=None, fix_extrapolation=True):
-    x = np.arange(-np.shape(psfmodel)[0]/2,  np.shape(psfmodel)[0]/2)
-    y = x.copy()
-    px = np.arange(0, np.shape(psfmodel)[0]/2, 0.2)
-    xv, yv = np.meshgrid(x, y)
-    radius = np.sqrt(xv**2 + yv**2)
-    cumcurve = np.array([np.sum(psfmodel[radius<i]) for i in px])
+from photutils.aperture import aperture_photometry, CircularAperture
+def measure_cog(sci_cutout, pos):
+    # make COG by apertures
+    radii = np.arange(1, np.shape(sci_cutout)[0]/2., 0.1)
+    apertures = [CircularAperture(pos, r) for r in radii]
+    phot_tab = aperture_photometry(sci_cutout, apertures)
+    cog = np.array([[phot_tab[coln][0] for coln in phot_tab.colnames[3:]]][0])
 
+    return radii, cog
+
+# Compute COG for PSF
+def psf_cog(psfmodel, filt, nearrad=None, fix_extrapolation=True, pixel_scale=None, norm_rad=0.5):
+    # x = np.arange(-np.shape(psfmodel)[0]/2,  np.shape(psfmodel)[0]/2)
+    # y = x.copy()
+    # px = np.arange(0, np.shape(psfmodel)[0]/2, 0.2)
+    # px = px[px<2.5/pixel_scale]
+    # xv, yv = np.meshgrid(x, y)
+    # radius = np.sqrt(xv**2 + yv**2)
+    # cumcurve = np.array([np.sum(psfmodel[radius<i]) for i in px])
+
+    pos = np.shape(psfmodel)[0]/2.,  np.shape(psfmodel)[1]/2.
+    radii, cog = measure_cog(psfmodel, pos)
+    radii *= pixel_scale
 
     if fix_extrapolation:
         from config import SW_FILTERS, LW_FILTERS, PATH_SW_ENERGY, PATH_LW_ENERGY, PIXEL_SCALE
+        if pixel_scale is None: pixel_scale = PIXEL_SCALE
         from astropy.io import ascii
         # Check if filter is valid and get correction term
         if filt in SW_FILTERS:
@@ -363,25 +378,29 @@ def psf_cog(psfmodel, filt, nearrad=None, fix_extrapolation=True):
             print(f'{filt} is NOT a valid NIRCam filter!')
             return
 
-        max_rad = px[-1]
-        large_rad = encircled['aperture_radius'] / PIXEL_SCALE
+        # max_rad = radius[-1]
+        large_rad = encircled['aper_radius']
         large_ee =  encircled[filt]
 
         # renormalize stamp
         # This is a little sketchy but should work so long as the SW/LW radial sampling is decent.
-        cumcurve *= large_ee[np.argmin(np.abs(large_rad-max_rad))] / cumcurve[-1]
+        # cumcurve *= large_ee[np.argmin(np.abs(large_rad-max_rad))] / cumcurve[-1]
 
-        px = np.array(list(px)+list(large_rad[large_rad>max_rad]))
-        cumcurve = np.array(list(cumcurve)+list(large_ee[large_rad>max_rad]))
+        ok = radii<norm_rad
+        radii = radii[ok]
+        cog = cog[ok]
+        cog *= large_ee[np.argmin(np.abs(large_rad-norm_rad))] / cog[-1]
+        radii = np.array(list(radii)+list(large_rad[large_rad>norm_rad]))
+        cog_norm = np.array(list(cog)+list(large_ee[large_rad>norm_rad]))
 
     import scipy.interpolate
-    modcumcurve = scipy.interpolate.interp1d(px, cumcurve, fill_value = 'extrapolate')
+    modcog_norm = scipy.interpolate.interp1d(radii, cog_norm, fill_value = 'extrapolate')
 
     if nearrad is None:
-        return px, cumcurve, modcumcurve
+        return radii, cog_norm, modcog_norm
 
     else:
-        output = modcumcurve(nearrad)
+        output = modcog_norm(nearrad)
         output[output>1] = 1.0
         return output
 
@@ -416,7 +435,7 @@ def get_date():
     return now
 
 # Make and rotate PSF
-def get_psf(filt, field='uncover', angle=None, fov=4, og_fov=10, pixscl=None, date=None, output='', jitter_kernel='gaussian', jitter_sigma=None):
+def get_webbpsf(filt, field='uncover', angle=None, fov=4, og_fov=10, pixscl=None, date=None, output='', jitter_kernel='gaussian', jitter_sigma=None):
     # makes the PSF at og_fov and clips down to fov. Works with 0.04 "/px
     import webbpsf
     from astropy.io import fits
@@ -433,11 +452,13 @@ def get_psf(filt, field='uncover', angle=None, fov=4, og_fov=10, pixscl=None, da
 
     # Check if filter is valid and get correction term
     if filt in SW_FILTERS:
+        detector = 'NCRA5'
         if fov != 4:
             print('WARNING! I will not fetch the correct encircled energy for your requested FOV!')
         # 17 corresponds with 2" radius (i.e. 4" FOV)
         encircled = ascii.read(PATH_SW_ENERGY)[17][filt]
     elif filt in LW_FILTERS:
+        detector = 'NCRA1'
         if fov != 4:
             print('WARNING! I will not fetch the correct encircled energy for your requested FOV!')
         encircled = ascii.read(PATH_LW_ENERGY)[17][filt]
@@ -456,14 +477,19 @@ def get_psf(filt, field='uncover', angle=None, fov=4, og_fov=10, pixscl=None, da
         nc.options['jitter'] = jitter_kernel   # jitter model name or None
         nc.options['jitter_sigma'] = jitter_sigma  # in arcsec per axis, default 0.007
 
-    outname = os.path.join(output, 'psf_'+field+'_'+filt+'_'+str(fov)+'arcsec') # what to save as?
+    outname = os.path.join(output, 'psf_'+field+'_'+filt+'_'+str(fov)+'arcsec_'+str(angle)) # what to save as?
 
     # make an oversampled webbpsf
-    if date is not None:
-        nc.load_wss_opd_by_date(date, plot=False)
+    # nc.detector = detector
     nc.filter = filt
     nc.pixelscale = pixscl
-    psf = nc.calc_psf(oversample=1, fov_arcsec=og_fov)['DET_SAMP'].data
+    if date is not None:
+        nc.load_wss_opd_by_date(date, plot=False)
+    psfraw = nc.calc_psf(oversample=4, fov_arcsec=og_fov)
+    psf = psfraw['DET_SAMP'].data
+
+    newhdu = fits.PrimaryHDU(psfraw[0].data)
+    newhdu.writeto(outname+'_orig.fits', overwrite=True)
 
     # rotate and handle interpolation internally; keep k = 1 to avoid -ve pixels
     rotated = ndimage.rotate(psf, -angle, reshape=False, order=1, mode='constant', cval=0.0)
@@ -485,6 +511,7 @@ def get_psf(filt, field='uncover', angle=None, fov=4, og_fov=10, pixscl=None, da
     # and save
     newhdu = fits.PrimaryHDU(rotated)
     newhdu.writeto(outname+'.fits', overwrite=True)
+    
 
     return rotated
 

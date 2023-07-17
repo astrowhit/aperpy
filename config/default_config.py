@@ -68,12 +68,8 @@ MED_CENTERS = [SkyCoord(3.587*u.deg, -30.40*u.deg), SkyCoord(3.577*u.deg, -30.35
 MED_SIZE = 1.3*u.arcmin
 BLOCK_SIZE = 10 # pixels
 
-### WEBBPSF GENERATION
-PSF_FOV = 4 # arcsec
-FIELD = 'uncover'
-ANGLE = None # takes the default uncover PA
-USE_NEAREST_DATE = False
-USE_DATE = None
+### PSF GENERATION
+
 
 ### BACKGROUNDS
 BACKPARAMS = dict(bw=32, bh=32, fw=8, fh=8, maskthresh=1, fthresh=0.)

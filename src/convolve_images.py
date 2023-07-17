@@ -44,7 +44,7 @@ for filename in SCI_FILENAMES:
     if band != KERNEL:
         print(f'  PSF-matching sci {band} to {KERNEL}')
         tstart = time.time()
-        fn_kernel = os.path.join(DIR_KERNELS, f'{KERNEL}_matched_psfs/{band}_kernel.fits')
+        fn_kernel = os.path.join(DIR_KERNELS, f'{band}_kernel.fits')
         print('  using kernel ', fn_kernel.split('/')[-1])
         kernel = fits.getdata(fn_kernel)
         kernel /= np.sum(kernel)

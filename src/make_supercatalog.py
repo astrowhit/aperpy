@@ -98,6 +98,35 @@ bigreg = Regions(regs)
 bigreg.write(os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_SUPER_OBJECTS.reg"), overwrite=True, format='ds9')
 
 print('BUILDING REGION FILE...')
+regs = []
+i = 0
+for coord, obj in zip(detcoords, RELEASE):
+    
+    objid = str(obj['id'])
+
+    if obj['use_phot'] == 0: continue
+    
+    if obj['use_circle'] == 0:
+        ellip = obj['b_image'] / obj['a_image']
+        kr = obj['kron_radius']
+        krcirc = kr * np.sqrt(obj['a_image'] * obj['b_image'])
+
+        width = 2* kr * obj['a_image'] * pixel_scale / 3600. * u.deg
+        height = 2* kr * obj['b_image'] * pixel_scale / 3600. * u.deg
+        angle = np.rad2deg(obj['theta_J2000']) * u.deg
+        # regs.append(CircleSkyRegion(coord, obj['use_aper']/2.*u.arcsec))
+        regs.append(EllipseSkyRegion(coord, width, height, angle, meta={'text':objid}))
+
+        
+    else:
+        regs.append(CircleSkyRegion(coord, obj['use_aper']/2.*u.arcsec, meta={'text':objid}))
+        
+regs = np.array(regs)
+bigreg = Regions(regs)
+bigreg.write(os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_SUPER_OBJECTS_AUTO.reg"), overwrite=True, format='ds9')
+
+
+print('BUILDING REGION FILE...')
 minaper = np.nanmin(obj['use_aper'][obj['use_aper']>0])
 regs = []
 i = 0
@@ -113,3 +142,17 @@ for coord, obj in zip(detcoords, RELEASE):
 regs = np.array(regs)
 bigreg = Regions(regs)
 bigreg.write(os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_ALL_OBJECTS.reg"), overwrite=True, format='ds9')
+
+print('BUILDING REGION FILE...')
+regs = []
+i = 0
+for coord, obj in zip(detcoords, RELEASE):
+    
+    objid = str(obj['id'])
+    
+    if obj['flag_star'] == 1:
+        regs.append(CircleSkyRegion(coord, 0.32/2.*u.arcsec, meta={'text':objid}))
+        
+regs = np.array(regs)
+bigreg = Regions(regs)
+bigreg.write(os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_STARS_OBJECTS.reg"), overwrite=True, format='ds9')
