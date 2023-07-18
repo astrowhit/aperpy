@@ -1,7 +1,7 @@
 from photutils.centroids import centroid_com
 import astropy.units as u
 
-from astropy.nddata import block_reduce 
+from astropy.nddata import block_reduce
 
 # from photutils.detection import find_peaks
 import time
@@ -50,14 +50,14 @@ def plot_profile(psf, target):
 
     phot_table = aperture_photometry(target, apertures)
     flux_target = np.array([phot_table[0][3+i] for i in range(len(radii_pix))])
-    
+
     return radii_pix[:-1], (flux_psf)[0:-1], (flux_target)[0:-1]
 
 
 def powspace(start, stop, num=30, power=0.5, **kwargs):
     """Generate a square-root spaced array with a specified number of points
     between two endpoints.
-    
+
     Parameters
     ----------
     start : float
@@ -67,7 +67,7 @@ def powspace(start, stop, num=30, power=0.5, **kwargs):
     pow: power of distribution, defaults to sqrt
     num_points : int, optional
         The number of points to generate in the array. Default is 50.
-    
+
     Returns
     -------
     numpy.ndarray
@@ -80,7 +80,7 @@ def powspace(start, stop, num=30, power=0.5, **kwargs):
 def measure_curve_of_growth(image, position=None, radii=None, rnorm='auto', nradii=30, verbose=False, showme=False, rbg='auto'):
     """
     Measure a curve of growth from cumulative circular aperture photometry on a list of radii centered on the center of mass of a source in a 2D image.
-    
+
     Parameters
     ----------
     image : `~numpy.ndarray`
@@ -89,13 +89,13 @@ def measure_curve_of_growth(image, position=None, radii=None, rnorm='auto', nrad
         Position of the source.
     radii : `~astropy.units.Quantity` array
         Array of aperture radii.
-        
+
     Returns
     -------
     `~astropy.table.Table`
         Table of photometry results, with columns 'aperture_radius' and 'aperture_flux'.
     """
-    
+
     if type(radii) is type(None):
         radii = powspace(0.5,image.shape[1]/2,nradii)
 
@@ -103,10 +103,10 @@ def measure_curve_of_growth(image, position=None, radii=None, rnorm='auto', nrad
     if type(position) is type(None):
 #        x0, y0 = centroid_2dg(image)
          position = centroid_com(image)
-    
+
     if rnorm == 'auto': rnorm = image.shape[1]/2.0
     if rbg == 'auto': rbg = image.shape[1]/2.0
- 
+
     apertures = [CircularAperture(position, r=r) for r in radii]
 
     if rbg:
@@ -114,7 +114,7 @@ def measure_curve_of_growth(image, position=None, radii=None, rnorm='auto', nrad
         bg = np.nanmedian(image[bg_mask])
         if verbose: print('background',bg)
     else:
-        bg = 0. 
+        bg = 0.
 
     # Perform aperture photometry for each aperture
     phot_table = aperture_photometry(image-bg, apertures)
@@ -124,13 +124,13 @@ def measure_curve_of_growth(image, position=None, radii=None, rnorm='auto', nrad
     if rnorm:
         rnorm_indx = np.searchsorted(radii, rnorm)
         cog /= cog[rnorm_indx]
-    
+
 
     area = np.pi*radii**2
     area_cog = np.insert(np.diff(area),0,area[0])
     profile = np.insert(np.diff(cog),0,cog[0])/area_cog
     profile /= profile.max()
-    
+
     if showme:
         plt.plot(radii, cog, marker='o')
         plt.plot(radii,profile/profile.max())
@@ -147,11 +147,11 @@ def stamp_rms_snr(img, block_size=3, rotate=True):
         dp = img-p180
     else:
         dp = img.copy()
-        
+
     s = dp.shape[1]
     buf = 6
     dp[s//buf:(buf-1)*s//buf,s//buf:(buf-1)*s//buf] = np.nan
-    dp3 = block_reduce(dp,block_size=3) 
+    dp3 = block_reduce(dp,block_size=3)
 
     rms = mad_std(dp,ignore_nan=True)/block_size * np.sqrt(img.size)
     if rotate: rms /= np.sqrt(2)
@@ -162,7 +162,7 @@ def stamp_rms_snr(img, block_size=3, rotate=True):
 
 pixscale = (40<<u.mas)/1000
 
-        
+
 def show_cogs(*args, title='', linear=False, pixscale=0.04, label=None, outname=''):
     npsfs = len(args)
     nfilts = len(args[0])
@@ -171,10 +171,10 @@ def show_cogs(*args, title='', linear=False, pixscale=0.04, label=None, outname=
 
     xtick = [0.1,0.2,0.3,0.5,0.7,1.0,1.5,2.0]
     plt.figure(figsize=(20,4.5))
-    
+
     if not label:
         label = ['' for p in range(npsfs)]
-        
+
     for filti in range(nfilts):
         psf_ref = args[0][filti]
         psf_ref2 = args[-1][filti]
@@ -195,12 +195,12 @@ def show_cogs(*args, title='', linear=False, pixscale=0.04, label=None, outname=
         plt.axhline(y=0,alpha=0.5,c='k')
         plt.axvline(x=0.16,alpha=0.5,c='k',ls='--')
         ax=plt.gca()
-        rms, snr = stamp_rms_snr(psf_ref) 
-        dx, dy = centroid_com(psf_ref)        
+        rms, snr = stamp_rms_snr(psf_ref)
+        dx, dy = centroid_com(psf_ref)
         plt.text(0.6,0.8,'snr = {:.2g} \nx0,y0 = {:.2f},{:.2f} '.format(snr,dx,dy),transform=ax.transAxes, c='C0')
 
         plt.subplot(142)
-        # if 'nircam_'+title.upper() in psf_ee.colnames: 
+        # if 'nircam_'+title.upper() in psf_ee.colnames:
         #     print('found NIRCam jdox EE',title)
         #     plt.plot(psf_ee['r'],psf_ee['nircam_'+title.upper()],':',c='gray',label='JDox')
 
@@ -231,7 +231,7 @@ def show_cogs(*args, title='', linear=False, pixscale=0.04, label=None, outname=
         plt.axvline(x=0.04,alpha=0.5,c='k',ls='--')
         plt.xlim(0.02,1)
         plt.ylim(0.5,1.5)
-        # if 'nircam_'+title.upper() in psf_ee.colnames: 
+        # if 'nircam_'+title.upper() in psf_ee.colnames:
         #     print('found NIRCam jdox EE',title)
         #     cog_jdox = np.interp(r, psf_ee['r'],psf_ee['nircam_'+title.upper()])
         #     plt.plot(r,cog_jdox/cog_ref,':',c='gray',label='JDox')
@@ -250,7 +250,7 @@ def show_cogs(*args, title='', linear=False, pixscale=0.04, label=None, outname=
         plt.axvline(x=0.04,alpha=0.5,c='k',ls='--')
         plt.xlim(0.02,1)
         plt.ylim(0.5,1.5)
-        # if 'nircam_'+title.upper() in psf_ee.colnames: 
+        # if 'nircam_'+title.upper() in psf_ee.colnames:
         #     print('found NIRCam jdox EE',title)
         #     cog_jdox = np.interp(r, psf_ee['r'],psf_ee['nircam_'+title.upper()])
         #     plt.plot(r,cog_jdox/cog_ref2,':',c='gray',label='JDox')
@@ -258,17 +258,17 @@ def show_cogs(*args, title='', linear=False, pixscale=0.04, label=None, outname=
         cogs = []
         profs = []
         psfs = [psf_ref]
-        for psfi in np.arange(1, npsfs):            
+        for psfi in np.arange(1, npsfs):
             psf = args[psfi][filti]
             _, cog, prof = measure_curve_of_growth(psf,nradii=50)
             cogs.append(cog)
             profs.append(prof)
-            dx, dy = centroid_com(psf)        
-            rms, snr = stamp_rms_snr(psf)        
-            
+            dx, dy = centroid_com(psf)
+            rms, snr = stamp_rms_snr(psf)
+
             plt.subplot(141)
             plt.plot(r,prof)
-            
+
             plt.text(0.5,0.8-psfi*0.1,'snr = {:.2g} \nx0,y0 = {:.2f},{:.2f} '.format(snr,dx,dy),transform=ax.transAxes, c='C'+str(psfi))
             plt.xlim(0.02,1)
 
@@ -281,18 +281,18 @@ def show_cogs(*args, title='', linear=False, pixscale=0.04, label=None, outname=
 
             plt.subplot(144)
             plt.plot(r,cog/cog_ref2,c='C'+str(psfi))
-            
+
             psfs.append(psf)
-        
+
         plt.savefig('_'.join([outname,'psf_cog.pdf']),dpi=300)
-    
+
         _ = imshow(psfs,cross_hairs=True,nsig=50,title=label)
-                
+
         plt.savefig('_'.join([outname,'psf_average.pdf']),dpi=300)
 
 def get_filename(imagedir, filt, skyext=''):
 
-    # if filt in ['f090w','f115w','f150w','f200w']: 
+    # if filt in ['f090w','f115w','f150w','f200w']:
     #     add = '_block40'
     # else:
     #     add=''
@@ -307,14 +307,15 @@ def get_filename(imagedir, filt, skyext=''):
     starname = filename.replace('.fits','')+'_star_cat.fits'
 
     return filename, starname
-    
+
 
 def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,2.,4.,7.5], range=[0,3], mag_lim = 24.0,
-               threshold_min = -0.5, threshold_mode=[-0.2,0.2], shift_lim=2, zp=28.9, instars=None, showme=True, label='', outdir='./'):
+               threshold_min = -0.5, threshold_mode=[-0.2,0.2], shift_lim=2, zp=28.9, instars=None, showme=True, label='',
+               outdir='./', plotdir='./'):
 
     img, hdr = fits.getdata(filename, header=True)
     wcs = WCS(hdr)
-    
+
     imgb = block_reduce(img, block_size, func=np.sum)
     sig = mad_std(imgb[imgb>0], ignore_nan=True)/block_size
 
@@ -330,7 +331,7 @@ def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,
     peaks['minv'] = 0.0
     for ir in np.arange(len(radii)): peaks['r'+str(ir)] = 0.
     for ir in np.arange(len(radii)): peaks['p'+str(ir)] = 0.
-    
+
     t0 = time.time()
     stars = []
     for ip,p in enumerate(peaks):
@@ -339,37 +340,37 @@ def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,
         # if offset > 3 pixels -> skip
         position = centroid_com(co.data)
         peaks['x0'][ip] = position[0] - size//2
-        peaks['y0'][ip] = position[1] - size//2 
+        peaks['y0'][ip] = position[1] - size//2
         peaks['minv'][ip] = np.nanmin(co.data)
         _ , cog, profile = measure_curve_of_growth(co.data, radii=np.array(radii), position=position, rnorm=None, rbg=None)
-        for ir in np.arange(len(radii)): peaks['r'+str(ir)][ip] = cog[ir] 
-        for ir in np.arange(len(radii)): peaks['p'+str(ir)][ip] = profile[ir] 
+        for ir in np.arange(len(radii)): peaks['r'+str(ir)][ip] = cog[ir]
+        for ir in np.arange(len(radii)): peaks['p'+str(ir)][ip] = profile[ir]
         co.radii = np.array(radii)
         co.cog = cog
         co.profile = profile
-        stars.append(co)                              
+        stars.append(co)
 
     stars = np.array(stars)
-     
+
     peaks['mag'] = zp-2.5*np.log10(peaks['r4'])
     r = peaks['r4']/peaks['r2']
     shift_lim_root = np.sqrt(shift_lim)
 
     ok_mag =  peaks['mag'] < mag_lim
-    ok_min =  peaks['minv'] > threshold_min 
+    ok_min =  peaks['minv'] > threshold_min
     ok_phot = np.isfinite(peaks['r'+str(len(radii)-1)]) &  np.isfinite(peaks['r2']) & np.isfinite(peaks['p1'])
     ok_shift = (np.sqrt(peaks['x0']**2 + peaks['y0']**2) < shift_lim) & \
                (np.abs(peaks['x0']) < shift_lim_root) & (np.abs(peaks['y0']) < shift_lim_root)
 
-    # ratio apertures @@@ hardcoded 
+    # ratio apertures @@@ hardcoded
     h = np.histogram(r[r>1.2], bins=range[1]*20,range=range)
     ih = np.argmax(h[0])
     rmode = h[1][ih]
     ok_mode =  ((r/rmode-1) > threshold_mode[0]) & ((r/rmode-1) < threshold_mode[1])
     ok = ok_phot & ok_mode & ok_min & ok_shift & ok_mag
-        
+
     # sigma clip around linear relation
-    try:        
+    try:
         fitter = FittingWithOutlierRemoval(LinearLSQFitter(), sigma_clip, sigma=2.8, niter=2)
         lfit, outlier = fitter(Linear1D(),x=zp-2.5*np.log10(peaks['r4'][ok]),y=(peaks['r4']/peaks['r2'])[ok])
         ioutlier = np.where(ok)[0][outlier]
@@ -380,10 +381,10 @@ def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,
         lfit = None
 
     mags = zp-2.5*np.log10(peaks['r4'])
-    
+
     peaks['id'] = 1
     peaks['id'][ok] = np.arange(1,len(peaks[ok])+1)
-    
+
     if showme:
         if not os.path.exists(outdir): os.mkdir(outdir)
         plt.figure(figsize=(14,8))
@@ -414,8 +415,8 @@ def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,
         plt.title('aper(2) / aper(4) vs mag(aper(4))')
 
         plt.subplot(233)
-        _ = plt.hist(r,bins=range[1]*20,range=range)   
-        _ = plt.hist(r[ok],bins=range[1]*20,range=range)   
+        _ = plt.hist(r,bins=range[1]*20,range=range)
+        _ = plt.hist(r[ok],bins=range[1]*20,range=range)
         plt.title('aper(2) / aper(4)')
 
         plt.subplot(234)
@@ -437,16 +438,16 @@ def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,
         plt.axis('scaled')
         plt.title('position (pix)')
         plt.tight_layout()
-        plt.savefig(outdir+'/'+os.path.basename(filename).replace('.fits','')+'_diagnostic.pdf')
-        
+        plt.savefig(plotdir+'/'+label+'_diagnostic.pdf')
+
         dd = [st.data for st in stars[ok]]
         title = ['{} {:.1f} {:.2f} {:.2f} {:.1f} {:.1f}'.format(ii, mm, pp,qq,xx,yy) for ii,mm,pp,qq,xx,yy in zip(peaks['id'][ok],mags[ok],peaks['p1'][ok],peaks['minv'][ok],peaks['x0'][ok],peaks['y0'][ok])]
         imshow(dd,nsig=30,title=title)
         plt.tight_layout()
-        plt.savefig(outdir+'/'+os.path.basename(filename).replace('.fits','')+'_star_stamps.pdf')
-    
-    peaks[ok].write(outdir+'/'+os.path.basename(filename).replace('.fits','')+'_star_cat.fits',overwrite=True)
-                
+        plt.savefig(plotdir+'/'+label+'_star_stamps.pdf')
+
+    peaks[ok].write(plotdir+'/'+label+'_star_cat.fits',overwrite=True)
+
     return peaks[ok], stars[ok]
 
 
@@ -456,7 +457,7 @@ from astropy.nddata import Cutout2D
 from scipy.ndimage import shift
 from photutils import CircularAperture, aperture_photometry
 from astropy.table import hstack
-import pickle 
+import pickle
 from astropy.io import fits
 
 import cv2
@@ -467,7 +468,7 @@ from scipy.ndimage import binary_dilation, binary_erosion
 from skimage.morphology import (square, rectangle, diamond, disk, cube,
                                 octahedron, ball, octagon, star)
 
-def grow(mask, structure=disk(2), **kwargs):  
+def grow(mask, structure=disk(2), **kwargs):
     return binary_dilation(mask,structure=structure,**kwargs)
 
 # grow mask not along sigma clip axis but in 2d axis
@@ -475,9 +476,9 @@ def sigma_clip_3d(data, maxiters=2, axis=0, **kwargs):
     clipped_data = data.copy()
     for i in range(maxiters):
         clipped_data, lo, hi = sigma_clip(clipped_data, maxiters=0, axis=0, masked=True, grow=False, return_bounds=True, **kwargs)
-        # grow mask 
+        # grow mask
         for i in range(len(clipped_data.mask)): clipped_data.mask[i,:,:] = grow(clipped_data.mask[i,:,:],iterations=1)
-    
+
     return np.mean(clipped_data,axis=axis), lo, hi, clipped_data
 
 # interpolation=cv2.INTER_LANCZOS4
@@ -499,7 +500,7 @@ def stamp_rms_snr(img, block_size=3, rotate=True):
     s = dp.shape[1]
     buf = 6
     dp[s//buf:(buf-1)*s//buf,s//buf:(buf-1)*s//buf] = np.nan
-    dp3 = block_reduce(dp,block_size=3) 
+    dp3 = block_reduce(dp,block_size=3)
 
     rms = mad_std(dp,ignore_nan=True)/block_size * np.sqrt(img.size)
     if rotate: rms /= np.sqrt(2)
@@ -522,19 +523,19 @@ class PSF():
             wcs = WCS(hdr)
             xx,yy = wcs.all_world2pix(x, y, 0)
             self.filename  = image
-        
+
         if type(ids) == type(None):
             ids = np.arange(1,len(x)+1)
 
         self.nx = pixsize
-        self.c0 = self.nx//2 
+        self.c0 = self.nx//2
         self.cat = Table([ids,xx,yy,x,y],names=['id','x','y','ra','dec'])
-        
+
         data = np.array([Cutout2D(img, (xx[i],yy[i]), (pixsize, pixsize),mode='partial').data for i in np.arange(len(x))])
         self.data = np.ma.array(data,mask = ~np.isfinite(data) | (data == 0) )
         self.data_orig = self.data.copy()
         self.ok = np.ones(len(self.cat))
-        
+
     def phot(self, radius=8):
         pos = np.array([self.cat['x'],self.cat['y']])
 
@@ -547,7 +548,7 @@ class PSF():
         peaks = []
         c0 = self.nx//2
         self.norm_radius = norm_radius
-                
+
         peaks = np.array([st.max()for st in self.data])
         peaks[~np.isfinite(peaks) | (peaks==0)] = 0
         pos = np.array([self.cat['x'],self.cat['y']])
@@ -562,7 +563,7 @@ class PSF():
         cmin = [ np.nanmin(st*cmask) for st in self.data]
 
         self.cat['frac_mask'] = 0.0
-        
+
         for i in np.arange(len(self.data)):
             self.data[i].mask |= (self.data[i]*cmask) < 0.0
 
@@ -586,39 +587,39 @@ class PSF():
     def select(self, snr_lim = 800, dshift_lim=3, mask_lim=0.40, phot_frac_mask_lim = 0.85, showme=False, **kwargs):
         self.ok = (self.cat['dshift'] < dshift_lim) & (self.cat['snr'] > snr_lim) & (self.cat['frac_mask'] < mask_lim) & (self.cat['phot_frac_mask'] > phot_frac_mask_lim)
 
-    #(self.cat['cmin'] >= -1.5)  #& (self.cat['cmin'] >= -1.5)  
+    #(self.cat['cmin'] >= -1.5)  #& (self.cat['cmin'] >= -1.5)
         self.cat['ok'] = np.int32(self.ok)
         self.cat['ok_shift'] = (self.cat['dshift'] < dshift_lim)
         self.cat['ok_snr'] = (self.cat['snr'] > snr_lim)
         self.cat['ok_frac_mask'] = (self.cat['frac_mask'] < mask_lim)
         self.cat['ok_phot_frac_mask'] = (self.cat['phot_frac_mask'] > phot_frac_mask_lim)
-                
+
         for c in self.cat.colnames:
             if 'id' not in c: self.cat[c].format='.3g'
-        
+
         if showme:
             title = f"{self.cat['id']}, {self.cat['ok']}"
             fig, ax = imshow(self.data, title=title,**kwargs)
             fig.savefig('test.pdf',dpi=300)
             # self.cat.pprint_all()
-            
-            
+
+
     def stack(self,sigma=3,maxiters=2):
         iok = np.where(self.ok)[0]
 
         norm = self.cat['phot'][iok]
         data = self.data_orig[iok].copy()
         for i in np.arange(len(data)): data[i] = data[i]/norm[i]
-        
+
         stack, lo, hi, clipped = sigma_clip_3d(data,sigma=sigma,axis=0,maxiters=maxiters)
         self.clipped = clipped
        # self.clipped[~np.isfinite(self.clipped)] = 0
-        
+
         # print('-',len(self.ok[self.ok]))
 
-        for i in np.arange(len(data)): 
+        for i in np.arange(len(data)):
             self.ok[iok[i]] = self.ok[iok[i]] and ~self.clipped[i].mask[50,50]
-            self.data[iok[i]].mask = self.clipped[i].mask 
+            self.data[iok[i]].mask = self.clipped[i].mask
             mask = self.data[iok[i]].mask
             self.cat['frac_mask'][iok[i]] = np.size(mask[mask]) / np.size(mask)
 
@@ -629,9 +630,9 @@ class PSF():
         indx = np.where(self.cat['id']==ID)[0][0]
         imshow([self.data[indx]], **kwargs)
         return self.data[indx]
-    
+
     def growth_curves(self):
-        for i in np.arange(len(self.data)): 
+        for i in np.arange(len(self.data)):
             radii, cog, profile = measure_curve_of_growth(a)
             r = radii*self.pixelscale
 
@@ -641,42 +642,42 @@ class PSF():
         cw = window//2
         c0 = self.c0
         pos = []
-        for i in np.arange(len(self.data)): 
+        for i in np.arange(len(self.data)):
             p = self.data[i,:,:]
             st = Cutout2D(p,(self.c0,self.c0),window,mode='partial',fill_value=0).data
             st[~np.isfinite(st)] = 0
-            x0, y0 = centroid_com(st)  
+            x0, y0 = centroid_com(st)
 
             p = imshift(p, (cw-x0), (cw-y0),interpolation=interpolation)
-            
+
             # now measure shift on recentered cutout
-            # first in small window 
+            # first in small window
             st = Cutout2D(p,(self.c0,self.c0),window,mode='partial',fill_value=0).data
             x1,y1 = centroid_com(st)
-            
+
             # now in central half of stamp
             st2 = Cutout2D(p,(self.c0,self.c0),int(self.nx*0.5),fill_value=0).data
-            # measure moment shift in positive definite in case there are strong ying yang residuals    
-            x2,y2 = centroid_com(np.maximum(p,0))     
+            # measure moment shift in positive definite in case there are strong ying yang residuals
+            x2,y2 = centroid_com(np.maximum(p,0))
 
             p = np.ma.array(p, mask = ~np.isfinite(p) | (p==0))
             self.data[i,:,:] = p
-            
+
             # difference in shift between central window and half of stamp is measure of contamination
-            # from bright off axis sources 
+            # from bright off axis sources
             dsh = np.sqrt(((c0-x2)-(cw-x1))**2 + ((c0-y2)-(cw-y1))**2)
             pos.append([cw-x0,cw-y0,cw-x1,cw-y1,dsh])
-                
+
         self.cat = hstack([self.cat,Table(np.array(pos),names=['x0','y0','x1','y1','dshift'])])
-        
+
     def save(self, outname=''):
         # with open('_'.join([outname, 'psf_stamps.fits']), 'wb') as handle:
         #     self.data[self.ok]
-        
+
         # self.data[self.ok].filled(-99).write('_'.join([outname, 'psf_stamps.fits']),overwrite=True)
-        
+
         fits.writeto('_'.join([outname, 'psf.fits']), np.array(self.psf_average),overwrite=True)
-        
+
         self.cat[self.ok].write('_'.join([outname, 'psf_cat.fits']),overwrite=True)
 
         title = f"{self.cat['id']}, {self.cat['ok']}"
@@ -761,12 +762,12 @@ def labelLines(lines,align=True,xvals=None,**kwargs):
 
     for line,x,label in zip(labLines,xvals,labels):
         labelLine(line,x,label,align,**kwargs)
-        
+
 
 import os
 from astropy import cosmology
 from astropy import units as u
-from astropy.nddata import Cutout2D 
+from astropy.nddata import Cutout2D
 from astropy.coordinates import ICRS
 from astropy.wcs import WCS as pywcs
 from astropy.stats import mad_std as mad
@@ -778,24 +779,24 @@ from astropy.visualization import (MinMaxInterval, LinearStretch, SqrtStretch, A
 from astropy.visualization import lupton_rgb
 
 def plot_cross_hairs(n, r, lw=4, color='white'):
-    c = n/2    
+    c = n/2
     plt.plot([n/2,n/2],[n/2-2*r,n/2-r],c=color,lw=lw)
     plt.plot([n/2-2*r,n/2-r],[n/2,n/2],c=color,lw=lw)
 
 def cutout_by_list(images, cat, size=2.4, scale=5, diam_aper=1/6.0, zout=None,
-                     colnames=None, detection=None, outname='', oid=None, 
+                     colnames=None, detection=None, outname='', oid=None,
                      color='black', rgbindex=[8,5,3], lupton_kw={'minimum':-0.3, 'stretch':2, 'Q':8}, ):
     ra = cat['ra']
     dec = cat['dec']
-    id = cat['id'] 
+    id = cat['id']
 
-    if outname: 
+    if outname:
         if not os.path.exists(outname): os.mkdir(outname)
-    
+
     position = SkyCoord( ICRS(ra=ra*u.deg, dec=dec*u.deg))
     nfilt = len(images)
     nobj = len(ra)
-    
+
     cutout_grid = []
     for ix,file in enumerate(images):
         img, hdr = fits.getdata(file,header=True)
@@ -809,33 +810,33 @@ def cutout_by_list(images, cat, size=2.4, scale=5, diam_aper=1/6.0, zout=None,
         cutout_grid.append(cutout_list)
 
     cutout_array = np.array(cutout_grid,dtype='object')
-    
+
     nstamps = nfilt + 1 if any(rgbindex) else 0
     w=1.44
     fs = 12
     lw = 1
     # print('width',w*nstamps,nstamps, nobj)
     fig, ax = plt.subplots(figsize=(w*nstamps,w*nobj))
-    
+
     for ipage,p in enumerate(position):
         obj_stamps = cutout_array[:,ipage]
-         
+
         if len(oid) > 0:
             textid = str(oid[ipage])
         else:
             textid = str(id[ipage])
 
-        # print(len(obj_stamps),obj_stamps.shape, nstamps)    
+        # print(len(obj_stamps),obj_stamps.shape, nstamps)
         for istamp,stamp in enumerate(obj_stamps):
             v = mad(stamp.data)
             npix = stamp.data.shape[0]
             plt.subplot(nobj, nstamps, istamp+1 + ipage*nstamps)
-            
+
             im = plt.imshow(-stamp.data+4.5*v,origin='lower',vmin=-scale*v,vmax=scale*v, cmap='gray')
 #            im.set_in_layout(True)
-            plot_cross_hairs(npix, diam_aper/2*npix, lw=lw, color=color)              
+            plot_cross_hairs(npix, diam_aper/2*npix, lw=lw, color=color)
 
-            if istamp == 0: 
+            if istamp == 0:
                 plt.text(npix/20, 4.8*npix/6, textid, color='black',fontsize=fs) # weight='bold',
 
             if ipage == 0:
@@ -843,7 +844,7 @@ def cutout_by_list(images, cat, size=2.4, scale=5, diam_aper=1/6.0, zout=None,
 
             plt.xticks([])
             plt.yticks([])
-            
+
         if  any(rgbindex):
             plt.subplot(nobj, nstamps, nstamps + ipage*nstamps)
             # print(images[rgbindex[0]],images[rgbindex[1]],images[rgbindex[2]])
@@ -853,7 +854,7 @@ def cutout_by_list(images, cat, size=2.4, scale=5, diam_aper=1/6.0, zout=None,
             g = obj_stamps[rgbindex[1]].data/scale*rgbscale/v*1.3 + rgboff
             b = obj_stamps[rgbindex[2]].data/scale*rgbscale/v*1.6 + rgboff
             # print(r.min(),r.max())
-            norm = ImageNormalize(vmin=-scale*v, vmax=scale*v, stretch=SqrtStretch())            
+            norm = ImageNormalize(vmin=-scale*v, vmax=scale*v, stretch=SqrtStretch())
             img = lupton_rgb.make_lupton_rgb(r,g,b, **lupton_kw)
      #       plt.imshow(img, origin='lower',norm=norm)
 
@@ -861,7 +862,7 @@ def cutout_by_list(images, cat, size=2.4, scale=5, diam_aper=1/6.0, zout=None,
             plt.xticks([])
             plt.yticks([])
 
-            #            plt.axis('off')                
+            #            plt.axis('off')
 
 
     plt.tight_layout(pad=0.4, w_pad=0.2, h_pad=0.4)
@@ -882,7 +883,7 @@ def plot_axes(ax, fig=None, geometry=(1,1,1)):
     return fig
 
 
-# note, always expects a list of images, so for single image do [image] 
+# note, always expects a list of images, so for single image do [image]
 def imshow(args, cross_hairs=False, log=False, **kwargs):
     width = 20
     nargs = len(args)
@@ -903,14 +904,14 @@ def imshow(args, cross_hairs=False, log=False, **kwargs):
 #        axi.imshow(arg, norm=norm, origin='lower', cmap='gray',interpolation='nearest')
         axi.imshow(arg, norm=norm, origin='lower', interpolation='nearest')
         axi.set_axis_off()
-        if cross_hairs: 
+        if cross_hairs:
             axi.plot(50,50, color='red', marker='+', ms=10, mew=1)
-#    c = n/2    
+#    c = n/2
 #    plt.plot([n/2,n/2],[n/2-2*r,n/2-r],c=color,lw=lw)
 #    plt.plot([n/2-2*r,n/2-r],[n/2,n/2],c=color,lw=lw)
 #           plot_cross_hairs(arg.shape[0],arg.shape[0]//4,color='red')
 
-    if type(title := kwargs.get('title')) is not type(None): 
+    if type(title := kwargs.get('title')) is not type(None):
         for fi,axi in zip(title,ax.flat): axi.set_title(fi)
 
     return fig, ax
@@ -919,50 +920,50 @@ class SquareRootScale(mscale.ScaleBase):
     """
     ScaleBase class for generating square root scale.
     """
- 
+
     name = 'squareroot'
- 
+
     def __init__(self, axis, **kwargs):
         # note in older versions of matplotlib (<3.1), this worked fine.
         # mscale.ScaleBase.__init__(self)
 
         # In newer versions (>=3.1), you also need to pass in `axis` as an arg
         mscale.ScaleBase.__init__(self, axis)
- 
+
     def set_default_locators_and_formatters(self, axis):
         axis.set_major_locator(ticker.AutoLocator())
         axis.set_major_formatter(ticker.ScalarFormatter())
         axis.set_minor_locator(ticker.NullLocator())
         axis.set_minor_formatter(ticker.NullFormatter())
- 
+
     def limit_range_for_scale(self, vmin, vmax, minpos):
         return  max(0., vmin), vmax
- 
+
     class SquareRootTransform(mtransforms.Transform):
         input_dims = 1
         output_dims = 1
         is_separable = True
- 
-        def transform_non_affine(self, a): 
+
+        def transform_non_affine(self, a):
             return np.array(a)**0.5
- 
+
         def inverted(self):
             return SquareRootScale.InvertedSquareRootTransform()
- 
+
     class InvertedSquareRootTransform(mtransforms.Transform):
         input_dims = 1
         output_dims = 1
         is_separable = True
- 
+
         def transform(self, a):
             return np.array(a)**2
- 
+
         def inverted(self):
             return SquareRootScale.SquareRootTransform()
- 
+
     def get_transform(self):
         return self.SquareRootTransform()
- 
+
 mscale.register_scale(SquareRootScale)
 
 def add_subplot_axes(ax,rect,axisbg='w'):
@@ -972,7 +973,7 @@ def add_subplot_axes(ax,rect,axisbg='w'):
     height = box.height
     inax_position  = ax.transAxes.transform(rect[0:2])
     transFigure = fig.transFigure.inverted()
-    infig_position = transFigure.transform(inax_position)    
+    infig_position = transFigure.transform(inax_position)
     x = infig_position[0]
     y = infig_position[1]
     width *= rect[2]
