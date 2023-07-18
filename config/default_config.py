@@ -117,9 +117,10 @@ FLUX_UNIT = '10*nJy'
 
 
 ### PHOTOZ
-TRANSLATE_FNAME = 'abell2744_uncover.translate'
+TRANSLATE_FNAME = 'ceers.translate'
 ITERATE_ZP = False
-TEMPLATE_SETS = ('fsps_full', 'sfhz')
+TEMPLATE_SETS = ('fsps_full', 'sfhz') #, 'sfhz_blue')
+# TEMPLATE_SETS = ('sfhz',)
 
 ### AREA CALCULATIONS
 RA_RANGE = (3.487, 3.687)
@@ -129,7 +130,7 @@ DEC_RANGE = (-30.5, -30.2)
 # POINT-LIKE FLAG - WEBB
 PS_WEBB_USE = True
 PS_WEBB_FLUXRATIO = (0.7, 0.32)
-PS_WEBB_FLUXRATIO_RANGE = (1.2, 1.5)
+PS_WEBB_FLUXRATIO_RANGE = (1.1, 1.27)
 PS_WEBB_FILT = 'f200w'
 PS_WEBB_MAGLIMIT = 25.0
 PS_WEBB_APERSIZE = 0.7
@@ -137,9 +138,9 @@ PS_WEBB_APERSIZE = 0.7
 # POINT-LIKE FLAG - HST
 PS_HST_USE = True
 PS_HST_FLUXRATIO = (0.7, 0.32)
-PS_HST_FLUXRATIO_RANGE = (1.2, 1.5)
+PS_HST_FLUXRATIO_RANGE = (1.2, 1.75)
 PS_HST_FILT = 'f160w'
-PS_HST_MAGLIMIT = 23.8
+PS_HST_MAGLIMIT = 25.0
 PS_HST_APERSIZE = 0.7
 
 # GAIA
@@ -149,16 +150,20 @@ GAIA_XMATCH_RADIUS = 0.7*u.arcsec
 
 # BADWHT
 BADWHT_USE = True
-FN_BADWHT = os.path.join(os.path.join(WORKING_DIR, DIR_IMAGES), 'uncover_v5.4_abell2744clu_f200w_block40_wht.fits.gz')
+FN_BADWHT = os.path.join(os.path.join(WORKING_DIR, DIR_IMAGES), 'ceers-full-grizli-v6.0-f200w-clear_drc_wht.fits.gz')
 SATURATEDSTAR_MAGLIMIT = 21
 SATURATEDSTAR_FILT = 'f200w'
 SATURATEDSTAR_APERSIZE = 0.7
 
 # EXTRABAD (e.g. bCGs)
-EXTRABAD_USE = True
-FN_EXTRABAD = '/Volumes/External1/Projects/Current/UNCOVER/data/external/grizli_v5.4-bcgsub-other/uncover_v5.4_f444w_bcgs_out.fits'
-EXTRABAD_XMATCH_RADIUS = 2*u.arcsec
-EXTRABAD_LABEL = 'bCG residuals'
+EXTRABAD_USE = False
+FN_EXTRABAD = None
+EXTRABAD_XMATCH_RADIUS = None
+EXTRABAD_LABEL = None
+
+# REGMASK (mask region file of your choice)
+REGMASK_USE = False
+FN_REGMASK = None
 
 ### BAD PIXELS
 BP_USE = True
@@ -166,7 +171,13 @@ BP_FLUXRATIO = (0.7, 0.32)
 BP_FLUXRATIO_RANGE = (0, 1.1)
 BP_FILT = {'LW':'f444w'}
 BP_MAGLIMIT = 26.
-BP_APERSIZE = 0.7
+BP_APERSIZE = 0.32
+
+### ARTIFACTS NEAR BAD PIXELS, EDGES
+ANBP_USE = True
+ANBP_XMATCH_RADIUS = 3*u.arcsec
+ANBP_MIN_NPIX = 10 
+ANBP_MAX_NPIX = 1000
 
 ### BAD KRON RADII
 BK_MINSIZE = 3.5 # arcsec
@@ -177,8 +188,12 @@ BADOBJECT_USE = False
 PATH_BADOBJECT = None
 
 ### HACK for GLASS (to turn off, set GLASS_MASK = None)
-GLASS_MASK = None
+from astropy.io import fits
+GLASS_MASK = None #fits.getdata('/Volumes/1TB_Weaver/Projects/Current/CEERS/data/external/GLASS_MASK.fits.gz')
 
+### CROSSMATCH (for DR1) (otherwise set to None)
+XCAT_FILENAME = '/Volumes/1TB_Weaver/Projects/Current/CEERS/releases/v5.2/CEERS_v5.2_SW_Kf444w_SCIREADY_0_7_CATALOG.fits'
+XCAT_NAME = 'v5'
 # ----------------
 
 HST_FILTERS = ['F105W', 'F125W', 'F140W', 'F160W', 'F435W', 'F475W', 'F606W', 'F775W', 'F814W']
