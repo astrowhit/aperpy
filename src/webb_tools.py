@@ -379,7 +379,7 @@ def psf_cog(psfmodel, filt, nearrad=None, fix_extrapolation=True, pixel_scale=No
             return
 
         # max_rad = radius[-1]
-        large_rad = encircled['aperture_radius']
+        large_rad = encircled['aper_radius']
         large_ee =  encircled[filt]
 
         # renormalize stamp
