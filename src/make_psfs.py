@@ -33,11 +33,21 @@ window = SplitCosineBellWindow(alpha=ALPHA, beta=BETA)
 
 use_filters = [MATCH_BAND] + [f for f in FILTERS if f != MATCH_BAND]
 for pfilt in use_filters:
+    print()
+    print(f'Finding stars for {pfilt}...')
     filename = glob.glob(os.path.join(DIR_OUTPUT, f'*{pfilt}*sci*{SKYEXT}.fits.gz'))[0]
-    starname = filename.replace('.fits', '_star_cat.fits').replace(DIR_OUTPUT, DIR_PSFS)
+    suffix = '.fits' + filename.split('.fits')[-1]
+    starname = filename.replace(suffix, '_star_cat.fits').replace(DIR_OUTPUT, DIR_PSFS)
     outname = os.path.join(DIR_PSFS, f'{pfilt}.fits')
 
-    print(pfilt, filename)
+
+    if os.path.exists(starname) & (pfilt != target_filter): 
+        print(f'PSFs already exist for {pfilt} -- skipping!')
+        continue
+    if pfilt == 'f435w': continue
+
+    print(filename)
+    print(starname)
 
     peaks, stars = find_stars(filename, outdir=DIR_PSFS, label=pfilt)
 
@@ -46,7 +56,7 @@ for pfilt in use_filters:
 
     snr_lim = 1000
     sigma = 2.8 if pfilt in ['f090w'] else 4.0
-    #snr_lim = 500 if f in ['f435w','f606w','f814w','f105w','f125w','f140w','f160w'] else 800
+    # snr_lim = 500 if f in ['f435w','f606w','f814w','f105w','f125w','f140w','f160w'] else 800
     showme=False
 
     maglim = MAGLIM

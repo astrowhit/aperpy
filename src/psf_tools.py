@@ -320,6 +320,7 @@ def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,
 
 #    img[~np.isfinite(img)] = 0.0
     peaks = find_peaks(img, threshold=10*sig, npeaks=npeaks)
+    print(peaks)
     peaks.rename_column('x_peak','x')
     peaks.rename_column('y_peak','y')
     ra,dec = wcs.all_pix2world(peaks['x'], peaks['y'], 0)
@@ -367,6 +368,13 @@ def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,
     rmode = h[1][ih]
     ok_mode =  ((r/rmode-1) > threshold_mode[0]) & ((r/rmode-1) < threshold_mode[1])
     ok = ok_phot & ok_mode & ok_min & ok_shift & ok_mag
+    print(np.sum(ok_phot))
+    print(np.sum(ok_mag))
+    print(np.sum(ok_min))
+    print(np.sum(ok_mode))
+    print(np.sum(ok_shift))
+    if np.sum(ok) < 5:
+        raise RuntimeError(f'Found {np.sum(ok)} viable stars -- too few!')
         
     # sigma clip around linear relation
     try:        
@@ -437,15 +445,16 @@ def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,
         plt.axis('scaled')
         plt.title('position (pix)')
         plt.tight_layout()
-        plt.savefig(outdir+'/'+os.path.basename(filename).replace('.fits','')+'_diagnostic.pdf')
+        suffix = '.fits' + filename.split('.fits')[-1]
+        plt.savefig(outdir+'/'+os.path.basename(filename).replace(suffix,'_diagnostic.pdf'))
         
         dd = [st.data for st in stars[ok]]
         title = ['{} {:.1f} {:.2f} {:.2f} {:.1f} {:.1f}'.format(ii, mm, pp,qq,xx,yy) for ii,mm,pp,qq,xx,yy in zip(peaks['id'][ok],mags[ok],peaks['p1'][ok],peaks['minv'][ok],peaks['x0'][ok],peaks['y0'][ok])]
         imshow(dd,nsig=30,title=title)
         plt.tight_layout()
-        plt.savefig(outdir+'/'+os.path.basename(filename).replace('.fits','')+'_star_stamps.pdf')
+        plt.savefig(outdir+'/'+os.path.basename(filename).replace(suffix,'_star_stamps.pdf'))
     
-    peaks[ok].write(outdir+'/'+os.path.basename(filename).replace('.fits','')+'_star_cat.fits',overwrite=True)
+    peaks[ok].write(outdir+'/'+os.path.basename(filename).replace(suffix,'_star_cat.fits'),overwrite=True)
                 
     return peaks[ok], stars[ok]
 

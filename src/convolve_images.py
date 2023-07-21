@@ -54,6 +54,7 @@ for filename in SCI_FILENAMES:
         if not os.path.exists(outsciname):
             print('Running science image convolution...')
             hdul[0].data = convolve_func(hdul[0].data, kernel, **convolve_kwargs).astype(np.float32)
+            print('convolved...')
             hdul[0].data[weight==0] = 0.
             hdul.writeto(outsciname, overwrite=True)
             print('Wrote file to ', outsciname)
