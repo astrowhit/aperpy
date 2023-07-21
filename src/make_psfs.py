@@ -45,11 +45,12 @@ for pfilt in use_filters:
     starname = filename.replace(suffix, '_star_cat.fits').replace(DIR_OUTPUT, DIR_PSFS)
     outname = os.path.join(DIR_PSFS, f'{pfilt}.fits')
 
-
-    if os.path.exists(starname) & (pfilt != target_filter): 
+    if os.path.exists(starname): 
         print(f'PSFs already exist for {pfilt} -- skipping!')
+        if pfilt == target_filter:
+            target_psf = fits.getdata(glob.glob(DIR_PSFS+'*'+target_filter.lower()+'*'+'psf.fits')[0])
         continue
-    if pfilt == 'f435w': continue
+    # if pfilt == 'f435w': continue
 
     print(filename)
     print(starname)

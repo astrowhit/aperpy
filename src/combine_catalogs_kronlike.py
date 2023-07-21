@@ -27,7 +27,8 @@ from config import FILTERS, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, DIR_OUTPUT, \
     GLASS_MASK, SATURATEDSTAR_APERSIZE, PS_WEBB_USE, PS_HST_USE, GAIA_USE, BADWHT_USE, EXTRABAD_USE, \
     BP_USE, BADOBJECT_USE, PHOT_USEMASK, PROJECT, VERSION, PSF_FOV, USE_COMBINED_KRON_IMAGE, KRON_COMBINED_BANDS, \
     XCAT_FILENAME, XCAT_NAME, ANBP_USE, ANBP_XMATCH_RADIUS, IS_COMPRESSED, ANBP_MIN_NPIX, ANBP_MAX_NPIX, \
-    PSF_REF_NAME, EXTERNALSTARS_USE, FN_EXTERNALSTARS, EXTERNALSTARS_XMATCH_RADIUS, REGMASK_USE, FN_REGMASK
+    PSF_REF_NAME, EXTERNALSTARS_USE, FN_EXTERNALSTARS, EXTERNALSTARS_XMATCH_RADIUS, REGMASK_USE, FN_REGMASK, \
+    AUTOSTAR_USE, AUTOSTAR_BANDS, AUTOSTAR_XMATCH_RADIUS
 
 
 DET_NICKNAME =  sys.argv[2] #'LW_f277w-f356w-f444w'
@@ -406,6 +407,20 @@ if EXTERNALSTARS_USE:
     maincat.add_column(Column(SEL_EXTERNALSTARS.astype(int), name='external_stars_flag'))
     SEL_STAR |= SEL_EXTERNALSTARS
 
+# Auto stars from PSF catalogs
+if AUTOSTAR_USE:
+    starcat = Table([])
+    for filt in AUTOSTAR_BANDS:
+        startab = Table.read(glob.glob(os.path.join(DIR_PSFS, f'diagnostics/*{filt}*_star_cat.fits')))
+        starcat = hstack([starcat, startab])
+    mCATALOG_autostar, mtab_autostar = crossmatch(maincat, starcat, [AUTOSTAR_XMATCH_RADIUS], plot=True)
+    SEL_AUTOSTAR = np.isin(maincat['ID'], mCATALOG_autostar['ID'])
+    print(f'Flagged {np.sum(SEL_AUTOSTAR)} objects as stars from combined star table')
+    maincat.add_column(Column(SEL_AUTOSTAR.astype(int), name='auto_stars_flag'))
+    SEL_STAR |= SEL_AUTOSTAR
+    
+
+
 # GAIA selection
 if GAIA_USE:
     fn_gaia = os.path.join(DIR_OUTPUT, 'gaia.fits')
@@ -528,6 +543,9 @@ if PS_WEBB_USE or PS_HST_USE or BP_USE:
     if BADWHT_USE: # plz don't use this.
         plot_elts.append((SEL_SATSTAR, 'pink', f'{SATURATEDSTAR_FILT} saturated stars'))
 
+    if AUTOSTAR_USE: 
+        plot_elts.append((SEL_AUTOSTAR, 'gold', f'Automatically-selected stars'))
+
     if BP_USE:
         axes[0].scatter(mag[SEL_LWBADPIXEL], size[SEL_LWBADPIXEL], s=12, alpha=0.8, c='firebrick', label='Bad LW pixel')
         axes[1].scatter(mag_hst[SEL_LWBADPIXEL], size_hst[SEL_LWBADPIXEL], s=12, alpha=0.8, c='firebrick')
@@ -555,6 +573,9 @@ if PS_WEBB_USE or PS_HST_USE or BP_USE:
         if PS_HST_USE:
             axes[1].scatter(mag_hst[stars], size_hst[stars], s=12, alpha=1, c=color)
         if BP_USE:
+            axes[2].scatter(mag[stars], fsize[stars], s=12, alpha=1, c=color)
+            axes[3].scatter(mag_bp[stars], size_bp[stars], s=12, alpha=1, c=color)
+        if AUTOSTAR_USE:
             axes[2].scatter(mag[stars], fsize[stars], s=12, alpha=1, c=color)
             axes[3].scatter(mag_bp[stars], size_bp[stars], s=12, alpha=1, c=color)
 

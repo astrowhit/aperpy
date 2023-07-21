@@ -309,7 +309,7 @@ def get_filename(imagedir, filt, skyext=''):
     return filename, starname
 
 
-def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,2.,4.,7.5], range=[0,3], mag_lim = 24.0,
+def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,2.,4.,7.5], range=[0,4], mag_lim = 24.0,
                threshold_min = -0.5, threshold_mode=[-0.2,0.2], shift_lim=2, zp=28.9, instars=None, showme=True, label='',
                outdir='./', plotdir='./'):
 
@@ -364,7 +364,7 @@ def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,
                (np.abs(peaks['x0']) < shift_lim_root) & (np.abs(peaks['y0']) < shift_lim_root)
 
     # ratio apertures @@@ hardcoded
-    h = np.histogram(r[r>1.2], bins=range[1]*20,range=range)
+    h = np.histogram(r[(r>1.2) & ok_mag], bins=np.arange(0, range[1], threshold_mode[1]),range=range)
     ih = np.argmax(h[0])
     rmode = h[1][ih]
     ok_mode =  ((r/rmode-1) > threshold_mode[0]) & ((r/rmode-1) < threshold_mode[1])
