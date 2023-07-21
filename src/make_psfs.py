@@ -23,6 +23,8 @@ pypher_r = PYPHER_R
 
 oversample = OVERSAMPLE
 outdir = DIR_PSFS
+if not os.path.exists(outdir):
+    os.mkdir(outdir)
 plotdir = os.path.join(outdir,'diagnostics/')
 if not os.path.exists(plotdir):
     os.mkdir(plotdir)
