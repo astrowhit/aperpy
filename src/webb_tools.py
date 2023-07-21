@@ -379,7 +379,7 @@ def psf_cog(psfmodel, filt, nearrad=None, fix_extrapolation=True, pixel_scale=No
             return
 
         # max_rad = radius[-1]
-        large_rad = encircled['aper_radius']
+        large_rad = encircled['aperture_radius']
         large_ee =  encircled[filt]
 
         # renormalize stamp
@@ -511,7 +511,8 @@ def get_webbpsf(filt, field='uncover', angle=None, fov=4, og_fov=10, pixscl=None
     # and save
     newhdu = fits.PrimaryHDU(rotated)
     newhdu.writeto(outname+'.fits', overwrite=True)
-    
+
+
     return rotated
 
 def create_circular_mask(h, w, center=None, radius=None):
@@ -606,7 +607,7 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, precomp=None, row=
                 flux, fluxerr = -99, -99
                 mag, magerr = -99, -99
                 snr = -99
-            
+
             if f'faper_{filt}' in row.colnames:
                 flux, fluxerr = row[f'faper_{filt}'], row[f'eaper_{filt}']
                 snr = flux / fluxerr
@@ -896,4 +897,3 @@ def randomize_segments(fn, ext=0):
 
 
     hdul.writeto(fn.replace('.fits', '_rand.fits'))
-    

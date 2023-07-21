@@ -23,11 +23,14 @@ pypher_r = PYPHER_R
 
 oversample = OVERSAMPLE
 outdir = DIR_PSFS
+plotdir = os.path.join(outdir,'diagnostics/')
+if not os.path.exists(plotdir):
+    os.mkdir(plotdir)
 
 target_filter = MATCH_BAND
 image_dir = DIR_OUTPUT
 print('target filter',target_filter)
-hdr = fits.getheader(glob.glob(os.path.join(DIR_OUTPUT, f'*{target_filter}*sci*{SKYEXT}.fits.gz'))[0])
+hdr = fits.getheader(glob.glob(os.path.join(DIR_OUTPUT, f'*{target_filter}*sci*{SKYEXT}.fits*'))[0])
 
 window = SplitCosineBellWindow(alpha=ALPHA, beta=BETA)
 
@@ -49,7 +52,7 @@ for pfilt in use_filters:
     print(filename)
     print(starname)
 
-    peaks, stars = find_stars(filename, outdir=DIR_PSFS, label=pfilt)
+    peaks, stars = find_stars(filename, outdir=DIR_PSFS, plotdir=plotdir, label=pfilt)
 
     print(f'Found {len(peaks)} bright sources')
     # if f != 'f090w': continue
@@ -71,11 +74,15 @@ for pfilt in use_filters:
     psf.stack(sigma=sigma)
     psf.select(snr_lim=snr_lim, dshift_lim=3, mask_lim=0.4, showme=True, nsig=30)
     psf.save(outname.replace('.fits',''))
-    
+
     imshow(psf.data[psf.ok],nsig=50,title=psf.cat['id'][psf.ok])
-    plt.savefig(outname.replace('.fits','_stamps_used.pdf'),dpi=300)
-    show_cogs([psf.psf_average],title=pfilt, label=['oPSF'],outname=DIR_PSFS+pfilt)
+    plt.savefig(outname.replace('.fits','_stamps_used.pdf').replace(outdir,plotdir),dpi=300)
+    show_cogs([psf.psf_average],title=pfilt, label=['oPSF'],outname=plotdir+pfilt)
     # psf.cat[psf.ok]
+    plots=glob.glob(outdir+'*.pdf')
+    plots+=glob.glob(outdir+'*_cat.fits')
+    for plot in plots:
+        os.rename(plot,plot.replace(outdir,plotdir))
 
     # [show_cogs([psf.psf_average], [i]) for i in psf.data[psf.ok].data]
     filt_psf = np.array(psf.psf_average)
@@ -83,11 +90,11 @@ for pfilt in use_filters:
         target_psf = filt_psf
     psfname = glob.glob(DIR_PSFS+'*'+pfilt.lower()+'*'+'psf.fits')[0]
     outname = DIR_KERNELS+os.path.basename(psfname).replace('psf','kernel')
-    
+
 #    if pfilt in ['f105w','f125w','f140w','f160w','f410m','f444w']: pypher_r = 3e-3
-    
+
     filt_psf = fits.getdata(psfname)
-    if oversample > 1:  
+    if oversample > 1:
         print(f'Oversampling PSF by {oversample}x...')
         filt_psf = zoom(filt_psf, oversample)
         if pfilt == MATCH_BAND:
@@ -106,12 +113,13 @@ for pfilt in use_filters:
         os.remove(DIR_KERNELS+'psf_a.fits')
         os.remove(DIR_KERNELS+'psf_b.fits')
         os.remove(DIR_KERNELS+'kernel_a_to_b.fits')
+        os.remove(DIR_KERNELS+'kernel_a_to_b.log')
 
     else:
         kernel =  create_matching_kernel(filt_psf, target_psf, window=window)
-        
+
     if oversample > 1:
-        kernel = block_reduce(kernel,block_size=oversample, func=np.sum) 
+        kernel = block_reduce(kernel,block_size=oversample, func=np.sum)
         kernel /= kernel.sum()
 
     print(f'Writing {pfilt}-->{MATCH_BAND} kernel to {outname.lower()}')
@@ -166,7 +174,7 @@ for i, pfilt in enumerate(use_filters[1:]):
     r,pf,pt = plot_profile(filt_psf_conv,target_psf)
     plt.plot(r*PIXEL_SCALE, pf/pt)
     plt.ylim(0.95,1.05)
-    if method == 'pypher': 
+    if method == 'pypher':
         plt.title('pypher r={}'.format(pypher_r))
     else:
         plt.title('alpha={}, beta={}'.format(ALPHA, BETA))
@@ -182,7 +190,7 @@ for i, pfilt in enumerate(use_filters[1:]):
     plt.ylabel('ee')
 
 plt.tight_layout()
-plt.savefig(DIR_KERNELS+'kernels.pdf',dpi=300)
+plt.savefig(plotdir+'kernels.pdf',dpi=300)
 
 # ----------------
 
