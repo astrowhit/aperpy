@@ -321,7 +321,7 @@ def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,
 
 #    img[~np.isfinite(img)] = 0.0
     peaks = find_peaks(img, threshold=10*sig, npeaks=npeaks)
-    print(peaks)
+    # print(peaks)
     peaks.rename_column('x_peak','x')
     peaks.rename_column('y_peak','y')
     ra,dec = wcs.all_pix2world(peaks['x'], peaks['y'], 0)
