@@ -436,7 +436,7 @@ def get_date():
 
 # Make and rotate PSF
 def get_webbpsf(filt, field='uncover', angle=None, fov=4, og_fov=10, pixscl=None, date=None, output='', jitter_kernel='gaussian', jitter_sigma=None):
-    # makes the PSF at og_fov and clips down to fov. Works with 0.04 "/px
+    # makes the PSF at og_fov and clips down to fov. Tested with 0.04 "/px
     import webbpsf
     from astropy.io import fits
     import numpy as np
@@ -485,7 +485,7 @@ def get_webbpsf(filt, field='uncover', angle=None, fov=4, og_fov=10, pixscl=None
     nc.pixelscale = pixscl
     if date is not None:
         nc.load_wss_opd_by_date(date, plot=False)
-    psfraw = nc.calc_psf(oversample=4, fov_arcsec=og_fov)
+    psfraw = nc.calc_psf(oversample=4, fov_arcsec=og_fov, normalize='exit_pupil')
     psf = psfraw['DET_SAMP'].data
 
     newhdu = fits.PrimaryHDU(psfraw[0].data)

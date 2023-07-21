@@ -47,8 +47,8 @@ DIR_PSFS = os.path.join(WORKING_DIR, 'intermediate/PSF/')
 DIR_KERNELS = os.path.join(WORKING_DIR, 'intermediate/kernels/') # Generally
 DIR_CATALOGS = os.path.join(WORKING_DIR, 'catalogs/')
 
-PATH_SW_ENERGY = '/Users/jweaver/Projects/Software/aperpy/config/Encircled_Energy_SW.txt'
-PATH_LW_ENERGY = '/Users/jweaver/Projects/Software/aperpy/config/Encircled_Energy_LW.txt'
+PATH_SW_ENERGY = '/Users/jweaver/Projects/Software/aperpy/config/Encircled_Energy_SW_ETCv2.txt'
+PATH_LW_ENERGY = '/Users/jweaver/Projects/Software/aperpy/config/Encircled_Energy_LW_ETCv2.txt'
 
 SKYEXT = ''
 WHT_REPLACE = ('bcgs_sci', 'wht') # easy as it comes.
