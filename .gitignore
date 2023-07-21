@@ -102,3 +102,4 @@ bin/
 
 # exclude external models from source control
 /src/external/
+.DS_Store
