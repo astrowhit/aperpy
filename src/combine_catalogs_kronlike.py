@@ -233,14 +233,14 @@ for apersize in PHOT_APER:
     f_ref_auto[use_circle] = f_ref_aper[use_circle]
     f_ref_auto[~np.isfinite(maincat[f'{KRON_MATCH_BAND}_RELWHT'])] = np.nan # if you don't have a weight then you don't have a flux_err, so you don't have flux, and so you shouldn't show auto either.
 
-    psffrac_ref_auto = psf_cog(conv_psfmodel, MATCH_BAND.upper(), nearrad = kronrad_circ, pixel_scale = PIXEL_SCALE, pixel_scale=PIXEL_SCALE) # in pixels
+    psffrac_ref_auto = psf_cog(conv_psfmodel, MATCH_BAND.upper(), nearrad = kronrad_circ, pixel_scale = PIXEL_SCALE) # in pixels
     # F160W kernel convolved MATCH_BAND PSF + missing flux from F160W beyond 2" radius
     f_ref_total = f_ref_auto / psffrac_ref_auto # equation 9
     # if apersize == PHOT_APER[0]:
     newcoln =f'{KRON_MATCH_BAND}_FLUX_REF_AUTO_APER{str_aper}'
     maincat.add_column(Column(f_ref_auto, newcoln))
 
-    min_corr = 1. / psf_cog(conv_psfmodel, MATCH_BAND.upper(), nearrad=(apersize / PIXEL_SCALE / 2.), pixel_scale = PIXEL_SCALE, pixel_scale=PIXEL_SCALE) # defaults to EE(<R_aper)
+    min_corr = 1. / psf_cog(conv_psfmodel, MATCH_BAND.upper(), nearrad=(apersize / PIXEL_SCALE / 2.), pixel_scale = PIXEL_SCALE) # defaults to EE(<R_aper)
     tot_corr = f_ref_total / f_ref_aper
 
     use_circle |= tot_corr < min_corr
