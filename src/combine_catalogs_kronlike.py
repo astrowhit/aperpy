@@ -410,7 +410,7 @@ if EXTERNALSTARS_USE:
 if AUTOSTAR_USE:
     starcat = Table([])
     for filt in AUTOSTAR_BANDS:
-        startab = Table.read(glob.glob(os.path.join(DIR_PSFS, f'diagnostics/*{filt}*_star_cat.fits'))[0])
+        startab = Table.read(glob.glob(os.path.join(DIR_PSFS, f'../diagnostics/*{filt}*_star_cat.fits'))[0])
         starcat = vstack([starcat, startab])
     mCATALOG_autostar, mtab_autostar = crossmatch(maincat, starcat, [AUTOSTAR_XMATCH_RADIUS], plot=True)
     SEL_AUTOSTAR = np.isin(maincat['ID'], mCATALOG_autostar['ID'])
