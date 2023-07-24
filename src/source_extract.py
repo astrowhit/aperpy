@@ -22,7 +22,6 @@ from config import TARGET_ZP, PHOT_APER, PHOT_AUTOPARAMS, PHOT_FLUXRADIUS, DETEC
 DET_NICKNAME = sys.argv[2] #'LW_f277w-f356w-f444w'
 KERNEL = sys.argv[3] # f444w or f160w or None
 
-
 DET_TYPE = 'noise-equal'
 FULLDIR_CATALOGS = os.path.join(DIR_CATALOGS, f'{DET_NICKNAME}_{DET_TYPE}/{KERNEL}/')
 if not os.path.exists(FULLDIR_CATALOGS):
