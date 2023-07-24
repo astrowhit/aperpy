@@ -9,7 +9,7 @@ from astropy.coordinates import SkyCoord
 from astroquery.svo_fps import SvoFps
 import extinction
 import matplotlib.pyplot as plt
-from webb_tools import psf_cog, fit_apercurve
+from webb_tools import psf_cog, fit_apercurve, crossmatch
 from astropy.convolution import convolve
 
 import sys
@@ -400,7 +400,6 @@ if PS_WEBB_USE:
 if EXTERNALSTARS_USE:
     SEL_EXTERNALSTARS = np.zeros(len(maincat), dtype=bool)
     tab_badobj = Table.read(FN_EXTERNALSTARS)
-    from webb_tools import crossmatch
     mCATALOG_badobj, mtab_badobj = crossmatch(maincat, tab_badobj, [EXTERNALSTARS_XMATCH_RADIUS], plot=True)
     SEL_EXTERNALSTARS = np.isin(maincat['ID'], mCATALOG_badobj['ID'])
     print(f'Flagged {np.sum(SEL_EXTERNALSTARS)} objects as bad from the external star table')
@@ -411,7 +410,7 @@ if EXTERNALSTARS_USE:
 if AUTOSTAR_USE:
     starcat = Table([])
     for filt in AUTOSTAR_BANDS:
-        startab = Table.read(glob.glob(os.path.join(DIR_PSFS, f'../diagnostics/*{filt}*_star_cat.fits'))[0])
+        startab = Table.read(glob.glob(os.path.join(DIR_PSFS, f'diagnostics/*{filt}*_star_cat.fits'))[0])
         starcat = vstack([starcat, startab])
     mCATALOG_autostar, mtab_autostar = crossmatch(maincat, starcat, [AUTOSTAR_XMATCH_RADIUS], plot=True)
     SEL_AUTOSTAR = np.isin(maincat['ID'], mCATALOG_autostar['ID'])
@@ -541,7 +540,7 @@ if PS_WEBB_USE or PS_HST_USE or BP_USE:
     if BADWHT_USE: # plz don't use this.
         plot_elts.append((SEL_SATSTAR, 'pink', f'{SATURATEDSTAR_FILT} saturated stars'))
 
-    if AUTOSTAR_USE: 
+    if AUTOSTAR_USE:
         plot_elts.append((SEL_AUTOSTAR, 'gold', f'Automatically-selected stars'))
 
     if BP_USE:
