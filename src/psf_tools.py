@@ -364,7 +364,7 @@ def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,
                (np.abs(peaks['x0']) < shift_lim_root) & (np.abs(peaks['y0']) < shift_lim_root)
 
     # ratio apertures @@@ hardcoded
-    h = np.histogram(r[(r>1.2) & ok_mag], bins=np.arange(0, range[1], threshold_mode[1]),range=range)
+    h = np.histogram(r[(r>1.2) & ok_mag], bins=np.arange(0, range[1], threshold_mode[1]/2.),range=range)
     ih = np.argmax(h[0])
     rmode = h[1][ih]
     ok_mode =  ((r/rmode-1) > threshold_mode[0]) & ((r/rmode-1) < threshold_mode[1])

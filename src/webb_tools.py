@@ -352,7 +352,7 @@ def measure_cog(sci_cutout, pos):
     return radii, cog
 
 # Compute COG for PSF
-def psf_cog(psfmodel, filt, nearrad=None, fix_extrapolation=True, pixel_scale=None, norm_rad=0.5):
+def psf_cog(psfmodel, filt, nearrad=None, fix_extrapolation=True, pixel_scale=None, norm_rad=1.0):
     # x = np.arange(-np.shape(psfmodel)[0]/2,  np.shape(psfmodel)[0]/2)
     # y = x.copy()
     # px = np.arange(0, np.shape(psfmodel)[0]/2, 0.2)
