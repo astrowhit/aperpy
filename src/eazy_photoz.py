@@ -115,7 +115,6 @@ ez.set_sys_err(positive=True)
 
 # Full catalog
 sample = ez.idx # all
-# sample = np.isfinite(ez.ZSPEC)
 
 ez.fit_parallel(sample, n_proc=8, prior=False, beta_prior=False)
 
@@ -244,14 +243,10 @@ for test, ylabel, fname in zip((rel_diff, ztest, dmag),
 
         ax.text(0.05, 0.8, filt, transform=ax.transAxes, fontsize=15)
 
-        # mag = TARGET_ZP - 2.5*np.log10(ez.fnu[:,i])
         snr = (ez.fnu/ez.efnu)[:,i]
-
-        # depth = TARGET_ZP - 2.5*np.log10( np.median(ez.fnu[:,i][(snr > 2.9) & (snr < 3.1)]) )
 
         sanity = ez.cat['use_phot'] == 1
         sanity &= snr > 5
-        # sanity &= ~np.isnan(mag)
 
         ebins = histedges_equalN(ez.zbest[sanity], 15)
         nbins, bin_centers, bmed, bstd = binned_med(ez.zbest[sanity], test[sanity, i], bins=ebins)

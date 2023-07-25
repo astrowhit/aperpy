@@ -29,11 +29,9 @@ for filename in SCI_FILENAMES:
         print(f'Convolved images exist, I will not overwrite')
         continue
 
-    # if f'sci{SKYEXT}' not in filename: continue
     for band in FILTERS:
         if band in filename:
             break
-    # if not ('f090w' in filename): continue
     fn_weight = filename.replace(DIR_OUTPUT, DIR_IMAGES).replace(WHT_REPLACE[0], WHT_REPLACE[1])
     print(band)
     print('  science image: ', filename)
