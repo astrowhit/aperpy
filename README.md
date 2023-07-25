@@ -5,19 +5,19 @@ Aperpy is a front-to-back aperture photometry pipeline written in python. It use
 
 If you use the software, please cite [Weaver et al. 2023](https://ui.adsabs.harvard.edu/abs/2023arXiv230102671W/abstract):
 
-@ARTICLE{Weaver2023,
+> @ARTICLE{Weaver2023,
        author = {{Weaver}, John R. and {Cutler}, Sam E. and {Pan}, Richard and {Whitaker}, Katherine E. and {Labbe}, Ivo and {Price}, Sedona H. and {Bezanson}, Rachel and {Brammer}, Gabriel and {Marchesini}, Danilo and {Leja}, Joel and {Wang}, Bingjie and {Furtak}, Lukas J. and {Zitrin}, Adi and {Atek}, Hakim and {Coe}, Dan and {Dayal}, Pratika and {van Dokkum}, Pieter and {Feldmann}, Robert and {Forster Schreiber}, Natascha and {Franx}, Marijn and {Fujimoto}, Seiji and {Fudamoto}, Yoshinobu and {Glazebrook}, Karl and {de Graaff}, Anna and {Greene}, Jenny E. and {Juneau}, Stephanie and {Kassin}, Susan and {Kriek}, Mariska and {Khullar}, Gourav and {Maseda}, Michael and {Mowla}, Lamiya A. and {Muzzin}, Adam and {Nanayakkara}, Themiya and {Nelson}, Erica J. and {Oesch}, Pascal A. and {Pacifici}, Camilla and {Papovich}, Casey and {Setton}, David and {Shapley}, Alice E. and {Smit}, Renske and {Stefanon}, Mauro and {Taylor}, Edward N. and {Weibel}, Andrea and {Williams}, Christina C.},
-        title = "{The UNCOVER Survey: A first-look HST+JWST catalog of 50,000 galaxies near Abell 2744 and beyond}",
-      journal = {arXiv e-prints},
-     keywords = {Astrophysics - Astrophysics of Galaxies},
-         year = 2023,
-        month = jan,
-          eid = {arXiv:2301.02671},
-        pages = {arXiv:2301.02671},
-          doi = {10.48550/arXiv.2301.02671},
-archivePrefix = {arXiv},
-       eprint = {2301.02671},
- primaryClass = {astro-ph.GA},
-       adsurl = {https://ui.adsabs.harvard.edu/abs/2023arXiv230102671W},
-      adsnote = {Provided by the SAO/NASA Astrophysics Data System}
-}
+>        title = "{The UNCOVER Survey: A first-look HST+JWST catalog of 50,000 galaxies near Abell 2744 and beyond}",
+>      journal = {arXiv e-prints},
+>     keywords = {Astrophysics - Astrophysics of Galaxies},
+>         year = 2023,
+>        month = jan,
+>          eid = {arXiv:2301.02671},
+>        pages = {arXiv:2301.02671},
+>          doi = {10.48550/arXiv.2301.02671},
+>archivePrefix = {arXiv},
+>       eprint = {2301.02671},
+> primaryClass = {astro-ph.GA},
+>       adsurl = {https://ui.adsabs.harvard.edu/abs/2023arXiv230102671W},
+>      adsnote = {Provided by the SAO/NASA Astrophysics Data System}
+>}
