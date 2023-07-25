@@ -19,8 +19,8 @@ from config import TARGET_ZP, PHOT_APER, PHOT_AUTOPARAMS, PHOT_FLUXRADIUS, DETEC
              USE_COMBINED_KRON_IMAGE, KRON_COMBINED_BANDS, KRON_ZPT, PHOT_EMPTYAPER_DIAMS
 
 # MAIN PARAMETERS
-DET_NICKNAME = sys.argv[2] #'LW_f277w-f356w-f444w'
-KERNEL = sys.argv[3] # f444w or f160w or None
+DET_NICKNAME = sys.argv[2]
+KERNEL = sys.argv[3]
 
 DET_TYPE = 'noise-equal'
 FULLDIR_CATALOGS = os.path.join(DIR_CATALOGS, f'{DET_NICKNAME}_{DET_TYPE}/{KERNEL}/')
@@ -141,13 +141,11 @@ for coord, obj in zip(detcoords, catalog):
     angle = np.rad2deg(obj['theta']) * u.deg
     objid = str(obj['ID'])
     regs.append(EllipseSkyRegion(coord, width, height, angle, meta={'label':objid}))
-    # regs.append(PointSkyRegion(coord))
 regs = np.array(regs)
 bigreg = Regions(regs)
 bigreg.write(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_OBJECTS.reg'), overwrite=True, format='ds9')
 
 segmap[np.isnan(detsci)] = -99
-# del detsci
 del detwht
 del detmask
 del deterr
@@ -302,7 +300,7 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
         for diam in PHOT_APER:
             rad = diam / 2. / pixel_scale
             print(f"{PHOT_NICKNAME} :: MEASURING PHOTOMETRY in {diam:2.2f}\" apertures... ({2*rad:2.1f} px)")
-            flux, fluxerr, flag = sep.sum_circle(photsci, xphot, yphot, #objects['x'], objects['y'],
+            flux, fluxerr, flag = sep.sum_circle(photsci, xphot, yphot,
                                                 mask = photmask,
                                                 err = photerr, subpix=0,
                                                 r=rad, gain=1.0)
@@ -317,16 +315,6 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
             print(f'{pc_badfluxerr*100:2.5f}% have BAD fluxerrs')
             print(f'{pc_ORbad*100:2.5f}% have BAD fluxes OR fluxerrs')
             print(f'{pc_ANDbad*100:2.5f}% have BAD fluxes AND fluxerrs')
-
-            # diagnostic region files
-            # regs = []
-            # for coord, obj in zip(detcoords, catalog):
-            #     regs.append(CircleSkyRegion(coord, rad*u.arcsec))
-            # regs = np.array(regs)
-            # bigreg = Regions(regs[badflux])
-            # bigreg.write(os.path.join(FULLDIR_CATALOGS, f'{PHOT_NICKNAME}_{DET_NICKNAME}_BADFLUX{diam}_OBJECTS.reg'), overwrite=True, format='ds9')
-            # bigreg = Regions(regs[badfluxerr])
-            # bigreg.write(os.path.join(FULLDIR_CATALOGS, f'{PHOT_NICKNAME}_{DET_NICKNAME}_BADFLUXERR{diam}_OBJECTS.reg'), overwrite=True, format='ds9')
 
             bad = badflux | badfluxerr
 
@@ -350,16 +338,15 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
             if use_kernel == KERNEL:
                 # KRON RADII AND MAG_AUTO
                 print(f"{PHOT_NICKNAME} :: MEASURING PHOTOMETRY in kron-corrected AUTO apertures...")
-                kronrad, krflag = sep.kron_radius(photsci, xphot, yphot, #catalog['x'], catalog['y'],
+                kronrad, krflag = sep.kron_radius(photsci, xphot, yphot,
                                                     catalog['a'], catalog['b'], catalog['theta'], PHOT_KRONPARAM,
                                                     mask=photmask,
                                                     segmap=seg, seg_id=seg_id) # SE uses 6
                 kronrad[np.isnan(kronrad)] = 0.
                 kronrad *= PHOT_AUTOPARAMS[0]
                 kronrad = np.maximum(kronrad, PHOT_AUTOPARAMS[1])
-                # print(np.isnan(kronrad).sum(), np.max(kronrad), np.min(kronrad))
                 catalog['theta'][catalog['theta'] > np.pi / 2.] = np.pi / 2. # numerical rounding correction!
-                flux, fluxerr, flag = sep.sum_ellipse(photsci, xphot, yphot, #catalog['x'], catalog['y'],
+                flux, fluxerr, flag = sep.sum_ellipse(photsci, xphot, yphot,
                                                     catalog['a'], catalog['b'], catalog['theta'], kronrad,
                                                     err = photerr, mask=photmask,
                                                     subpix=0, segmap=seg, seg_id=seg_id)
@@ -428,7 +415,6 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
         empty_aper = list(PHOT_APER)+list(PHOT_EMPTYAPER_DIAMS)
         empty_aper = np.sort(empty_aper)
         plotname = os.path.join(FULLDIR_CATALOGS, f'figures/{PHOT_NICKNAME}_K{use_kernel}_emptyaper.pdf')
-        # zpt_factor = conv_flux(PHOT_ZPT)
         noise_equal = photsci * np.sqrt(photwht)
         noise_equal[photwht<=0] = 0.
         stats[PHOT_NICKNAME] = empty_apertures(noise_equal, photwht, segmap, N=int(1e4), pixscl=PIXEL_SCALE,

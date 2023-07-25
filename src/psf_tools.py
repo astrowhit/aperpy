@@ -137,7 +137,6 @@ def measure_curve_of_growth(image, position=None, radii=None, rnorm='auto', nrad
         plt.xlabel('radius pix')
         plt.ylabel('curve of growth')
 
-    #    profile = [f in zip(cog[1:],cog]
     # Create output table of aperture radii and cumulative fluxes
     return radii, cog, profile
 
@@ -166,8 +165,6 @@ pixscale = (40<<u.mas)/1000
 def show_cogs(*args, title='', linear=False, pixscale=0.04, label=None, outname=''):
     npsfs = len(args)
     nfilts = len(args[0])
-    # print(npsfs, 'psfs', nfilts, 'filters')
-    # psf_ee = Table.read('PSF_EE/JWST_PSF_ee.fits')
 
     xtick = [0.1,0.2,0.3,0.5,0.7,1.0,1.5,2.0]
     plt.figure(figsize=(20,4.5))
@@ -200,9 +197,6 @@ def show_cogs(*args, title='', linear=False, pixscale=0.04, label=None, outname=
         plt.text(0.6,0.8,'snr = {:.2g} \nx0,y0 = {:.2f},{:.2f} '.format(snr,dx,dy),transform=ax.transAxes, c='C0')
 
         plt.subplot(142)
-        # if 'nircam_'+title.upper() in psf_ee.colnames:
-        #     print('found NIRCam jdox EE',title)
-        #     plt.plot(psf_ee['r'],psf_ee['nircam_'+title.upper()],':',c='gray',label='JDox')
 
         plt.plot(r,cog_ref,label=label[0])
         plt.xlabel('arcsec')
@@ -231,10 +225,6 @@ def show_cogs(*args, title='', linear=False, pixscale=0.04, label=None, outname=
         plt.axvline(x=0.04,alpha=0.5,c='k',ls='--')
         plt.xlim(0.02,1)
         plt.ylim(0.5,1.5)
-        # if 'nircam_'+title.upper() in psf_ee.colnames:
-        #     print('found NIRCam jdox EE',title)
-        #     cog_jdox = np.interp(r, psf_ee['r'],psf_ee['nircam_'+title.upper()])
-        #     plt.plot(r,cog_jdox/cog_ref,':',c='gray',label='JDox')
 
         plt.subplot(144)
         plt.plot(r,cog_ref/cog_ref2,label=label[0],c='C0')
@@ -250,10 +240,7 @@ def show_cogs(*args, title='', linear=False, pixscale=0.04, label=None, outname=
         plt.axvline(x=0.04,alpha=0.5,c='k',ls='--')
         plt.xlim(0.02,1)
         plt.ylim(0.5,1.5)
-        # if 'nircam_'+title.upper() in psf_ee.colnames:
-        #     print('found NIRCam jdox EE',title)
-        #     cog_jdox = np.interp(r, psf_ee['r'],psf_ee['nircam_'+title.upper()])
-        #     plt.plot(r,cog_jdox/cog_ref2,':',c='gray',label='JDox')
+
 
         cogs = []
         profs = []

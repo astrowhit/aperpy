@@ -58,11 +58,9 @@ for pfilt in use_filters:
     peaks, stars = find_stars(filename, outdir=DIR_PSFS, plotdir=plotdir, label=pfilt)
 
     print(f'Found {len(peaks)} bright sources')
-    # if f != 'f090w': continue
 
     snr_lim = 1000
     sigma = 2.8 if pfilt in ['f090w'] else 4.0
-    # snr_lim = 500 if f in ['f435w','f606w','f814w','f105w','f125w','f140w','f160w'] else 800
     showme=False
 
     maglim = MAGLIM
@@ -81,20 +79,16 @@ for pfilt in use_filters:
     imshow(psf.data[psf.ok],nsig=50,title=psf.cat['id'][psf.ok])
     plt.savefig(outname.replace('.fits','_stamps_used.pdf').replace(outdir,plotdir),dpi=300)
     show_cogs([psf.psf_average],title=pfilt, label=['oPSF'],outname=plotdir+pfilt)
-    # psf.cat[psf.ok]
     plots=glob.glob(outdir+'*.pdf')
     plots+=glob.glob(outdir+'*_cat.fits')
     for plot in plots:
         os.rename(plot,plot.replace(outdir,plotdir))
 
-    # [show_cogs([psf.psf_average], [i]) for i in psf.data[psf.ok].data]
     filt_psf = np.array(psf.psf_average)
     if pfilt == MATCH_BAND:
         target_psf = filt_psf
     psfname = glob.glob(DIR_PSFS+'*'+pfilt.lower()+'*'+'psf.fits')[0]
     outname = DIR_KERNELS+os.path.basename(psfname).replace('psf','kernel')
-
-#    if pfilt in ['f105w','f125w','f140w','f160w','f410m','f444w']: pypher_r = 3e-3
 
     filt_psf = fits.getdata(psfname)
     if oversample > 1:
@@ -133,7 +127,6 @@ plt.figure(figsize=(30,nfilt*4))
 npanel = 7
 
 target_psf = fits.getdata(glob.glob(DIR_PSFS+'*'+MATCH_BAND.lower()+'*'+'psf.fits')[0])
-# if oversample > 1:  target_psf = zoom(target_psf,oversample)
 target_psf /= target_psf.sum()
 
 print(f'Plotting kernel checkfile...')
@@ -143,7 +136,6 @@ for i, pfilt in enumerate(use_filters[1:]):
     outname = DIR_KERNELS+os.path.basename(psfname).replace('psf','kernel')
 
     filt_psf = fits.getdata(psfname)
-    # if oversample > 1:  filt_psf = zoom(filt_psf,oversample)
     filt_psf /= filt_psf.sum()
 
     kernel = fits.getdata(outname.lower())
@@ -161,7 +153,6 @@ for i, pfilt in enumerate(use_filters[1:]):
 
     plt.imshow(kernel, norm=simple, interpolation='antialiased',origin='lower')
 
-    # print('centroid psf,target,kernel', centroid_2dg(filt_psf), centroid_2dg(target_psf), centroid_2dg(kernel))
     filt_psf_conv = convolve_fft(filt_psf, kernel)
 
     plt.subplot(nfilt,npanel,4+i*npanel)
@@ -195,28 +186,9 @@ for i, pfilt in enumerate(use_filters[1:]):
 plt.tight_layout()
 plt.savefig(plotdir+'kernels.pdf',dpi=300)
 
-# ----------------
-
-
-# Default behavior generates a 10" FOV PSF and clips down to 4" FOV; PIXEL_SCALE "/px
-# for filt in FILTERS:
-#     filt = filt.upper()
-#     if filt not in USE_FILTERS: continue
-#     print(f'Fetching WebbPSF for {filt} at PA {ANGLE}deg for date {date}')
-#     get_webbpsf(filt, FIELD, ANGLE, output=DIR_PSFS, date=date, pixscl=PIXEL_SCALE)
-
 
 def renorm_psf(filt, field, dir=DIR_PSFS, pixscl=PIXEL_SCALE, fov=PSF_FOV):
     psfmodel = fits.getdata(os.path.join(dir, f'{filt.lower()}_psf_unmatched.fits'))
-
-    # encircled = {} # rounded to nearest 100nm, see hst docs
-    # encircled['F105W'] = 0.975
-    # encircled['F125W'] = 0.969
-    # encircled['F140W'] = 0.967
-    # encircled['F160W'] = 0.967
-    # encircled['F435W'] = 0.989
-    # encircled['F606W'] = 0.980
-    # encircled['F814W'] = 0.976
 
     # Encircled energy for WFC3 IR within 2" radius, ACS Optical, and UVIS from HST docs
     encircled = {}
@@ -255,9 +227,3 @@ def renorm_psf(filt, field, dir=DIR_PSFS, pixscl=PIXEL_SCALE, fov=PSF_FOV):
     # and save
     newhdu = fits.PrimaryHDU(psfmodel)
     newhdu.writeto(os.path.join(DIR_PSFS, f'psf_{field}_{filt}_{fov}arcsec.fits'), overwrite=True)
-
-# for filt in FILTERS:
-#     filt = filt.upper()
-#     if filt in USE_FILTERS: continue
-#     print(f'Normalizing ePSF for {filt}...')
-#     renorm_psf(filt, FIELD)

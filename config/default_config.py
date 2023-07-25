@@ -117,10 +117,9 @@ FLUX_UNIT = '10*nJy'
 
 
 ### PHOTOZ
-TRANSLATE_FNAME = 'ceers.translate'
+TRANSLATE_FNAME = f'{PROJECT.lower()}.translate'
 ITERATE_ZP = False
 TEMPLATE_SETS = ('fsps_full', 'sfhz') #, 'sfhz_blue')
-# TEMPLATE_SETS = ('sfhz',)
 
 ### AREA CALCULATIONS
 RA_RANGE = (3.487, 3.687)
@@ -191,10 +190,6 @@ BK_SLOPE = 250
 ### USER SUPPLED BAD IDs
 BADOBJECT_USE = False
 PATH_BADOBJECT = None
-
-### HACK for GLASS (to turn off, set GLASS_MASK = None)
-from astropy.io import fits
-GLASS_MASK = None #fits.getdata('/Volumes/1TB_Weaver/Projects/Current/CEERS/data/external/GLASS_MASK.fits.gz')
 
 ### CROSSMATCH (for DR1) (otherwise set to None)
 XCAT_FILENAME = '/Volumes/1TB_Weaver/Projects/Current/CEERS/releases/v5.2/CEERS_v5.2_SW_Kf444w_SCIREADY_0_7_CATALOG.fits'

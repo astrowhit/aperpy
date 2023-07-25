@@ -580,17 +580,6 @@ if PS_WEBB_USE or PS_HST_USE or BP_USE:
     fig.tight_layout()
     fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_K{KERNEL}_star_id.png'))
 
-
-# # bad kron radius flag
-# krc = maincat[f'{KRON_MATCH_BAND}_KRON_RADIUS_CIRC{mask}'] * PIXEL_SCALE
-# snr = (maincat[f'{KRON_MATCH_BAND}_FLUX_APER{str_aper}_COLOR']/maincat[f'{KRON_MATCH_BAND}_FLUXERR_APER{str_aper}_COLOR'])
-# sel_badkron = (snr < BK_SLOPE*(krc - BK_MINSIZE))  #| (krc > 9)
-# print(f'Flagged {np.sum(sel_badkron)} objects as having enormous kron radii for their SNR')
-# maincat.add_column(Column(sel_badkron.astype(int), name='badkron_flag'))
-
-# SEL_GEN |= sel_badkron # NO! leave this off. We want to use them still.
-# low-weight source flag -  TODO
-
 # HACK for glass
 if GLASS_MASK is not None:
     SEL_BADGLASS = np.zeros(len(maincat), dtype=bool)
@@ -766,20 +755,14 @@ for apersize in PHOT_APER:
         cols['iso_area'] = 'iso_area'
         cols['a'] = 'a_image'
         cols['b'] = 'b_image'
-        cols['theta'] = 'theta_J2000' # double check this!
+        cols['theta'] = 'theta_J2000'
         cols[f'{KRON_MATCH_BAND}_FLUX_RADIUS_FRAC0_5'] = 'flux_radius'
         cols['use_phot'] = 'use_phot'
         cols['lowsnr_flag'] = 'flag_lowsnr'
         cols['star_flag'] = 'flag_star'
-        # cols['bad_wht_flag'] = 'flag_badwht'
         cols['combined_artifact_flag'] = 'flag_artifact'
         if EXTRABAD_USE:
             cols['extrabad_flag'] = 'flag_nearbcg'
-        # if PATH_BADOBJECT is not None:
-        #     cols['badobject_flag'] = 'flag_badobject'
-        # cols['badkron_flag'] = 'flag_badkron'
-        # if GLASS_MASK is not None:
-        #     cols['badglass_flag'] = 'flag_badflat'
         cols['z_spec'] = 'z_spec'
 
         subcat = maincat[list(cols.keys())].copy()
@@ -817,15 +800,7 @@ for apersize in PHOT_APER:
         for coln in subcat.colnames:
             if 'radius' in coln:
                 subcat[coln][badsel] = np.nan
-        # print(np.sum(subcat['use_phot']==0))
 
-        # # use flag (minimum SNR cut + not a star)
-        # snr_ref = subcat[f'f_{KRON_MATCH_BAND}'] / subcat[f'e_{KRON_MATCH_BAND}']
-        # snr_ref[subcat[f'e_{KRON_MATCH_BAND}']<=0] = -1
-        # use_phot = np.zeros(len(subcat))
-        # use_phot[snr_ref >= 3] = 1
-        # use_phot[SEL_STAR | SEL_BADPIX | SEL_EXTRABAD | SEL_BADOBJECT | SEL_BADGLASS | sel_badkron] = 0
-        # subcat['use_phot'] = use_phot
         str_aper = str_aper.replace('_', '')
         if len(str_aper) == 2:
             str_aper += '0' # 07 -> 070

@@ -353,14 +353,6 @@ def measure_cog(sci_cutout, pos):
 
 # Compute COG for PSF
 def psf_cog(psfmodel, filt, nearrad=None, fix_extrapolation=True, pixel_scale=None, norm_rad=1.0):
-    # x = np.arange(-np.shape(psfmodel)[0]/2,  np.shape(psfmodel)[0]/2)
-    # y = x.copy()
-    # px = np.arange(0, np.shape(psfmodel)[0]/2, 0.2)
-    # px = px[px<2.5/pixel_scale]
-    # xv, yv = np.meshgrid(x, y)
-    # radius = np.sqrt(xv**2 + yv**2)
-    # cumcurve = np.array([np.sum(psfmodel[radius<i]) for i in px])
-
     pos = np.shape(psfmodel)[0]/2.,  np.shape(psfmodel)[1]/2.
     radii, cog = measure_cog(psfmodel, pos)
     radii *= pixel_scale
@@ -382,10 +374,6 @@ def psf_cog(psfmodel, filt, nearrad=None, fix_extrapolation=True, pixel_scale=No
         large_rad = encircled['aper_radius']
         large_ee =  encircled[filt]
 
-        # renormalize stamp
-        # This is a little sketchy but should work so long as the SW/LW radial sampling is decent.
-        # cumcurve *= large_ee[np.argmin(np.abs(large_rad-max_rad))] / cumcurve[-1]
-
         ok = radii<norm_rad
         radii = radii[ok]
         cog = cog[ok]
@@ -404,8 +392,6 @@ def psf_cog(psfmodel, filt, nearrad=None, fix_extrapolation=True, pixel_scale=No
         output[output>1] = 1.0
         return output
 
-# from numba import njit
-# @njit
 def compute_isofluxes(seg_flat, sci_flat):
     isofluxes = np.zeros(np.max(seg_flat))
     for idx, val in zip(seg_flat, sci_flat):
@@ -496,7 +482,6 @@ def get_webbpsf(filt, field='uncover', angle=None, fov=4, og_fov=10, pixscl=None
 
     clip = int((og_fov - fov) / 2 / nc.pixelscale)
     rotated = rotated[clip:-clip, clip:-clip]
-    # print(np.shape(rotated))
 
     # Normalize to correct for missing flux
     # Has to be done encircled! Ensquared were calibated to zero angle...
@@ -560,12 +545,8 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, precomp=None, row=
             if not os.path.exists(fn):
                 print(f'WARNING -- image for {filt} does not exist at {fn}. Skipping!')
                 continue
-            # print('foo')
             hdu = fits.open(fn)[0]
             img = hdu.data
-            # print('foo2')
-            # if plot: # get these from the big mosaic!
-            #     mean, median, rms = sigma_clipped_stats(img[img!=0], sigma=3)
             wcs = WCS(hdu.header)
         else:
             hdu, img, head = precomp[filt]
@@ -625,15 +606,11 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, precomp=None, row=
                 if flux <=0:
                     mag, magerr = -1, flux/fluxerr
 
-                # print(filt)
-                # print(flux, fluxerr)
-                # print(mag, magerr)
             scale = np.nanmax(img)
             if scale <= 0:
                 scale = 0.02
             elif np.isnan(scale):
                 scale = 1
-            # print(filt, rms, scale, np.nanmedian(img), np.nanmin(img), np.nanmax(img), np.sum(img))
             ax.imshow(img, cmap='RdGy', norm=SymLogNorm(3*rms, 1, -scale, scale))
             ax.text(0.05, 1.05, f'{filt}\n{flux:2.2f}+/-{fluxerr:2.2f} 10*nJy (S/N:{snr:2.2f})', transform=ax.transAxes)
             ax.axes.xaxis.set_visible(False)
@@ -673,7 +650,6 @@ def binned_med(X, Y, xrange=None, dbins=1.0, bins=None, use_scott=False):
         bins = bins
     else:
         bins = np.arange(xrange[0], xrange[1], dbins)
-    # delta = bins[1]-bins[0]
 
     Y = Y[X<bins[-1]]
     X = X[X<bins[-1]]
@@ -826,14 +802,10 @@ def crossmatch(cat1, cat2, thresh=[1*u.arcsec,], verbose=1, plot=False, col1=Non
     for i, iter_thresh in enumerate(thresh):
 
         # Perform crossmatch
-        # print(len(np.unique(coord_primary.ra)), len(coord_primary))
-        # print(len(np.unique(coord_match.ra)), len(coord_match))
         idx, d2d, d3d = coord_primary.match_to_catalog_sky(coord_match)
         d2d = d2d.to(u.arcsec)
 
         sel_thresh = d2d < iter_thresh
-        # print(len(np.unique(idx)), len(idx))
-        # print(len(np.unique(idx[sel_thresh])), np.sum(sel_thresh))
         mcoord_primary = coord_primary[sel_thresh]
         mcoord_match = coord_match[idx[sel_thresh]]
 
@@ -882,7 +854,6 @@ def crossmatch(cat1, cat2, thresh=[1*u.arcsec,], verbose=1, plot=False, col1=Non
 
     print(f'idx1: {len(np.unique(idx1))} unique entires out of {len(idx1)}')
     print(f'idx2: {len(np.unique(idx2))} unique entires out of {len(idx2)}')
-    # print(np.sum(np.unique(idx2, return_counts=True)[1]==1))
 
     if return_idx:
         return cat1[idx1], cat2[idx2], idx1, idx2
