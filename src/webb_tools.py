@@ -556,7 +556,7 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, precomp=None, row=
             print(f'CRITICAL -- {coord} is not within the image footprint!')
             # sys.exit()
         try:
-            cutout = Cutout2D(img, position=coord, size=size*u.arcsec, wcs=wcs, copy=True)
+            cutout = Cutout2D(img, position=coord, size=size*u.arcsec, wcs=wcs)
         except:
             ax.axes.xaxis.set_visible(False)
             ax.axes.yaxis.set_visible(False)
@@ -570,10 +570,10 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, precomp=None, row=
                 rms = 0.002
 
         if write:
-            hdu.data = cutout.data
-            hdu.header.update(cutout.wcs.to_header())
-            hdu.name = filt
-            hdul.append(hdu)
+            hdu_out = fits.ImageHDU(cutout.data, header=hdu.header)
+            hdu_out.header.update(cutout.wcs.to_header())
+            hdu_out.name = filt
+            hdul.append(hdu_out)
 
         if plot: # nice stamp pdfs scaled optimally to show noise + structure
 
@@ -627,13 +627,13 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, precomp=None, row=
         ax_rgb.axes.xaxis.set_visible(False)
         ax_rgb.axes.yaxis.set_visible(False)
         if write:
-            fig_rgb.savefig(os.path.join(dir, f'cutouts/{nickname}_z{redshift:2.1f}_RGB.pdf'), dpi=300)
+            fig_rgb.savefig(os.path.join(dir, f'{nickname}_z{redshift:2.1f}_RGB.pdf'), dpi=300)
 
     fig.tight_layout()
-    if plot:
-        fig.savefig(os.path.join(dir, f'cutouts/{nickname}_z{redshift:2.1f}.pdf'), dpi=300)
+    if plot & write:
+        fig.savefig(os.path.join(dir, f'{nickname}_z{redshift:2.1f}.pdf'), dpi=300)
     if write:
-        hdul.writeto(os.path.join(dir, f'cutouts/{nickname}_z{redshift:2.1f}.fits'), overwrite=True)
+        hdul.writeto(os.path.join(dir, f'{nickname}_z{redshift:2.1f}.fits'), overwrite=True)
 
 
 def histedges_equalN(x, nbin):
