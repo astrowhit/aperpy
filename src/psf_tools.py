@@ -1015,3 +1015,43 @@ if 0:
     labelLines(lines[:-1],align=False)
 
     plt.show()
+
+def renorm_psf(psfmodel, filt, fov=4.04, pixscl=0.04):
+    
+    filt = filt.upper()
+
+    # Encircled energy for WFC3 IR within 2" radius, ACS Optical, and UVIS from HST docs
+    encircled = {}
+    encircled['F225W'] = 0.993
+    encircled['F275W'] = 0.984
+    encircled['F336W'] = 0.9905
+    encircled['F435W'] = 0.979
+    encircled['F606W'] = 0.975
+    encircled['F775W'] = 0.972
+    encircled['F814W'] = 0.972
+    encircled['F850LP'] = 0.970
+    encircled['F098M'] = 0.974
+    encircled['F105W'] = 0.973
+    encircled['F125W'] = 0.969
+    encircled['F140W'] = 0.967
+    encircled['F160W'] = 0.966
+    encircled['F090W'] = 0.9837
+    encircled['F115W'] = 0.9822
+    encircled['F150W'] = 0.9804
+    encircled['F200W'] = 0.9767
+    encircled['F277W'] = 0.9691
+    encircled['F356W'] = 0.9618
+    encircled['F410M'] = 0.9568
+    encircled['F444W'] = 0.9546
+
+    # Normalize to correct for missing flux
+    # Has to be done encircled! Ensquared were calibated to zero angle...
+    w, h = np.shape(psfmodel)
+    Y, X = np.ogrid[:h, :w]
+    r = fov / 2. / pixscl
+    center = [w/2., h/2.]
+    dist_from_center = np.sqrt((X - center[0])**2 + (Y-center[1])**2)
+    psfmodel /= np.sum(psfmodel[dist_from_center < r])
+    psfmodel *= encircled[filt] # to get the missing flux accounted for
+
+    return psfmodel

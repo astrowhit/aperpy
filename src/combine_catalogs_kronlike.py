@@ -26,9 +26,9 @@ from config import FILTERS, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, DIR_OUTPUT, \
     FN_EXTRABAD, EXTRABAD_XMATCH_RADIUS, EXTRABAD_LABEL, PATH_BADOBJECT, \
     GLASS_MASK, SATURATEDSTAR_APERSIZE, PS_WEBB_USE, PS_HST_USE, GAIA_USE, BADWHT_USE, EXTRABAD_USE, \
     BP_USE, BADOBJECT_USE, PHOT_USEMASK, PROJECT, VERSION, USE_COMBINED_KRON_IMAGE, KRON_COMBINED_BANDS, \
-    XCAT_FILENAME, XCAT_NAME, ANBP_USE, ANBP_XMATCH_RADIUS, IS_COMPRESSED, ANBP_MIN_NPIX, ANBP_MAX_NPIX, \
+    XCAT_FILENAME, XCAT_NAME, XCAT2_FILENAME, XCAT2_NAME, ANBP_USE, ANBP_XMATCH_RADIUS, IS_COMPRESSED, ANBP_MIN_NPIX, ANBP_MAX_NPIX, \
     PSF_REF_NAME, EXTERNALSTARS_USE, FN_EXTERNALSTARS, EXTERNALSTARS_XMATCH_RADIUS, REGMASK_USE, FN_REGMASK, \
-    AUTOSTAR_USE, AUTOSTAR_BANDS, AUTOSTAR_XMATCH_RADIUS
+    AUTOSTAR_USE, AUTOSTAR_BANDS, AUTOSTAR_XMATCH_RADIUS, AUTOSTAR_NFILT
 
 
 DET_NICKNAME =  sys.argv[2] #'LW_f277w-f356w-f444w'
@@ -203,8 +203,6 @@ for i, id in enumerate(maincat['ID']):
     is_dominant[i] = np.all(isofluxes[i] > isofluxes[friends])
 kronrad_area = np.pi * (maincat[f'{KRON_MATCH_BAND}_KRON_RADIUS_CIRC{mask}'] * PIXEL_SCALE)**2
 
-# is_dominant = np.zeros(len(is_dominant), dtype=bool) # !!!!!!!!!!!!!
-
 sel_badkron[(maincat['flag'] > 0)] = True
 sel_badkron[sel_badkron & (kronrad_area < maincat[f'iso_area'])] = False
 sel_badkron[sel_badkron & (is_dominant & (kronrad_area < 1.5*maincat[f'iso_area']))] = False
@@ -374,7 +372,7 @@ SEL_STAR = np.zeros(len(maincat),dtype=bool)
 # Select in F160W
 if PS_HST_USE:
     str_aper = str(PS_HST_APERSIZE).replace('.', '_')
-    mag_hst = TARGET_ZP - 2.5*np.log10(maincat[f'{PS_HST_FILT}_FLUX_APER{str_aper}_TOTAL'])
+    mag_hst = TARGET_ZP - 2.5*np.log10(maincat[f'{PS_HST_FILT}_FLUX_APER{str_aper}'])
     size_hst = maincat_unmatched[f'{PS_HST_FILT}_FLUX_APER{str(PS_HST_FLUXRATIO[0]).replace(".", "_")}']  \
                     / maincat_unmatched[f'{PS_HST_FILT}_FLUX_APER{str(PS_HST_FLUXRATIO[1]).replace(".", "_")}']
 
@@ -387,7 +385,7 @@ if PS_HST_USE:
 # Select from Webb band
 if PS_WEBB_USE:
     str_aper = str(PS_WEBB_APERSIZE).replace('.', '_')
-    mag = TARGET_ZP - 2.5*np.log10(maincat[f'{PS_WEBB_FILT}_FLUX_APER{str_aper}_TOTAL'])
+    mag = TARGET_ZP - 2.5*np.log10(maincat[f'{PS_WEBB_FILT}_FLUX_APER{str_aper}'])
     size = maincat_unmatched[f'{PS_WEBB_FILT}_FLUX_APER{str(PS_WEBB_FLUXRATIO[0]).replace(".", "_")}']  \
                     / maincat_unmatched[f'{PS_WEBB_FILT}_FLUX_APER{str(PS_WEBB_FLUXRATIO[1]).replace(".", "_")}']
     SEL_WEBB = (size > PS_WEBB_FLUXRATIO_RANGE[0]) & (size < PS_WEBB_FLUXRATIO_RANGE[1]) & (mag < PS_WEBB_MAGLIMIT)
@@ -411,11 +409,15 @@ if AUTOSTAR_USE:
     starcat = Table([])
     for filt in AUTOSTAR_BANDS:
         startab = Table.read(glob.glob(os.path.join(DIR_PSFS, f'../diagnostics/*{filt}*_star_cat.fits'))[0])
-        starcat = vstack([starcat, startab])
-    mCATALOG_autostar, mtab_autostar = crossmatch(maincat, starcat, [AUTOSTAR_XMATCH_RADIUS], plot=True)
-    SEL_AUTOSTAR = np.isin(maincat['ID'], mCATALOG_autostar['ID'])
-    print(f'Flagged {np.sum(SEL_AUTOSTAR)} objects as stars from combined star table')
+        mCATALOG_autostar, mtab_autostar = crossmatch(maincat, startab, [AUTOSTAR_XMATCH_RADIUS], plot=True)
+        SEL_AUTOSTAR_FILTER = np.isin(maincat['ID'], mCATALOG_autostar['ID'])
+        if filt == AUTOSTAR_BANDS[0]:
+            maincat.add_column(Column(SEL_AUTOSTAR_FILTER.astype(int), name='auto_nstars'))
+        else:
+            maincat['auto_nstars'] += SEL_AUTOSTAR_FILTER.astype(int)
+    SEL_AUTOSTAR = SEL_AUTOSTAR_FILTER >= AUTOSTAR_NFILT
     maincat.add_column(Column(SEL_AUTOSTAR.astype(int), name='auto_stars_flag'))
+    print(f'Flagged {np.sum(SEL_AUTOSTAR)} objects as stars from combined star table')
     SEL_STAR |= SEL_AUTOSTAR
 
 # GAIA selection
@@ -447,7 +449,7 @@ if GAIA_USE:
 if BADWHT_USE:
     weightmap = fits.getdata(FN_BADWHT) # this is lazy, but OK.
     str_aper = str(SATURATEDSTAR_APERSIZE).replace('.', '_')
-    mag_sat = TARGET_ZP - 2.5*np.log10(maincat[f'{SATURATEDSTAR_FILT}_FLUX_APER{str_aper}_TOTAL'])
+    mag_sat = TARGET_ZP - 2.5*np.log10(maincat[f'{SATURATEDSTAR_FILT}_FLUX_APER{str_aper}'])
     SEL_BADWHT = (weightmap[maincat['y'].astype(int).value, maincat['x'].astype(int).value] == 1)
     sw_wht = maincat[f'{SATURATEDSTAR_FILT}_SRC_MEDWHT'].copy()
     sw_wht[np.isnan(sw_wht)] = 0
@@ -496,7 +498,7 @@ if ANBP_USE:
 if BP_USE:
     str_aper = str(BP_APERSIZE).replace('.', '_')
     BP_FILT_SEL = BP_FILT[DET_NICKNAME.split('_')[0]]
-    mag_bp = TARGET_ZP - 2.5*np.log10(maincat[f'{BP_FILT_SEL}_FLUX_APER{str_aper}_TOTAL'])
+    mag_bp = TARGET_ZP - 2.5*np.log10(maincat[f'{BP_FILT_SEL}_FLUX_APER{str_aper}'])
     size_bp = maincat_unmatched[f'{BP_FILT_SEL}_FLUX_APER{str(BP_FLUXRATIO[0]).replace(".", "_")}']  \
                     / maincat_unmatched[f'{BP_FILT_SEL}_FLUX_APER{str(BP_FLUXRATIO[1]).replace(".", "_")}']
     SEL_LWBADPIXEL = (size_bp > BP_FLUXRATIO_RANGE[0]) & (size_bp < BP_FLUXRATIO_RANGE[1])
@@ -545,7 +547,8 @@ if PS_WEBB_USE or PS_HST_USE or BP_USE:
 
     if BP_USE:
         axes[0].scatter(mag[SEL_LWBADPIXEL], size[SEL_LWBADPIXEL], s=12, alpha=0.8, c='firebrick', label='Bad LW pixel')
-        axes[1].scatter(mag_hst[SEL_LWBADPIXEL], size_hst[SEL_LWBADPIXEL], s=12, alpha=0.8, c='firebrick')
+        if PS_HST_USE:
+            axes[1].scatter(mag_hst[SEL_LWBADPIXEL], size_hst[SEL_LWBADPIXEL], s=12, alpha=0.8, c='firebrick')
 
         axes[2].scatter(mag, fsize, s=3, alpha=0.2, c='grey')
         axes[2].scatter(mag[SEL_LWBADPIXEL], fsize[SEL_LWBADPIXEL], s=12, alpha=0.8, c='firebrick', label='Bad LW pixel')
@@ -785,6 +788,19 @@ for apersize in PHOT_APER:
             matchrad[idx1] = dsky[idx1]
             subcat.add_column(MaskedColumn(ids, name=f'id_{XCAT_NAME}', mask=ids<=0, dtype='i4'))
             subcat.add_column(MaskedColumn(matchrad*u.arcsec, name=f'match_radius_{XCAT_NAME}', mask=ids<=0))
+
+        if XCAT2_FILENAME is not None:
+            # Crossmatch to DR1 and make a new column (ID + radius)
+            from catalog_tools import crossmatch
+            from astropy.table import Table, Column, MaskedColumn
+            cat_old = Table.read(XCAT2_FILENAME)
+            mcat_new, mcat_old, idx1, idx2, dsky  = crossmatch(subcat, cat_old, thresh=[0.08*u.arcsec], plot=True, return_idx=True)
+            ids = np.zeros(len(subcat))
+            ids[idx1] = cat_old['id'][idx2]
+            matchrad = np.zeros(len(subcat))
+            matchrad[idx1] = dsky[idx1]
+            subcat.add_column(MaskedColumn(ids, name=f'id_{XCAT2_NAME}', mask=ids<=0, dtype='i4'))
+            subcat.add_column(MaskedColumn(matchrad*u.arcsec, name=f'match_radius_{XCAT2_NAME}', mask=ids<=0))
 
         # Kill any weight that has no flux
         for coln in subcat.colnames:

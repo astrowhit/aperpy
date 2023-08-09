@@ -51,7 +51,7 @@ for i in np.array(np.unique(np.array(RELEASE['use_aper']), return_counts=True)).
     print(f'N({i[0]}'+'\"'+f') = {int(i[1])} ({100*i[1]/len(RELEASE):2.0f}%)')
 print('------')
 for col in RELEASE.colnames:
-    if ('flag' in col) | ('use' in col):
+    if ('flag' in col) | ('use' in col) & ('use_aper' not in col):
         print(f'N({col}) =  {np.sum(RELEASE[col]!=0)}  ({100*RELEASE[col].sum()/len(RELEASE):2.0f}%)' )
 
 RELEASE.meta['APER_DIAM'] = 'ADAPTIVE'
