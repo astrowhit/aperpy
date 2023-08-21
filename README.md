@@ -3,7 +3,7 @@
 
 Aperpy is a front-to-back aperture photometry pipeline written in python aimed at deep space-based galaxy fields. It uses pythonic Source Extractor (SEP, [Barbary et al. 2016](https://ui.adsabs.harvard.edu/abs/2016JOSS....1...58B/abstract)) to detect sources in a noise-equalized (i.e. inverse variance weighted) detection image, resamples images to a common pixel scale, builds emperical PSFs from point sources and corresponding matching kernels, measures photometry in a number of apertures including Kron-like 'AUTO' ellipses, auto-selects the most suitable aperture for a given source size, flags stars and artifacts, prepares ready-to-use output catalogs, and even run EAZY ([Brammer et al. 2008](https://ui.adsabs.harvard.edu/abs/2008ApJ...686.1503B/abstract)). A large number of diagnostic figures are provided as output. 
 
-Methodology was adapted from [Whitaker et al. 2011](https://ui.adsabs.harvard.edu/abs/2011ApJ...735...86W/abstract) and [Labbe et al. 2003](https://ui.adsabs.harvard.edu/abs/2003AJ....125.1107L/abstract). Currently it is designed for use with JWST and HST data, although extensions are possible. 
+Methodology was adapted mainly from [Whitaker et al. 2011](https://ui.adsabs.harvard.edu/abs/2011ApJ...735...86W/abstract) and [Labbe et al. 2003](https://ui.adsabs.harvard.edu/abs/2003AJ....125.1107L/abstract). Currently it is designed for use with JWST and HST data, although extensions are possible. 
 
 If you use the software, please cite [Weaver et al. 2023](https://ui.adsabs.harvard.edu/abs/2023arXiv230102671W/abstract):
 
