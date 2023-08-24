@@ -2,11 +2,11 @@ import os
 from typing import OrderedDict
 import astropy.units as u
 from astropy.coordinates import SkyCoord
+import numpy as np
 
 ### GENERAL
 KERNELS = {}
 KERNELS['f444w'] = 'regularization'
-# KERNELS['f160w'] = 'shapelets'
 
 DETECTION_PARAMS = dict(
     thresh =  1.2,
@@ -18,72 +18,88 @@ DETECTION_PARAMS = dict(
     clean = False,
     )
 
-PHOT_APER = [0.32, 0.48, 0.7 , 1.5] # diameter in arcsec
-PHOT_AUTOPARAMS = 2.0, 1.0 # Kron-scaling radius, mimumum kron factor
+PHOT_APER = [0.32, 0.48, 0.7, 1.0, 1.4] # diameter in arcsec
+PHOT_AUTOPARAMS = 2.5, 1.0 # Kron-scaling radius, mimumum kron factor
 PHOT_FLUXRADIUS = 0.5, 0.6 # FLUX_RADIUS at 50% and 60% of flux (always keep 0.5!)
 PHOT_KRONPARAM = 6.0 # SE hardcodes this as 6.0
 PHOT_USEMASK = True # masks out neighbors when measuring kron, auto fluxes, and flux radius (not circ apers)
 MATCH_BAND = 'f444w' # indicates band used to match PSFs
-USE_COMBINED_KRON_IMAGE = True   # uses a REF_BAND PSF-matched NE image for kron radius/flux + flux radius
-KRON_COMBINED_BANDS = ['f277w', 'f356w', 'f444w']
-KRON_ZPT = 28.9 # I hope it's the same as all of your combined mosaics!
+PSF_REF_NAME = None
 
 PIXEL_SCALE = 0.04 # arcsec / px
 APPLY_MWDUST = 'MEDIAN'
 USE_FFT_CONV = True
 
-SCI_APER = 0.32 # science aperture
+PHOT_EMPTYAPER_DIAMS = np.linspace(0.16, 1.4, 30)
+
+BORROW_HEADER_FILE = 'path/to/image/file/'
+
+BLEND_SHRINK_FACTOR = 1.2 # factor by which the isophotal areas are shrunk for assigning apertures to blends
+
+SCI_APER = 0.32 # set to the aperture size you expect to use most
 MAKE_SCIREADY_ALL = True # make aperture corrected catalogs for all apertures
 
-
 ### DIRECTORIES
-PROJECT = 'UNCOVER'
-VERSION = '0.4.1a'
-IS_COMPRESSED = True # outputs files as .gz
-WORKING_DIR = '/Volumes/Weaver_2TB/Projects/Current/UNCOVER/data/v0.4a'
-DIR_IMAGES = os.path.join(WORKING_DIR, '../external/grizli-v5.4-bcgsub/')
+PROJECT = 'PROJECT'
+VERSION = '0.0.1'
+WORKING_DIR = 'path/to/working/directory'
+DIR_IMAGES = os.path.join(WORKING_DIR, 'images/')
+
 DIR_OUTPUT = os.path.join(WORKING_DIR, 'output/')
 DIR_PSFS = os.path.join(WORKING_DIR, 'intermediate/PSF/')
-DIR_KERNELS = os.path.join(WORKING_DIR, 'intermediate/kernels/') # Generally
+DIR_KERNELS = os.path.join(WORKING_DIR, 'intermediate/kernels/')
 DIR_CATALOGS = os.path.join(WORKING_DIR, 'catalogs/')
+IS_COMPRESSED = True # outputs files as .gz
 
-PATH_SW_ENERGY = '/Users/jweaver/Projects/Software/aperpy/config/Encircled_Energy_SW_ETCv2.txt'
-PATH_LW_ENERGY = '/Users/jweaver/Projects/Software/aperpy/config/Encircled_Energy_LW_ETCv2.txt'
+PATH_SW_ENERGY = '/path/to/config/Encircled_Energy_SW_ETCv2.txt'
+PATH_LW_ENERGY = '/path/to/config/Encircled_Energy_LW_ETCv2.txt'
 
 SKYEXT = ''
-WHT_REPLACE = ('bcgs_sci', 'wht') # easy as it comes.
+WHT_REPLACE = ('sci', 'wht') # easy as it comes.
 DIRWHT_REPLACE = (DIR_OUTPUT, DIR_IMAGES) #i.e. no change
-DIR_SFD = '~/Projects/Common/py_tools/sfddata-master'
-ZSPEC = '/Volumes/Weaver_2TB/Projects/Current/UNCOVER/data/external/zspec_abell2744_all.fits'
+DIR_SFD = 'path/to/sfddata-master' # you need to install SFDMap! # pip install sfdmap + download maps
+ZSPEC = 'path/to/spec_z.fits'
 ZCOL = 'z'
 ZRA = 'RA'
 ZDEC = 'DEC'
-ZCONF = 'zconf', (3, 4)
+ZCONF = 'zconf', (3, 4) # confidence flag
 MAX_SEP = 0.3 * u.arcsec
 
 ### MEDIAN FILTERING
-IS_CLUSTER = True
+IS_CLUSTER = True  # if True, use median filtering
 FILTER_SIZE = 8.3 # arcsec
-MED_CENTERS = [SkyCoord(3.587*u.deg, -30.40*u.deg), SkyCoord(3.577*u.deg, -30.35*u.deg), SkyCoord(3.548*u.deg, -30.37*u.deg)]
+MED_CENTERS = [SkyCoord(3.587*u.deg, -30.40*u.deg)] # where to center the median filter regions
 MED_SIZE = 1.3*u.arcmin
 BLOCK_SIZE = 10 # pixels
 
 ### PSF GENERATION
-
+OVERSAMPLE = 3
+ALPHA = 0.3
+BETA = 0.15
+PYPHER_R = 3e-3
+MAGLIM = (18.0, 24.0)
+PSF_FOV = 4 # arcsec
 
 ### BACKGROUNDS
 BACKPARAMS = dict(bw=32, bh=32, fw=8, fh=8, maskthresh=1, fthresh=0.)
-BACKTYPE = 'var'
+BACKTYPE = 'var' # var, global, med, or none
 
-### DETECTION COADD
+### DETECTION COADD # use '-' in nicknames, NOT '_'
 DETECTION_GROUPS = {}
-# DETECTION_GROUPS['SW'] = ('f150w', 'f200w')
 DETECTION_GROUPS['LW'] = ('f277w', 'f356w', 'f444w')
+
+USE_COMBINED_KRON_IMAGE = True   # uses a REF_BAND PSF-matched NE image for kron radius/flux + flux radius
+KRON_COMBINED_BANDS = {}
+KRON_COMBINED_BANDS['LW'] = ('f277w', 'f356w', 'f444w')
+KRON_ZPT = 28.9 # I hope it's the same as all of your combined mosaics!
 
 DET_TYPE = 'noise-equal'
 DETECTION_NICKNAMES = []
 for nickname in DETECTION_GROUPS:
-    joined = '-'.join(DETECTION_GROUPS[nickname])
+    if len(nickname) > 1:
+        joined = '-'.join(DETECTION_GROUPS[nickname])
+    else:
+        joined = nickname
     DETECTION_NICKNAMES.append(f'{nickname}_{joined}')
 
 import glob
@@ -117,7 +133,7 @@ FLUX_UNIT = '10*nJy'
 
 
 ### PHOTOZ
-TRANSLATE_FNAME = f'{PROJECT.lower()}.translate'
+TRANSLATE_FNAME = 'abell2744_uncover.translate'
 ITERATE_ZP = False
 TEMPLATE_SETS = ('fsps_full', 'sfhz') #, 'sfhz_blue')
 
@@ -129,45 +145,51 @@ DEC_RANGE = (-30.5, -30.2)
 # POINT-LIKE FLAG - WEBB
 PS_WEBB_USE = True
 PS_WEBB_FLUXRATIO = (0.7, 0.32)
-PS_WEBB_FLUXRATIO_RANGE = (1.1, 1.27)
+PS_WEBB_FLUXRATIO_RANGE = (1.1, 1.2)
 PS_WEBB_FILT = 'f200w'
 PS_WEBB_MAGLIMIT = 25.0
 PS_WEBB_APERSIZE = 0.7
 
 # POINT-LIKE FLAG - HST
-PS_HST_USE = True
+PS_HST_USE = False
 PS_HST_FLUXRATIO = (0.7, 0.32)
-PS_HST_FLUXRATIO_RANGE = (1.2, 1.75)
+PS_HST_FLUXRATIO_RANGE = (1.5, 1.65)
 PS_HST_FILT = 'f160w'
-PS_HST_MAGLIMIT = 25.0
+PS_HST_MAGLIMIT = 23
 PS_HST_APERSIZE = 0.7
 
 # AUTOSTAR -- flag stars found in PSF star catalogs
 AUTOSTAR_USE = True
 AUTOSTAR_BANDS = FILTERS
 AUTOSTAR_XMATCH_RADIUS = 0.3*u.arcsec
+AUTOSTAR_NFILT = 1
 
 # GAIA
-GAIA_USE = True
+GAIA_USE = False
 GAIA_ROW_LIMIT = 10000
-GAIA_XMATCH_RADIUS = 0.7*u.arcsec
+GAIA_XMATCH_RADIUS = 0.6*u.arcsec
 
-# BADWHT
-BADWHT_USE = True
-FN_BADWHT = os.path.join(os.path.join(WORKING_DIR, DIR_IMAGES), 'ceers-full-grizli-v6.0-f200w-clear_drc_wht.fits.gz')
+# EXTERNAL STARS (useful for high proper motion stars)
+EXTERNALSTARS_USE = True
+FN_EXTERNALSTARS = 'path/to/external/files/UNCOVER_F160W_stars.fits' # includes ra and dec at minimum
+EXTERNALSTARS_XMATCH_RADIUS = 0.7*u.arcsec
+
+# BADWHT (useful for bad regions of the images)
+BADWHT_USE = False 
+FN_BADWHT = os.path.join(os.path.join(WORKING_DIR, DIR_IMAGES), 'uncover_v7.0_abell2744clu_f200w_block40_wht.fits.gz')
 SATURATEDSTAR_MAGLIMIT = 21
 SATURATEDSTAR_FILT = 'f200w'
 SATURATEDSTAR_APERSIZE = 0.7
 
 # EXTRABAD (e.g. bCGs)
-EXTRABAD_USE = False
-FN_EXTRABAD = None
-EXTRABAD_XMATCH_RADIUS = None
-EXTRABAD_LABEL = None
+EXTRABAD_USE = True
+FN_EXTRABAD = 'path/to/external/files/uncover_v7.0_f444w_bcgs_out.fits'
+EXTRABAD_XMATCH_RADIUS = 3*u.arcsec
+EXTRABAD_LABEL = 'bCG residuals'
 
 # REGMASK (mask region file of your choice)
-REGMASK_USE = False
-FN_REGMASK = None
+REGMASK_USE = True
+FN_REGMASK = 'path/to/external/files/UNCOVER_v2.2.0_SUPERCATALOG_starspike_mask.reg'
 
 ### BAD PIXELS
 BP_USE = True
@@ -175,7 +197,7 @@ BP_FLUXRATIO = (0.7, 0.32)
 BP_FLUXRATIO_RANGE = (0, 1.1)
 BP_FILT = {'LW':'f444w'}
 BP_MAGLIMIT = 26.
-BP_APERSIZE = 0.32
+BP_APERSIZE = 0.7
 
 ### ARTIFACTS NEAR BAD PIXELS, EDGES
 ANBP_USE = True
@@ -191,10 +213,19 @@ BK_SLOPE = 250
 BADOBJECT_USE = False
 PATH_BADOBJECT = None
 
-### CROSSMATCH (for DR1) (otherwise set to None)
-XCAT_FILENAME = '/Volumes/1TB_Weaver/Projects/Current/CEERS/releases/v5.2/CEERS_v5.2_SW_Kf444w_SCIREADY_0_7_CATALOG.fits'
-XCAT_NAME = 'v5'
-# ----------------
+### CROSSMATCH (otherwise set to None)
+XCAT_FILENAME = None
+XCAT_NAME = 'id', 'DR1' # column to include, name to use
+
+### CROSSMATCH (otherwise set to None)
+XCAT2_FILENAME = None
+XCAT2_NAME = 'id', 'INT_v2'
+
+### CROSSMATCH (otherwise set to None)
+XCAT3_FILENAME = None
+XCAT3_NAME = 'id_msa', 'msa'
+
+# ---------------- generally don't touch this! ------
 
 HST_FILTERS = ['F105W', 'F125W', 'F140W', 'F160W', 'F435W', 'F475W', 'F606W', 'F775W', 'F814W']
 

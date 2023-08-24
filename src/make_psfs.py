@@ -36,11 +36,12 @@ hdr = fits.getheader(glob.glob(os.path.join(DIR_OUTPUT, f'*{target_filter}*sci*{
 
 window = SplitCosineBellWindow(alpha=ALPHA, beta=BETA)
 
-use_filters = [MATCH_BAND] + [f for f in FILTERS if f != MATCH_BAND]
+# use_filters = [MATCH_BAND] + [f for f in FILTERS if f != MATCH_BAND]
+use_filters = ['f090w',]
 for pfilt in use_filters:
     print()
     print(f'Finding stars for {pfilt}...')
-    filename = glob.glob(os.path.join(DIR_OUTPUT, f'*{pfilt}*sci*{SKYEXT}.fits.gz'))[0]
+    filename = glob.glob(os.path.join(DIR_OUTPUT, f'*{pfilt}*sci*{SKYEXT}.fits.gz'))[-1]
     suffix = '.fits' + filename.split('.fits')[-1]
     starname = filename.replace(suffix, '_star_cat.fits').replace(DIR_OUTPUT, DIR_PSFS)
     outname = os.path.join(DIR_PSFS, f'{pfilt}.fits')

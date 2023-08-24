@@ -24,9 +24,10 @@ from config import FILTERS, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, DIR_OUTPUT, \
     BP_FLUXRATIO, BP_FLUXRATIO_RANGE, BP_FILT, BP_MAGLIMIT, BP_APERSIZE, RA_RANGE, DEC_RANGE, \
     GAIA_ROW_LIMIT, GAIA_XMATCH_RADIUS, FN_BADWHT, SATURATEDSTAR_MAGLIMIT, SATURATEDSTAR_FILT, \
     FN_EXTRABAD, EXTRABAD_XMATCH_RADIUS, EXTRABAD_LABEL, PATH_BADOBJECT, \
-    GLASS_MASK, SATURATEDSTAR_APERSIZE, PS_WEBB_USE, PS_HST_USE, GAIA_USE, BADWHT_USE, EXTRABAD_USE, \
+    SATURATEDSTAR_APERSIZE, PS_WEBB_USE, PS_HST_USE, GAIA_USE, BADWHT_USE, EXTRABAD_USE, \
     BP_USE, BADOBJECT_USE, PHOT_USEMASK, PROJECT, VERSION, USE_COMBINED_KRON_IMAGE, KRON_COMBINED_BANDS, \
-    XCAT_FILENAME, XCAT_NAME, XCAT2_FILENAME, XCAT2_NAME, ANBP_USE, ANBP_XMATCH_RADIUS, IS_COMPRESSED, ANBP_MIN_NPIX, ANBP_MAX_NPIX, \
+    XCAT_FILENAME, XCAT_NAME, XCAT2_FILENAME, XCAT2_NAME, XCAT3_FILENAME, XCAT3_NAME, \
+    ANBP_USE, ANBP_XMATCH_RADIUS, IS_COMPRESSED, ANBP_MIN_NPIX, ANBP_MAX_NPIX, \
     PSF_REF_NAME, EXTERNALSTARS_USE, FN_EXTERNALSTARS, EXTERNALSTARS_XMATCH_RADIUS, REGMASK_USE, FN_REGMASK, \
     AUTOSTAR_USE, AUTOSTAR_BANDS, AUTOSTAR_XMATCH_RADIUS, AUTOSTAR_NFILT
 
@@ -583,20 +584,6 @@ if PS_WEBB_USE or PS_HST_USE or BP_USE:
     fig.tight_layout()
     fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{DET_NICKNAME}_K{KERNEL}_star_id.png'))
 
-# HACK for glass
-if GLASS_MASK is not None:
-    SEL_BADGLASS = np.zeros(len(maincat), dtype=bool)
-    in_glass = GLASS_MASK[maincat['y'].astype(int), maincat['x'].astype(int)] == 1
-    print(f'{np.sum(in_glass)} objects in GLASS region')
-    sw_wht = maincat['f200w_SRC_MEDWHT'].copy()
-    sw_wht[np.isnan(sw_wht)] = 0
-    sw_snr = maincat['f200w_FLUX_APER0_32_COLOR'] / maincat['f200w_FLUXERR_APER0_32_COLOR']
-    SEL_BADGLASS = (((sw_snr < 3) & (sw_wht > 0)) | (sw_wht <= 0)) & in_glass
-    print(f'Flagged {np.sum(SEL_BADGLASS)} objects as bad in the GLASS region')
-    maincat.add_column(Column(SEL_BADGLASS.astype(int), name='badglass_flag'))
-    maincat['combined_artifact_flag'][SEL_BADGLASS] = 1
-    SEL_GEN |= SEL_BADGLASS
-
 # user supplied bad objects
 if BADOBJECT_USE:
     SEL_BADOBJECT = np.zeros(len(maincat), dtype=bool)
@@ -783,11 +770,11 @@ for apersize in PHOT_APER:
             cat_old = Table.read(XCAT_FILENAME)
             mcat_new, mcat_old, idx1, idx2, dsky  = crossmatch(subcat, cat_old, thresh=[0.08*u.arcsec], plot=True, return_idx=True)
             ids = np.zeros(len(subcat))
-            ids[idx1] = cat_old['id'][idx2]
+            ids[idx1] = cat_old[XCAT_NAME[0]][idx2]
             matchrad = np.zeros(len(subcat))
             matchrad[idx1] = dsky[idx1]
-            subcat.add_column(MaskedColumn(ids, name=f'id_{XCAT_NAME}', mask=ids<=0, dtype='i4'))
-            subcat.add_column(MaskedColumn(matchrad*u.arcsec, name=f'match_radius_{XCAT_NAME}', mask=ids<=0))
+            subcat.add_column(MaskedColumn(ids, name=f'id_{XCAT_NAME[1]}', mask=ids<=0, dtype='i4'))
+            subcat.add_column(MaskedColumn(matchrad*u.arcsec, name=f'match_radius_{XCAT_NAME[1]}', mask=ids<=0))
 
         if XCAT2_FILENAME is not None:
             # Crossmatch to DR1 and make a new column (ID + radius)
@@ -796,11 +783,25 @@ for apersize in PHOT_APER:
             cat_old = Table.read(XCAT2_FILENAME)
             mcat_new, mcat_old, idx1, idx2, dsky  = crossmatch(subcat, cat_old, thresh=[0.08*u.arcsec], plot=True, return_idx=True)
             ids = np.zeros(len(subcat))
-            ids[idx1] = cat_old['id'][idx2]
+            ids[idx1] = cat_old[XCAT2_NAME[0]][idx2]
             matchrad = np.zeros(len(subcat))
             matchrad[idx1] = dsky[idx1]
-            subcat.add_column(MaskedColumn(ids, name=f'id_{XCAT2_NAME}', mask=ids<=0, dtype='i4'))
-            subcat.add_column(MaskedColumn(matchrad*u.arcsec, name=f'match_radius_{XCAT2_NAME}', mask=ids<=0))
+            subcat.add_column(MaskedColumn(ids, name=f'id_{XCAT2_NAME[1]}', mask=ids<=0, dtype='i4'))
+            subcat.add_column(MaskedColumn(matchrad*u.arcsec, name=f'match_radius_{XCAT2_NAME[1]}', mask=ids<=0))
+
+        if XCAT3_FILENAME is not None:
+            # Crossmatch to DR1 and make a new column (ID + radius)
+            from catalog_tools import crossmatch
+            from astropy.table import Table, Column, MaskedColumn
+            cat_old = Table.read(XCAT3_FILENAME)
+            mcat_new, mcat_old, idx1, idx2, dsky  = crossmatch(subcat, cat_old, thresh=[0.08*u.arcsec], plot=True, return_idx=True)
+            ids = np.zeros(len(subcat))
+            ids[idx1] = cat_old[XCAT3_NAME[0]][idx2]
+            matchrad = np.zeros(len(subcat))
+            matchrad[idx1] = dsky[idx1]
+            subcat.add_column(MaskedColumn(ids, name=f'id_{XCAT3_NAME[1]}', mask=ids<=0, dtype='i4'))
+            subcat.add_column(MaskedColumn(matchrad*u.arcsec, name=f'match_radius_{XCAT3_NAME[1]}', mask=ids<=0))
+
 
         # Kill any weight that has no flux
         for coln in subcat.colnames:
