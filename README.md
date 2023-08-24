@@ -5,7 +5,7 @@ Aperpy is a front-to-back aperture photometry pipeline written in python aimed a
 
 Methodology was adapted mainly from [Whitaker et al. 2011](https://ui.adsabs.harvard.edu/abs/2011ApJ...735...86W/abstract) and [Labbe et al. 2003](https://ui.adsabs.harvard.edu/abs/2003AJ....125.1107L/abstract). Currently it is designed for use with JWST and HST data, although extensions are possible. 
 
-This software is being actively developed. Comments, questions, and pull requests are welcome. We strongly recommend that interested users get in touch with us before diving in: [john.weaver.astro@gmail.com](john.weaver.astro@gmail.com)
+This software is being actively developed. Comments, questions, and pull requests are welcome. We strongly recommend that interested users get in touch with us before diving in: [john.weaver.astro@gmail.com](mailto:john.weaver.astro@gmail.com)
 
 If you use the software, please cite [Weaver et al. 2023](https://ui.adsabs.harvard.edu/abs/2023arXiv230102671W/abstract):
 
