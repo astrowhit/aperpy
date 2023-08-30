@@ -153,7 +153,7 @@ zout['u_v'] = u_v
 zout['v_j'] = v_j
 zout['uvj_class'] = clas
 
-zout['flag_eazy'] = np.where(np.isnan(zout['mass']) | (zout['z_phot_chi2'] > 300), 1, 0)
+zout['flag_eazy'] = np.where( (zout['z_phot']>0) & np.isfinite(zout['mass']) & (zout['z_phot_chi2'] < 300), 1, 0)
 
 zout.write(os.path.join(FULLDIR_CATALOGS, f'{PROJECT}_v{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_{nickname}_{is_zpiter}CATALOG_{TEMPLATES}.zout.fits'), overwrite=True)
 
