@@ -92,7 +92,7 @@ target/
 .ipynb_checkpoints/
 
 # exclude compiled binaries
-bin/
+# bin/
 
 # exclude data from source control by default
 /data/external

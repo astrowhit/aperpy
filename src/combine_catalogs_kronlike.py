@@ -29,7 +29,7 @@ from config import FILTERS, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, DIR_OUTPUT, \
     XCAT_FILENAME, XCAT_NAME, XCAT2_FILENAME, XCAT2_NAME, XCAT3_FILENAME, XCAT3_NAME, \
     ANBP_USE, ANBP_XMATCH_RADIUS, IS_COMPRESSED, ANBP_MIN_NPIX, ANBP_MAX_NPIX, \
     PSF_REF_NAME, EXTERNALSTARS_USE, FN_EXTERNALSTARS, EXTERNALSTARS_XMATCH_RADIUS, REGMASK_USE, FN_REGMASK, \
-    AUTOSTAR_USE, AUTOSTAR_BANDS, AUTOSTAR_XMATCH_RADIUS, AUTOSTAR_NFILT
+    AUTOSTAR_USE, AUTOSTAR_BANDS, AUTOSTAR_XMATCH_RADIUS, AUTOSTAR_NFILT, XCAT_RAD, XCAT2_RAD, XCAT3_RAD
 
 
 DET_NICKNAME =  sys.argv[2] #'LW_f277w-f356w-f444w'
@@ -768,7 +768,7 @@ for apersize in PHOT_APER:
             from catalog_tools import crossmatch
             from astropy.table import Table, Column, MaskedColumn
             cat_old = Table.read(XCAT_FILENAME)
-            mcat_new, mcat_old, idx1, idx2, dsky  = crossmatch(subcat, cat_old, thresh=[0.08*u.arcsec], plot=True, return_idx=True)
+            mcat_new, mcat_old, idx1, idx2, dsky  = crossmatch(subcat, cat_old, thresh=[XCAT_RAD*u.arcsec], plot=True, return_idx=True)
             ids = np.zeros(len(subcat))
             ids[idx1] = cat_old[XCAT_NAME[0]][idx2]
             matchrad = np.zeros(len(subcat))
@@ -781,7 +781,7 @@ for apersize in PHOT_APER:
             from catalog_tools import crossmatch
             from astropy.table import Table, Column, MaskedColumn
             cat_old = Table.read(XCAT2_FILENAME)
-            mcat_new, mcat_old, idx1, idx2, dsky  = crossmatch(subcat, cat_old, thresh=[0.08*u.arcsec], plot=True, return_idx=True)
+            mcat_new, mcat_old, idx1, idx2, dsky  = crossmatch(subcat, cat_old, thresh=[XCAT2_RAD*u.arcsec], plot=True, return_idx=True)
             ids = np.zeros(len(subcat))
             ids[idx1] = cat_old[XCAT2_NAME[0]][idx2]
             matchrad = np.zeros(len(subcat))
@@ -794,7 +794,7 @@ for apersize in PHOT_APER:
             from catalog_tools import crossmatch
             from astropy.table import Table, Column, MaskedColumn
             cat_old = Table.read(XCAT3_FILENAME)
-            mcat_new, mcat_old, idx1, idx2, dsky  = crossmatch(subcat, cat_old, thresh=[0.08*u.arcsec], plot=True, return_idx=True)
+            mcat_new, mcat_old, idx1, idx2, dsky  = crossmatch(subcat, cat_old, thresh=[XCAT3_RAD*u.arcsec], plot=True, return_idx=True)
             ids = np.zeros(len(subcat))
             ids[idx1] = cat_old[XCAT3_NAME[0]][idx2]
             matchrad = np.zeros(len(subcat))

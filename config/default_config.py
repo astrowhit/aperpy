@@ -216,14 +216,17 @@ PATH_BADOBJECT = None
 ### CROSSMATCH (otherwise set to None)
 XCAT_FILENAME = None
 XCAT_NAME = 'id', 'DR1' # column to include, name to use
+XCAT_RAD = 0.08
 
 ### CROSSMATCH (otherwise set to None)
 XCAT2_FILENAME = None
 XCAT2_NAME = 'id', 'INT_v2'
+XCAT2_RAD = 0.08
 
 ### CROSSMATCH (otherwise set to None)
 XCAT3_FILENAME = None
 XCAT3_NAME = 'id_msa', 'msa'
+XCAT3_RAD = 0.24
 
 # ---------------- generally don't touch this! ------
 
