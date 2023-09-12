@@ -26,15 +26,16 @@ for kern in KERNELS:
     os.system(f'python {PATH_APERPY}/convolve_images.py {DIR_CONFIG} {kern}') 
 
 # Extract on raw images + make catalogs + run photo-z (a)
-for det_nickname in DETECTION_NICKNAMES:
-    os.system(f'python {PATH_APERPY}/source_extract.py {DIR_CONFIG} {det_nickname} {kern}')
-    os.system(f'python {PATH_APERPY}/combine_catalogs_kronlike.py {DIR_CONFIG} {det_nickname} {kern}')
-    os.system(f'python {PATH_APERPY}/make_supercatalog.py {DIR_CONFIG} {det_nickname} {kern}')
+for kern in KERNELS:
+    for det_nickname in DETECTION_NICKNAMES:
+        os.system(f'python {PATH_APERPY}/source_extract.py {DIR_CONFIG} {det_nickname} {kern}')
+        os.system(f'python {PATH_APERPY}/combine_catalogs_kronlike.py {DIR_CONFIG} {det_nickname} {kern}')
+        os.system(f'python {PATH_APERPY}/make_supercatalog.py {DIR_CONFIG} {det_nickname} {kern}')
 
-    # run photoz (each aper + super...)
-    for APER in ['SUPER'] + PHOT_APER:
-        if APER != 'SUPER':
-            APER = str(APER).replace('.', '_')
-        for template in TEMPLATE_SETS:
-            os.system(f'python {PATH_APERPY}/eazy_photoz.py {DIR_CONFIG} {det_nickname} {kern} {APER} {template}')
+        # run photoz (each aper + super...)
+        for APER in ['SUPER'] + PHOT_APER:
+            if APER != 'SUPER':
+                APER = str(APER).replace('.', '_')
+            for template in TEMPLATE_SETS:
+                os.system(f'python {PATH_APERPY}/eazy_photoz.py {DIR_CONFIG} {det_nickname} {kern} {APER} {template}')
 
