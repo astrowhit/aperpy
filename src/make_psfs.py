@@ -36,17 +36,17 @@ hdr = fits.getheader(glob.glob(os.path.join(DIR_OUTPUT, f'*{target_filter}*sci*{
 
 window = SplitCosineBellWindow(alpha=ALPHA, beta=BETA)
 
-# use_filters = [MATCH_BAND] + [f for f in FILTERS if f != MATCH_BAND]
-use_filters = ['f090w',]
+use_filters = [MATCH_BAND] + [f for f in FILTERS if f != MATCH_BAND]
+# use_filters = ['f090w',]
 for pfilt in use_filters:
     print()
     print(f'Finding stars for {pfilt}...')
-    filename = glob.glob(os.path.join(DIR_OUTPUT, f'*{pfilt}*sci*{SKYEXT}.fits.gz'))[-1]
+    filename = glob.glob(os.path.join(DIR_OUTPUT, f'*{pfilt}*sci*{SKYEXT}.fits*'))[-1]
     suffix = '.fits' + filename.split('.fits')[-1]
     starname = filename.replace(suffix, '_star_cat.fits').replace(DIR_OUTPUT, DIR_PSFS)
     outname = os.path.join(DIR_PSFS, f'{pfilt}.fits')
 
-    if len(glob.glob(DIR_PSFS+'*'+pfilt.lower()+'*'+'psf.fits')) > 0: 
+    if len(glob.glob(DIR_PSFS+'*'+pfilt.lower()+'*'+'psf.fits')) > 0:
         print(f'PSFs already exist for {pfilt} -- skipping!')
         if pfilt == target_filter:
             target_psf = fits.getdata(glob.glob(DIR_PSFS+'*'+target_filter.lower()+'*'+'psf.fits')[0])
@@ -189,6 +189,3 @@ for i, pfilt in enumerate(use_filters[1:]):
 
 plt.tight_layout()
 plt.savefig(plotdir+'kernels.pdf',dpi=300)
-
-
-
