@@ -1,0 +1,10 @@
+astropy==5.3.1
+eazy==0.6.5.dev1+g9809a6c.d20230411
+extinction==0.4.6
+matplotlib==3.7.2
+numpy==1.25.1
+photutils==1.8.
+scipy==1.11.1
+sep==1.2.1
+sfdmap==0.1.1
+tqdm==4.65.0
