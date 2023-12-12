@@ -33,7 +33,7 @@ for aper in np.sort(PHOT_APER):
     is_blended = RELEASE['flag_kron'] != 0 # blended, or some other detection issue. Don't trust it.
     iso_aper = np.sqrt(RELEASE['iso_area'] / np.pi) * 2. #2.
     use_phot = RELEASE['use_phot'] == 1
-    use_aper[(iso_aper > aper) & (use_phot) & (~is_blended)] = aper
+    use_aper[(iso_aper > aper) & (use_phot) & (~is_blended)] = aper 
     use_aper[((iso_aper/shrink_factor) > (aper)) & (use_phot) & is_blended] = aper
     
 # Then loop over 

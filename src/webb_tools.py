@@ -432,6 +432,8 @@ def get_webbpsf(filt, field='uncover', angle=None, fov=4, og_fov=10, pixscl=None
 
     from config import SW_FILTERS, LW_FILTERS, PATH_SW_ENERGY, PATH_LW_ENERGY
 
+    print(f'{filt} at {fov}" FOV')
+
     if pixscl is None:
         from config import PIXEL_SCALE
         pixscl = PIXEL_SCALE
@@ -439,15 +441,19 @@ def get_webbpsf(filt, field='uncover', angle=None, fov=4, og_fov=10, pixscl=None
     # Check if filter is valid and get correction term
     if filt in SW_FILTERS:
         detector = 'NCRA5'
-        if fov != 4:
-            print('WARNING! I will not fetch the correct encircled energy for your requested FOV!')
         # 17 corresponds with 2" radius (i.e. 4" FOV)
-        encircled = ascii.read(PATH_SW_ENERGY)[17][filt]
+        energy_table = ascii.read(PATH_SW_ENERGY)
+        row = np.argmin(abs(fov/2. - energy_table['aper_radius']))
+        encircled = energy_table[row][filt]
+        norm_fov = energy_table['aper_radius'][row] * 2
+        print(f'Will normalize PSF within {norm_fov}" FOV to {encircled}')
     elif filt in LW_FILTERS:
         detector = 'NCRA1'
-        if fov != 4:
-            print('WARNING! I will not fetch the correct encircled energy for your requested FOV!')
-        encircled = ascii.read(PATH_LW_ENERGY)[17][filt]
+        energy_table = ascii.read(PATH_LW_ENERGY)
+        row = np.argmin(abs(fov/2. - energy_table['aper_radius']))
+        encircled = energy_table[row][filt]
+        norm_fov = energy_table['aper_radius'][row] * 2
+        print(f'Will normalize PSF within {norm_fov}" FOV to {encircled}')
     else:
         print(f'{filt} is NOT a valid NIRCam filter!')
         return
@@ -487,11 +493,12 @@ def get_webbpsf(filt, field='uncover', angle=None, fov=4, og_fov=10, pixscl=None
     # Has to be done encircled! Ensquared were calibated to zero angle...
     w, h = np.shape(rotated)
     Y, X = np.ogrid[:h, :w]
-    r = fov / 2. / nc.pixelscale
+    r = norm_fov / 2. / nc.pixelscale
     center = [w/2., h/2.]
     dist_from_center = np.sqrt((X - center[0])**2 + (Y-center[1])**2)
     rotated /= np.sum(rotated[dist_from_center < r])
     rotated *= encircled # to get the missing flux accounted for
+    print(f'Final stamp normalization: {rotated.sum()}')
 
     # and save
     newhdu = fits.PrimaryHDU(rotated)
@@ -612,6 +619,7 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, precomp=None, row=
             elif np.isnan(scale):
                 scale = 1
             ax.imshow(img, cmap='RdGy', norm=SymLogNorm(3*rms, 1, -scale, scale))
+            print(flux, fluxerr, snr)
             ax.text(0.05, 1.05, f'{filt}\n{flux:2.2f}+/-{fluxerr:2.2f} 10*nJy (S/N:{snr:2.2f})', transform=ax.transAxes)
             ax.axes.xaxis.set_visible(False)
             ax.axes.yaxis.set_visible(False)

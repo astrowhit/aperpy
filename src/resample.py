@@ -14,11 +14,11 @@ sys.path.insert(0, PATH_CONFIG)
 from config import DIR_IMAGES, SW_FILTERS, WEBB_FILTERS, WHT_REPLACE, BORROW_HEADER_FILE
 
 SCI_FILENAMES = list(glob.glob(DIR_IMAGES+f'/*_sci.fits*'))
-
 BORROW_HEADER = fits.getheader(BORROW_HEADER_FILE)
 
 for filename in SCI_FILENAMES:
 
+    print(filename)
     is_ok = False
     for band in SW_FILTERS:
         if band.lower() in filename:
@@ -26,9 +26,14 @@ for filename in SCI_FILENAMES:
     if not is_ok:
         continue
 
-    print(filename.split('/')[-1])
+    # print(filename.split('/')[-1])
     sci, header = fits.getdata(filename), fits.getheader(filename)
-    wht = fits.getdata(filename.replace(WHT_REPLACE[0], WHT_REPLACE[1]))
+    wht_filename = filename.replace(WHT_REPLACE[0], WHT_REPLACE[1])
+    wht = fits.getdata(wht_filename)
+
+    print('Reading from...')
+    print(filename)
+    print(wht_filename)
 
     wcs = WCS(header)
 

@@ -77,6 +77,8 @@ elif TEMPLATES == 'sfhz':
     params['TEMPLATES_FILE'] = 'templates/sfhz/carnall_sfhz_13.param'
 elif TEMPLATES == 'sfhz_blue':
     params['TEMPLATES_FILE'] = 'templates/sfhz/blue_sfhz_13.param'
+elif TEMPLATES == 'sfhz_blue_agn':
+    params['TEMPLATES_FILE'] = 'templates/sfhz/agn_blue_sfhz_13.param'
 
 params['VERBOSITY'] = 1
 

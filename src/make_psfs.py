@@ -14,8 +14,8 @@ from astropy.convolution import convolve_fft
 PATH_CONFIG = sys.argv[1]
 sys.path.insert(0, PATH_CONFIG)
 
-from config import DIR_PSFS, PIXEL_SCALE, DIR_OUTPUT, PSF_FOV, FILTERS, \
-                MATCH_BAND, SKYEXT, DIR_KERNELS, OVERSAMPLE, ALPHA, BETA, PYPHER_R, MAGLIM
+from config import DIR_PSFS, PIXEL_SCALE, DIR_OUTPUT, PSF_FOV, FILTERS, PHOT_ZP, \
+                MATCH_BAND, SKYEXT, DIR_KERNELS, OVERSAMPLE, ALPHA, BETA, PYPHER_R, MAGLIM, LW_FILTERS
 from psf_tools import *
 
 method = 'pypher'
@@ -36,9 +36,10 @@ hdr = fits.getheader(glob.glob(os.path.join(DIR_OUTPUT, f'*{target_filter}*sci*{
 
 window = SplitCosineBellWindow(alpha=ALPHA, beta=BETA)
 
-# use_filters = [MATCH_BAND] + [f for f in FILTERS if f != MATCH_BAND]
-use_filters = ['f090w',]
+use_filters = [MATCH_BAND] + [f for f in FILTERS if f != MATCH_BAND]
 for pfilt in use_filters:
+    # if pfilt.upper() not in ('F444W','F210M', 'F300M', 'F410M'): continue
+    if pfilt.upper() not in ('F444W',): continue
     print()
     print(f'Finding stars for {pfilt}...')
     filename = glob.glob(os.path.join(DIR_OUTPUT, f'*{pfilt}*sci*{SKYEXT}.fits.gz'))[-1]
@@ -56,12 +57,12 @@ for pfilt in use_filters:
     print(filename)
     print(starname)
 
-    peaks, stars = find_stars(filename, outdir=DIR_PSFS, plotdir=plotdir, label=pfilt)
+    peaks, stars = find_stars(filename, outdir=DIR_PSFS, plotdir=plotdir, label=pfilt, zp=PHOT_ZP[pfilt])
 
     print(f'Found {len(peaks)} bright sources')
 
     snr_lim = 1000
-    sigma = 2.8 if pfilt in ['f090w'] else 4.0
+    sigma = 2.8 #if pfilt in ['f090w'] else 4.0
     showme=False
 
     maglim = MAGLIM
@@ -106,6 +107,7 @@ for pfilt in use_filters:
     target_psf /= target_psf.sum()
 
     print(f'Building {pfilt}-->{MATCH_BAND} kernel...')
+    assert(filt_psf.shape == target_psf.shape, f'Shape of filter psf ({filt_psf.shape}) must match target psf ({target_psf.shape})')
     if method == 'pypher':
         fits.writeto(DIR_KERNELS+'psf_a.fits',filt_psf,header=hdr,overwrite=True)
         fits.writeto(DIR_KERNELS+'psf_b.fits',target_psf,header=hdr,overwrite=True)
@@ -135,7 +137,10 @@ target_psf /= target_psf.sum()
 
 print(f'Plotting kernel checkfile...')
 for i, pfilt in enumerate(use_filters[1:]):
+    # if pfilt.upper() not in ('F444W','F410M'): continue
 
+    print(DIR_PSFS)
+    print(pfilt.lower())
     psfname = glob.glob(DIR_PSFS+'*'+pfilt.lower()+'*'+'psf.fits')[0]
     outname = DIR_KERNELS+os.path.basename(psfname).replace('psf','kernel')
 
@@ -171,6 +176,8 @@ for i, pfilt in enumerate(use_filters[1:]):
     plt.subplot(nfilt,npanel,7+i*npanel)
     r,pf,pt = plot_profile(filt_psf_conv,target_psf)
     plt.plot(r*PIXEL_SCALE, pf/pt)
+    fr,fpf,fpt = plot_profile(filt_psf,target_psf)
+    plt.plot(fr*PIXEL_SCALE, fpf/fpt)
     plt.ylim(0.95,1.05)
     if method == 'pypher':
         plt.title('pypher r={}'.format(pypher_r))

@@ -22,6 +22,7 @@ else:
     convolve_kwargs = {}
 
 for filename in SCI_FILENAMES:
+    if 'f210m' not in filename: continue
     outsciname = filename.replace(f'{SKYEXT}.fits', f'{SKYEXT}_{KERNEL}-matched.fits')
     outwhtname=filename.replace(f'_sci{SKYEXT}.fits', f'_wht_{KERNEL}-matched.fits')
     if os.path.exists(outsciname) and os.path.exists(outwhtname):
@@ -29,9 +30,15 @@ for filename in SCI_FILENAMES:
         print(f'Convolved images exist, I will not overwrite')
         continue
 
-    for band in FILTERS:
-        if band in filename:
-            break
+    haveit = False
+    while not haveit:
+        for band in FILTERS:
+            if band in filename:
+                haveit = True
+                break
+    if not haveit:
+        print(f'Valid band not found in filename {filename}! Check your config for requested bands!')
+        sys.exit()
     fn_weight = filename.replace(DIR_OUTPUT, DIR_IMAGES).replace(WHT_REPLACE[0], WHT_REPLACE[1])
     print(band)
     print('  science image: ', filename)

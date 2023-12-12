@@ -206,8 +206,6 @@ if (KERNEL != 'None') & (USE_COMBINED_KRON_IMAGE):
         print(f'Wrote Kron image to {PATH_KRONSCI}')
 
 
-areas = {}
-stats = {}
 
 KRON_MATCH_BAND = None
 USE_FILTERS = FILTERS
@@ -220,6 +218,9 @@ if (KERNEL != 'None') & (USE_COMBINED_KRON_IMAGE):
 
 for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
     for use_kernel in ('None', KERNEL):
+
+        areas = {}
+        stats = {}
 
         print(PHOT_NICKNAME)
         if PHOT_NICKNAME != KRON_MATCH_BAND:
@@ -424,9 +425,8 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
         print(f'DONE. Writing out catalog.')
         catalog.write(os.path.join(FULLDIR_CATALOGS, f'{PHOT_NICKNAME}_{DET_NICKNAME}_K{use_kernel}_PHOT_CATALOG.fits'), overwrite=True)
 
-np.save(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_emptyaper_stats.npy'), stats)
-with open(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_AREAS.dat'), 'w') as f:
-    for filt in FILTERS:
-        area = areas[filt]
-        f.write(f'{filt} {area}')
-        f.write('\n')
+        np.save(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_{PHOT_NICKNAME.lower()}_emptyaper_stats.npy'), stats)
+        with open(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_{PHOT_NICKNAME.lower()}_AREAS.dat'), 'w') as f:
+            area = areas[PHOT_NICKNAME]
+            f.write(f'{PHOT_NICKNAME} {area}')
+            f.write('\n')

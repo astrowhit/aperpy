@@ -67,10 +67,10 @@ MAX_SEP = 0.3 * u.arcsec
 
 ### MEDIAN FILTERING
 IS_CLUSTER = True  # if True, use median filtering
-FILTER_SIZE = 8.3 # arcsec
 MED_CENTERS = [SkyCoord(3.587*u.deg, -30.40*u.deg)] # where to center the median filter regions
 MED_SIZE = 1.3*u.arcmin
 BLOCK_SIZE = 10 # pixels
+FILTER_SIZE = 8.3 # arcsec
 
 ### PSF GENERATION
 OVERSAMPLE = 3

@@ -40,7 +40,6 @@ FULLDIR_CATALOGS = os.path.join(DIR_CATALOGS, f'{DET_NICKNAME}_{DET_TYPE}/{KERNE
 
 def DIR_KERNEL(band):
     return glob.glob(os.path.join(DIR_KERNELS, f'{KERNEL}*/{band.lower()}_kernel.fits'))[0]
-stats = np.load(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_emptyaper_stats.npy'), allow_pickle=True).item()
 
 if PSF_REF_NAME==None:
     FNAME_REF_PSF = os.path.join(DIR_PSFS, f'{MATCH_BAND}_psf.fits')
@@ -50,7 +49,11 @@ else:
 def sigma_aper(filter, weight, apersize=0.7):
     # Equation 5
     # apersize = str(apersize).replace('.', '_') + 'arcsec'
-    sigma_nmad_filt = stats[filter.lower()][apersize]['fit_std']
+    stats = np.load(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_{filter.lower()}_emptyaper_stats.npy'), allow_pickle=True).item()
+    try:
+        sigma_nmad_filt = stats[filter.lower()][apersize]['fit_std']
+    except:
+        sigma_nmad_filt = stats[apersize]['fit_std']
     # sigma_nmad_filt = ERROR_TABLE[f'e{apersize}'][ERROR_TABLE['filter']==filter.lower()][0]
     # g_i = 1.*2834.508 # here's to hoping.  EFFECTIVE GAIN!
     fluxerr = sigma_nmad_filt / np.sqrt(weight)  #+ (flux_aper / g_i)
@@ -179,7 +182,8 @@ if PHOT_USEMASK:
 
 # Get some static refband stuff
 plotname = os.path.join(FULLDIR_CATALOGS, f'figures/aper_{KRON_MATCH_BAND}_nmad.pdf')
-p, pcov, sigma1 = fit_apercurve(stats[KRON_MATCH_BAND], plotname=plotname, stat_type=['fit_std'], pixelscale=PIXEL_SCALE)
+stats_matchband = np.load(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_{KRON_MATCH_BAND.lower()}_emptyaper_stats.npy'), allow_pickle=True).item()
+p, pcov, sigma1 = fit_apercurve(stats_matchband[KRON_MATCH_BAND], plotname=plotname, stat_type=['fit_std'], pixelscale=PIXEL_SCALE)
 alpha, beta = p['fit_std']
 sig1 = sigma1['fit_std']
 wht_ref = maincat[f'{KRON_MATCH_BAND}_SRC_MEDWHT']
@@ -330,8 +334,13 @@ if APPLY_MWDUST is not None:
     filter_pwav = OrderedDict()
     print('Building directory of pivot wavelengths')
     for filter in FILTERS:
+        if filter == 'f150w2-f162m':
+            filter = 'f162m'
         filter_pwav[filter] = np.nan # ensures the order
         for i, tryfilt in enumerate(filter_table['filterID']):
+            
+            if filter == 'f160m':
+                print(filter, tryfilt)
             if filter == 'f410m':
                 if 'NIRCam' in tryfilt:
                     if tryfilt.endswith(filter.upper()):

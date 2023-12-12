@@ -296,7 +296,7 @@ def get_filename(imagedir, filt, skyext=''):
     return filename, starname
 
 
-def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,2.,4.,7.5], range=[0,4], mag_lim = 24.0,
+def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,2.,4.,7.5], range=[0,3], mag_lim = 24.0,
                threshold_min = -0.5, threshold_mode=[-0.2,0.2], shift_lim=2, zp=28.9, instars=None, showme=True, label='',
                outdir='./', plotdir='./'):
 
@@ -1052,6 +1052,9 @@ def renorm_psf(psfmodel, filt, fov=4.04, pixscl=0.04):
     center = [w/2., h/2.]
     dist_from_center = np.sqrt((X - center[0])**2 + (Y-center[1])**2)
     psfmodel /= np.sum(psfmodel[dist_from_center < r])
-    psfmodel *= encircled[filt] # to get the missing flux accounted for
+    if filt in encircled:
+        psfmodel *= encircled[filt] # to get the missing flux accounted for
+    else:
+        print(f'WARNING -- I DO NOT HAVE ENCIRCLED ENERGY FOR {filt}! SKIPPING NORM.')
 
     return psfmodel
