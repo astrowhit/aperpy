@@ -296,7 +296,7 @@ def get_filename(imagedir, filt, skyext=''):
     return filename, starname
 
 
-def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,2.,4.,7.5], range=[0,3], mag_lim = 24.0,
+def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,2.,4.,7.5], range=[0,4], mag_lim = 24.0,
                threshold_min = -0.5, threshold_mode=[-0.2,0.2], shift_lim=2, zp=28.9, instars=None, showme=True, label='',
                outdir='./', plotdir='./'):
 

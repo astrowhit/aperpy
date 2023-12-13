@@ -22,7 +22,6 @@ else:
     convolve_kwargs = {}
 
 for filename in SCI_FILENAMES:
-    if 'f210m' not in filename: continue
     outsciname = filename.replace(f'{SKYEXT}.fits', f'{SKYEXT}_{KERNEL}-matched.fits')
     outwhtname=filename.replace(f'_sci{SKYEXT}.fits', f'_wht_{KERNEL}-matched.fits')
     if os.path.exists(outsciname) and os.path.exists(outwhtname):

@@ -50,7 +50,7 @@ for pfilt in use_filters:
         if pfilt == target_filter:
             target_psf = fits.getdata(glob.glob(DIR_PSFS+'*'+target_filter.lower()+'*'+'psf.fits')[0])
         continue
-    # if pfilt == 'f435w': continue
+    # if pfilt == 'f140w': continue
 
     print(filename)
     print(starname)
