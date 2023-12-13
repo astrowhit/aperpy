@@ -358,6 +358,7 @@ def psf_cog(psfmodel, filt, nearrad=None, fix_extrapolation=True, pixel_scale=No
     radii *= pixel_scale
 
     if fix_extrapolation:
+        sys.path.append('/Volumes/2TB_Weaver/Projects/Current/UNCOVER/scripts/')
         from config import SW_FILTERS, LW_FILTERS, PATH_SW_ENERGY, PATH_LW_ENERGY, PIXEL_SCALE
         if pixel_scale is None: pixel_scale = PIXEL_SCALE
         from astropy.io import ascii

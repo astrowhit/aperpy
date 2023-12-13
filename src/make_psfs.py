@@ -38,8 +38,6 @@ window = SplitCosineBellWindow(alpha=ALPHA, beta=BETA)
 
 use_filters = [MATCH_BAND] + [f for f in FILTERS if f != MATCH_BAND]
 for pfilt in use_filters:
-    # if pfilt.upper() not in ('F444W','F210M', 'F300M', 'F410M'): continue
-    if pfilt.upper() not in ('F444W',): continue
     print()
     print(f'Finding stars for {pfilt}...')
     filename = glob.glob(os.path.join(DIR_OUTPUT, f'*{pfilt}*sci*{SKYEXT}.fits*'))[-1]
