@@ -32,7 +32,7 @@ if not os.path.exists(plotdir):
 target_filter = MATCH_BAND
 image_dir = DIR_OUTPUT
 print('target filter',target_filter)
-hdr = fits.getheader(glob.glob(os.path.join(DIR_OUTPUT, f'*{target_filter}*sci*{SKYEXT}.fits*'))[0])
+hdr = fits.getheader(glob.glob(os.path.join(DIR_OUTPUT, f'*{target_filter}*sci{SKYEXT}.fits*'))[0])
 
 window = SplitCosineBellWindow(alpha=ALPHA, beta=BETA)
 
@@ -40,7 +40,7 @@ use_filters = [MATCH_BAND] + [f for f in FILTERS if f != MATCH_BAND]
 for pfilt in use_filters:
     print()
     print(f'Finding stars for {pfilt}...')
-    filename = glob.glob(os.path.join(DIR_OUTPUT, f'*{pfilt}*sci*{SKYEXT}.fits*'))[-1]
+    filename = glob.glob(os.path.join(DIR_OUTPUT, f'*{pfilt}*sci{SKYEXT}.fits*'))[0]
     suffix = '.fits' + filename.split('.fits')[-1]
     starname = filename.replace(suffix, '_star_cat.fits').replace(DIR_OUTPUT, DIR_PSFS)
     outname = os.path.join(DIR_PSFS, f'{pfilt}.fits')
@@ -49,8 +49,6 @@ for pfilt in use_filters:
         print(f'PSFs already exist for {pfilt} -- skipping!')
         if pfilt == target_filter:
             target_psf = fits.getdata(glob.glob(DIR_PSFS+'*'+target_filter.lower()+'*'+'psf.fits')[0])
-        continue
-    # if pfilt == 'f140w': continue
 
     print(filename)
     print(starname)
