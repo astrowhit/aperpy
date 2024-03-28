@@ -88,8 +88,6 @@ for pfilt in use_filters:
     filt_psf = np.array(psf.psf_average)
     if pfilt == MATCH_BAND:
         target_psf = filt_psf
-        target_psf /= target_psf.sum()
-        continue
     
     psfname = glob.glob(DIR_PSFS+'*'+pfilt.lower()+'*'+'psf.fits')[0]
     outname = DIR_KERNELS+os.path.basename(psfname).replace('psf','kernel')
@@ -103,8 +101,11 @@ for pfilt in use_filters:
 
     print(f'Normalizing PSF to unity...')
     filt_psf /= filt_psf.sum()
-    
 
+    if pfilt == MATCH_BAND:
+        target_psf /= target_psf.sum()
+        continue
+    
     print(f'Building {pfilt}-->{MATCH_BAND} kernel...')
     assert(filt_psf.shape == target_psf.shape, f'Shape of filter psf ({filt_psf.shape}) must match target psf ({target_psf.shape})')
     if method == 'pypher':
