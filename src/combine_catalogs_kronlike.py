@@ -418,6 +418,8 @@ if EXTERNALSTARS_USE:
 if AUTOSTAR_USE:
     starcat = Table([])
     for filt in AUTOSTAR_BANDS:
+        print(filt)
+        if filt == 'f160w': continue
         startab = Table.read(glob.glob(os.path.join(DIR_PSFS, f'../diagnostics/*{filt}*_star_cat.fits'))[0])
         mCATALOG_autostar, mtab_autostar = crossmatch(maincat, startab, [AUTOSTAR_XMATCH_RADIUS], plot=True)
         SEL_AUTOSTAR_FILTER = np.isin(maincat['ID'], mCATALOG_autostar['ID'])
@@ -508,6 +510,7 @@ if ANBP_USE:
 if BP_USE:
     str_aper = str(BP_APERSIZE).replace('.', '_')
     BP_FILT_SEL = BP_FILT[DET_NICKNAME.split('_')[0]]
+    # BP_FILT_SEL = 'f410m'
     mag_bp = TARGET_ZP - 2.5*np.log10(maincat[f'{BP_FILT_SEL}_FLUX_APER{str_aper}'])
     size_bp = maincat_unmatched[f'{BP_FILT_SEL}_FLUX_APER{str(BP_FLUXRATIO[0]).replace(".", "_")}']  \
                     / maincat_unmatched[f'{BP_FILT_SEL}_FLUX_APER{str(BP_FLUXRATIO[1]).replace(".", "_")}']
@@ -699,6 +702,7 @@ for i, colname in enumerate(maincat.colnames):
     elif colname in ('a', 'b', 'x', 'y'):
         maincat[colname].unit = u.pixel
     elif colname == 'theta':
+        maincat[colname] = np.rad2deg(maincat[colname])
         maincat[colname].unit = u.deg
 
     # print(i, colname)
