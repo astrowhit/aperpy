@@ -3,7 +3,7 @@ from astropy.io import fits
 from astropy.table import Table, hstack, Column, vstack, MaskedColumn
 import numpy as np
 import os, sys, glob
-import sfdmap
+from sfdmap2 import sfdmap
 import astropy.units as u
 from astropy.coordinates import SkyCoord
 from astroquery.svo_fps import SvoFps
@@ -338,7 +338,7 @@ if APPLY_MWDUST is not None:
             filter = 'f162m'
         filter_pwav[filter] = np.nan # ensures the order
         for i, tryfilt in enumerate(filter_table['filterID']):
-            
+
             if filter == 'f160m':
                 print(filter, tryfilt)
             if filter == 'f410m':
@@ -446,7 +446,7 @@ if GAIA_USE:
         j = Gaia.cone_search_async(coord, radius)
         gaia = j.get_results()
         # gaia.pprint()
-        tab_gaia = Table(gaia)['solution_id', 'source_id', 'ra', 'dec', 'ref_epoch', 'pmra', 'pmdec']
+        tab_gaia = Table(gaia)['solution_id', 'SOURCE_ID', 'ra', 'dec', 'ref_epoch', 'pmra', 'pmdec']
         tab_gaia.write(os.path.join(DIR_OUTPUT, 'gaia.fits'), format='fits', overwrite=True)
 
     from webb_tools import crossmatch

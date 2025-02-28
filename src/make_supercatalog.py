@@ -93,7 +93,7 @@ for coord, obj in zip(detcoords, RELEASE):
     else:
         regs.append(CircleSkyRegion(coord, obj['use_aper']/2.*u.arcsec, meta={'text':objid}))
         
-regs = np.array(regs)
+# regs = np.array(regs)
 bigreg = Regions(regs)
 bigreg.write(os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_SUPER_OBJECTS.reg"), overwrite=True, format='ds9')
 
@@ -121,7 +121,7 @@ for coord, obj in zip(detcoords, RELEASE):
     else:
         regs.append(CircleSkyRegion(coord, obj['use_aper']/2.*u.arcsec, meta={'text':objid}))
         
-regs = np.array(regs)
+# regs = np.array(regs)
 bigreg = Regions(regs)
 bigreg.write(os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_SUPER_OBJECTS_AUTO.reg"), overwrite=True, format='ds9')
 
@@ -139,7 +139,7 @@ for coord, obj in zip(detcoords, RELEASE):
     else:
         regs.append(CircleSkyRegion(coord, minaper/2.*u.arcsec, meta={'text':objid}))
         
-regs = np.array(regs)
+# regs = np.array(regs)
 bigreg = Regions(regs)
 bigreg.write(os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_ALL_OBJECTS.reg"), overwrite=True, format='ds9')
 
@@ -153,6 +153,6 @@ for coord, obj in zip(detcoords, RELEASE):
     if obj['flag_star'] == 1:
         regs.append(CircleSkyRegion(coord, 0.32/2.*u.arcsec, meta={'text':objid}))
         
-regs = np.array(regs)
+# regs = np.array(regs)
 bigreg = Regions(regs)
 bigreg.write(os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_STARS_OBJECTS.reg"), overwrite=True, format='ds9')

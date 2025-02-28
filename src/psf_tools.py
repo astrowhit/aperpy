@@ -297,8 +297,8 @@ def get_filename(imagedir, filt, skyext=''):
 
 
 def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,2.,4.,7.5], range=[0,4], mag_lim = 24.0,
-               threshold_min = -0.5, threshold_mode=[-0.2,0.2], shift_lim=2, zp=28.9, instars=None, showme=True, label='',
-               outdir='./', plotdir='./'):
+               threshold_min = -0.5, threshold_max = 10, threshold_mode=[-0.2,0.2], shift_lim=2, zp=28.9, instars=None,
+               showme=True, label='', outdir='./', plotdir='./'):
 
     img, hdr = fits.getdata(filename, header=True)
     wcs = WCS(hdr)
@@ -307,7 +307,7 @@ def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,
     sig = mad_std(imgb[imgb>0], ignore_nan=True)/block_size
 
 #    img[~np.isfinite(img)] = 0.0
-    peaks = find_peaks(img, threshold=10*sig, npeaks=npeaks)
+    peaks = find_peaks(img, threshold=threshold_max*sig, npeaks=npeaks)
     # print(peaks)
     peaks.rename_column('x_peak','x')
     peaks.rename_column('y_peak','y')
@@ -322,6 +322,10 @@ def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,
 
     t0 = time.time()
     stars = []
+
+    from regions import Regions, CirclePixelRegion, PixCoord
+    regs=[]
+
     for ip,p in enumerate(peaks):
         co = Cutout2D(img, (p['x'], p['y']), size, mode='partial')
         # measure offset, feed it to measure cog
@@ -337,6 +341,13 @@ def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,
         co.cog = cog
         co.profile = profile
         stars.append(co)
+
+        for rr in radii:
+            regs.append(CirclePixelRegion(PixCoord(x=p['x'],y=p['y']),radius=rr))
+    regs = np.array(regs)
+    bigreg = Regions(regs)
+    bigreg.write(filename.replace('.fits.gz','.reg'), overwrite=True, format='ds9')
+
 
     stars = np.array(stars)
 
@@ -356,7 +367,7 @@ def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,
     rmode = h[1][ih]
     ok_mode =  ((r/rmode-1) > threshold_mode[0]) & ((r/rmode-1) < threshold_mode[1])
     ok = ok_phot & ok_mode & ok_min & ok_shift & ok_mag
-        
+
     # sigma clip around linear relation
     try:
         fitter = FittingWithOutlierRemoval(LinearLSQFitter(), sigma_clip, sigma=2.8, niter=2)
@@ -428,15 +439,15 @@ def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,
         plt.tight_layout()
         suffix = '.fits' + filename.split('.fits')[-1]
         plt.savefig(outdir+'/'+os.path.basename(filename).replace(suffix,'_diagnostic.pdf'))
-        
+
         dd = [st.data for st in stars[ok]]
         title = ['{} {:.1f} {:.2f} {:.2f} {:.1f} {:.1f}'.format(ii, mm, pp,qq,xx,yy) for ii,mm,pp,qq,xx,yy in zip(peaks['id'][ok],mags[ok],peaks['p1'][ok],peaks['minv'][ok],peaks['x0'][ok],peaks['y0'][ok])]
         imshow(dd,nsig=30,title=title)
         plt.tight_layout()
         plt.savefig(outdir+'/'+os.path.basename(filename).replace(suffix,'_star_stamps.pdf'))
-    
+
     peaks[ok].write(outdir+'/'+os.path.basename(filename).replace(suffix,'_star_cat.fits'),overwrite=True)
-                
+
     return peaks[ok], stars[ok]
 
 
@@ -467,7 +478,9 @@ def sigma_clip_3d(data, maxiters=2, axis=0, **kwargs):
         clipped_data, lo, hi = sigma_clip(clipped_data, maxiters=0, axis=0, masked=True, grow=False, return_bounds=True, **kwargs)
         # grow mask
         for i in range(len(clipped_data.mask)): clipped_data.mask[i,:,:] = grow(clipped_data.mask[i,:,:],iterations=1)
-
+    # print((np.mean(clipped_data,axis=axis)[67,67]))
+    # print(clipped_data.mask[:,67,67])
+    # raise
     return np.mean(clipped_data,axis=axis), lo, hi, clipped_data
 
 # interpolation=cv2.INTER_LANCZOS4
@@ -607,7 +620,7 @@ class PSF():
         # print('-',len(self.ok[self.ok]))
 
         for i in np.arange(len(data)):
-            self.ok[iok[i]] = self.ok[iok[i]] and ~self.clipped[i].mask[50,50]
+            self.ok[iok[i]] = self.ok[iok[i]] and ~self.clipped[i].mask[int(self.nx)//2,int(self.nx)//2]
             self.data[iok[i]].mask = self.clipped[i].mask
             mask = self.data[iok[i]].mask
             self.cat['frac_mask'][iok[i]] = np.size(mask[mask]) / np.size(mask)
@@ -669,7 +682,7 @@ class PSF():
 
         self.cat[self.ok].write('_'.join([outname, 'psf_cat.fits']),overwrite=True)
 
-        title = f"{self.cat['id']}, {self.cat['ok']}"
+        title = f"{self.cat['id'].data}, {self.cat['ok'].data}"
         fig, ax = imshow(self.data, nsig=30, title=title)
         fig.savefig('_'.join([outname, 'psf_stamps.pdf']),dpi=300)
 
@@ -1017,7 +1030,7 @@ if 0:
     plt.show()
 
 def renorm_psf(psfmodel, filt, fov=4.04, pixscl=0.04):
-    
+
     filt = filt.upper()
 
     # Encircled energy for WFC3 IR within 2" radius, ACS Optical, and UVIS from HST docs

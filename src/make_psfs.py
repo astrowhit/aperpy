@@ -46,14 +46,28 @@ for pfilt in use_filters:
     outname = os.path.join(DIR_PSFS, f'{pfilt}.fits')
 
     if len(glob.glob(DIR_PSFS+'*'+pfilt.lower()+'*'+'psf.fits')) > 0:
-        print(f'PSFs already exist for {pfilt} -- skipping!')
+        # print(f'PSFs already exist for {pfilt} -- skipping!')
         if pfilt == target_filter:
             target_psf = fits.getdata(glob.glob(DIR_PSFS+'*'+target_filter.lower()+'*'+'psf.fits')[0])
 
     print(filename)
     print(starname)
 
-    peaks, stars = find_stars(filename, outdir=DIR_PSFS, plotdir=plotdir, label=pfilt, zp=PHOT_ZP[pfilt])
+    # if pfilt=='f356w':
+    #     range=[0,3]
+    # else:
+    radii=np.array([0.5,1.,2.,4.,7.5])#*0.04/PIXEL_SCALE
+    print(radii)
+
+    if pfilt in ['f606w','f814w']:
+        range=[0,3]
+        thresh=7
+    else:
+        range=[0,3]
+        thresh=10
+    peaks, stars = find_stars(filename, outdir=DIR_PSFS, plotdir=plotdir,
+        label=pfilt, zp=PHOT_ZP[pfilt], range=range, radii=radii,
+        threshold_max=thresh)
 
     print(f'Found {len(peaks)} bright sources')
 
@@ -66,7 +80,9 @@ for pfilt in use_filters:
     ra, dec, ids = peaks['ra'][ok], peaks['dec'][ok], peaks['id'][ok]
 
     print(f'Processing PSF...')
-    psf = PSF(image=filename, x=ra, y=dec, ids=ids, pixsize=101)
+    pixsize=int(4/PIXEL_SCALE)
+    if pixsize % 2 == 0: pixsize+=1
+    psf = PSF(image=filename, x=ra, y=dec, ids=ids, pixsize=pixsize)
     psf.center()
     psf.measure()
     psf.select(snr_lim=snr_lim, dshift_lim=3, mask_lim=0.99, showme=showme, nsig=30)
@@ -77,7 +93,7 @@ for pfilt in use_filters:
     psfmodel = renorm_psf(psf.psf_average, filt=pfilt)
     fits.writeto('_'.join([outname.replace('.fits',''), 'psf_norm.fits']), np.array(psfmodel),overwrite=True)
 
-    imshow(psf.data[psf.ok],nsig=50,title=psf.cat['id'][psf.ok])
+    imshow(psf.data[psf.ok],nsig=50,title=psf.cat['id'][psf.ok].data)
     plt.savefig(outname.replace('.fits','_stamps_used.pdf').replace(outdir,plotdir),dpi=300)
     show_cogs([psf.psf_average],title=pfilt, label=['oPSF'],outname=plotdir+pfilt)
     plots=glob.glob(outdir+'*.pdf')
@@ -88,7 +104,7 @@ for pfilt in use_filters:
     filt_psf = np.array(psf.psf_average)
     if pfilt == MATCH_BAND:
         target_psf = filt_psf
-    
+
     psfname = glob.glob(DIR_PSFS+'*'+pfilt.lower()+'*'+'psf.fits')[0]
     outname = DIR_KERNELS+os.path.basename(psfname).replace('psf','kernel')
 
@@ -105,7 +121,7 @@ for pfilt in use_filters:
     if pfilt == MATCH_BAND:
         target_psf /= target_psf.sum()
         continue
-    
+
     print(f'Building {pfilt}-->{MATCH_BAND} kernel...')
     assert(filt_psf.shape == target_psf.shape, f'Shape of filter psf ({filt_psf.shape}) must match target psf ({target_psf.shape})')
     if method == 'pypher':

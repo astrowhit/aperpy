@@ -44,15 +44,18 @@ def conv_flux(in_zpt, out_zpt=TARGET_ZP):
 
 # READ IN IMAGES
 print('READING DETECTION IMAGES...')
-detsci = fits.getdata(PATH_DETSCI).byteswap().newbyteorder()
+detsci = fits.getdata(PATH_DETSCI)#.byteswap().newbyteorder()
+detsci = detsci.astype(detsci.dtype.newbyteorder('='))
 print(PATH_DETSCI)
 if PATH_DETWHT != 'None':
-    detwht = fits.getdata(PATH_DETWHT).byteswap().newbyteorder()
+    detwht = fits.getdata(PATH_DETWHT)#.byteswap().newbyteorder()
+    detwht = detwht.astype(detwht.dtype.newbyteorder('='))
     print(PATH_DETWHT)
 else:
     detwht = np.ones_like(detsci)
 if PATH_DETMASK != 'None':
-    detmask =  fits.getdata(PATH_DETMASK).byteswap().newbyteorder().astype(float)
+    detmask =  fits.getdata(PATH_DETMASK)#.byteswap().newbyteorder().astype(float)
+    detmask = detmask.astype(detmask.dtype.newbyteorder('=')).astype(float)
     print(PATH_DETMASK)
 else:
     detmask = np.zeros_like(detsci)
@@ -141,7 +144,7 @@ for coord, obj in zip(detcoords, catalog):
     angle = np.rad2deg(obj['theta']) * u.deg
     objid = str(obj['ID'])
     regs.append(EllipseSkyRegion(coord, width, height, angle, meta={'label':objid}))
-regs = np.array(regs)
+# regs = np.array(regs) # delete for numpy 2.0 version of regions
 bigreg = Regions(regs)
 bigreg.write(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_OBJECTS.reg'), overwrite=True, format='ds9')
 
@@ -248,13 +251,16 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
             # 2 FORCED PHOTOMETRY + measurements
             # READ IN IMAGES
             print('READING PHOTOMETRY IMAGES...')
-            photsci = fits.getdata(PATH_PHOTSCI).byteswap().newbyteorder()
+            photsci = fits.getdata(PATH_PHOTSCI)#.byteswap().newbyteorder()
+            photsci = photsci.astype(photsci.dtype.newbyteorder('='))
             print(PATH_PHOTSCI)
-            photwht = fits.getdata(PATH_PHOTWHT).byteswap().newbyteorder()
+            photwht = fits.getdata(PATH_PHOTWHT)#.byteswap().newbyteorder()
+            photwht = photwht.astype(photwht.dtype.newbyteorder('='))
             photmask = np.where((photwht<=0.)|~np.isfinite(photwht), 1., 0.)
             print(PATH_PHOTWHT)
             if PATH_PHOTMASK != 'None':
-                photmask_user = fits.getdata(PATH_PHOTMASK).byteswap().newbyteorder().astype(float)
+                photmask_user = fits.getdata(PATH_PHOTMASK)#.byteswap().newbyteorder().astype(float)
+                photmask_user = photmask_user.astype(photmask_user.dtype.newbyteorder('=')).astype(float)
                 print(PATH_PHOTMASK)
                 photmask[photmask_user] = 1.
 
@@ -270,8 +276,10 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
         # We actually run AUTO fluxes on each band
         # So just do again for each band and take their coverage -- uber consistent this way.)
         elif PHOT_NICKNAME == KRON_MATCH_BAND:
-                photsci = fits.getdata(PATH_KRONSCI).byteswap().newbyteorder()
-                photerr = fits.getdata(PATH_KRONERR).byteswap().newbyteorder()
+                photsci = fits.getdata(PATH_KRONSCI)#.byteswap().newbyteorder()
+                photsci = photsci.astype(photsci.dtype.newbyteorder('='))
+                photerr = fits.getdata(PATH_KRONERR)#.byteswap().newbyteorder()
+                photerr = photerr.astype(photerr.dtype.newbyteorder('='))
                 photwht = np.where(photerr<=0., 0, 1/(photerr**2))
                 phothead = fits.getheader(PATH_KRONSCI, 0)
                 photwcs = WCS(phothead)
@@ -305,7 +313,7 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
                                                 mask = photmask,
                                                 err = photerr, subpix=0,
                                                 r=rad, gain=1.0)
-            
+
             badflux = (flux == 0.) | ~np.isfinite(flux) | (flag > 0)
             badfluxerr = (fluxerr <= 0.) | ~np.isfinite(fluxerr) | (flag > 0)
             pc_badflux = np.sum(badflux) / len(flux)
