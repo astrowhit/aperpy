@@ -18,7 +18,7 @@ import sys
 PATH_CONFIG = sys.argv[1]
 sys.path.insert(0, PATH_CONFIG)
 
-from config import DIR_IMAGES, DIR_OUTPUT, BACKTYPE, BACKPARAMS, \
+from config import DIR_IMAGES, DIR_OUTPUT, BACKTYPE, BACKPARAMS,\
             FILTERS, MED_CENTERS, MED_SIZE, FILTER_SIZE, PIXEL_SCALE, IS_CLUSTER, BLOCK_SIZE
 
 SCI_FILENAMES = list(glob.glob(DIR_IMAGES+'/*_sci.fits*'))
@@ -48,6 +48,8 @@ for filename in SCI_FILENAMES:
             subimg = Cutout2D(img, MED_CENTER, MED_SIZE, wcs=WCS(head))
             subwht = Cutout2D(wht, MED_CENTER, MED_SIZE, wcs=WCS(head))
             print(f'    Block summing cluster cutout ({BLOCK_SIZE} x {BLOCK_SIZE})')
+            if subimg.data.shape[0] % BLOCK_SIZE != 0:
+                raise(IndexError(f'"MED_SIZE" ({subimg.data.shape[0]} pix) divided by "BLOCK_SIZE" ({BLOCK_SIZE} pix) must equal 0. Check config.'))
             subwht_blocked = block_reduce(subwht.data, BLOCK_SIZE, func=np.sum) / (BLOCK_SIZE**2)**2
             subimg_blocked = block_reduce(subimg.data*subwht.data, BLOCK_SIZE, func=np.sum) / subwht_blocked / (BLOCK_SIZE**2)
             print(f'    Building median filtered cluster image ({FILTER_SIZE}\"; {round_up_to_odd(FILTER_SIZE / (PIXEL_SCALE * BLOCK_SIZE))}px)')

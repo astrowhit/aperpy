@@ -296,7 +296,7 @@ def get_filename(imagedir, filt, skyext=''):
     return filename, starname
 
 
-def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,2.,4.,7.5], range=[0,4], mag_lim = 24.0,
+def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,2.,4.,7.5], range=[1.2,4], mag_lim = 24.0,
                threshold_min = -0.5, threshold_max = 10, threshold_mode=[-0.2,0.2], shift_lim=2, zp=28.9, instars=None,
                showme=True, label='', outdir='./', plotdir='./'):
 
@@ -344,7 +344,6 @@ def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,
 
         for rr in radii:
             regs.append(CirclePixelRegion(PixCoord(x=p['x'],y=p['y']),radius=rr))
-    regs = np.array(regs)
     bigreg = Regions(regs)
     bigreg.write(filename.replace('.fits.gz','.reg'), overwrite=True, format='ds9')
 
@@ -362,7 +361,7 @@ def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,
                (np.abs(peaks['x0']) < shift_lim_root) & (np.abs(peaks['y0']) < shift_lim_root)
 
     # ratio apertures @@@ hardcoded
-    h = np.histogram(r[(r>1.2) & ok_mag], bins=np.arange(0, range[1], threshold_mode[1]/2.),range=range)
+    h = np.histogram(r[(r>range[0]) & ok_mag], bins=np.arange(0, range[1], threshold_mode[1]/2.),range=range)
     ih = np.argmax(h[0])
     rmode = h[1][ih]
     ok_mode =  ((r/rmode-1) > threshold_mode[0]) & ((r/rmode-1) < threshold_mode[1])
@@ -414,8 +413,8 @@ def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,
         plt.title('aper(2) / aper(4) vs mag(aper(4))')
 
         plt.subplot(233)
-        _ = plt.hist(r,bins=range[1]*20,range=range)
-        _ = plt.hist(r[ok],bins=range[1]*20,range=range)
+        _ = plt.hist(r,bins=int(range[1])*20,range=range)
+        _ = plt.hist(r[ok],bins=int(range[1])*20,range=range)
         plt.title('aper(2) / aper(4)')
 
         plt.subplot(234)
@@ -455,7 +454,7 @@ import cv2
 from astropy.wcs import WCS
 from astropy.nddata import Cutout2D
 from scipy.ndimage import shift
-from photutils import CircularAperture, aperture_photometry
+from photutils.aperture import CircularAperture, aperture_photometry
 from astropy.table import hstack
 import pickle
 from astropy.io import fits
@@ -588,19 +587,19 @@ class PSF():
 
     def select(self, snr_lim = 800, dshift_lim=3, mask_lim=0.40, phot_frac_mask_lim = 0.85, showme=False, **kwargs):
         self.ok = (self.cat['dshift'] < dshift_lim) & (self.cat['snr'] > snr_lim) & (self.cat['frac_mask'] < mask_lim) & (self.cat['phot_frac_mask'] > phot_frac_mask_lim)
-
     #(self.cat['cmin'] >= -1.5)  #& (self.cat['cmin'] >= -1.5)
         self.cat['ok'] = np.int32(self.ok)
         self.cat['ok_shift'] = (self.cat['dshift'] < dshift_lim)
         self.cat['ok_snr'] = (self.cat['snr'] > snr_lim)
         self.cat['ok_frac_mask'] = (self.cat['frac_mask'] < mask_lim)
         self.cat['ok_phot_frac_mask'] = (self.cat['phot_frac_mask'] > phot_frac_mask_lim)
-
+        
         for c in self.cat.colnames:
             if 'id' not in c: self.cat[c].format='.3g'
 
         if showme:
-            title = f"{self.cat['id']}, {self.cat['ok']}"
+            title = [f"{idl}, {okk}" for idl,okk in
+                     zip(self.cat['id'],self.cat['ok'])]
             fig, ax = imshow(self.data, title=title,**kwargs)
             fig.savefig('test.pdf',dpi=300)
             # self.cat.pprint_all()
@@ -618,13 +617,13 @@ class PSF():
        # self.clipped[~np.isfinite(self.clipped)] = 0
 
         # print('-',len(self.ok[self.ok]))
-
+        
         for i in np.arange(len(data)):
             self.ok[iok[i]] = self.ok[iok[i]] and ~self.clipped[i].mask[int(self.nx)//2,int(self.nx)//2]
             self.data[iok[i]].mask = self.clipped[i].mask
             mask = self.data[iok[i]].mask
             self.cat['frac_mask'][iok[i]] = np.size(mask[mask]) / np.size(mask)
-
+        
         self.psf_average = stack
         self.cat['phot_frac_mask'] = self.phot(radius=self.norm_radius)/self.cat['phot']
 
@@ -682,7 +681,8 @@ class PSF():
 
         self.cat[self.ok].write('_'.join([outname, 'psf_cat.fits']),overwrite=True)
 
-        title = f"{self.cat['id'].data}, {self.cat['ok'].data}"
+        title = [f"{idl}, {okl}" for idl, okl in 
+                 zip(self.cat['id'].data,self.cat['ok'].data)]
         fig, ax = imshow(self.data, nsig=30, title=title)
         fig.savefig('_'.join([outname, 'psf_stamps.pdf']),dpi=300)
 
@@ -1035,11 +1035,15 @@ def renorm_psf(psfmodel, filt, fov=4.04, pixscl=0.04):
 
     # Encircled energy for WFC3 IR within 2" radius, ACS Optical, and UVIS from HST docs
     encircled = {}
+    encircled['F200LP'] = 0.985
     encircled['F225W'] = 0.993
     encircled['F275W'] = 0.984
     encircled['F336W'] = 0.9905
+    encircled['F350LPU'] = 0.98036
+    encircled['F390WU'] = 0.98865
     encircled['F435W'] = 0.979
     encircled['F606W'] = 0.975
+    encircled['F625W'] = 0.974
     encircled['F775W'] = 0.972
     encircled['F814W'] = 0.972
     encircled['F850LP'] = 0.970
@@ -1052,10 +1056,13 @@ def renorm_psf(psfmodel, filt, fov=4.04, pixscl=0.04):
     encircled['F115W'] = 0.9822
     encircled['F150W'] = 0.9804
     encircled['F200W'] = 0.9767
+    encircled['F250M'] = 0.973
     encircled['F277W'] = 0.9691
+    encircled['F300M'] = 0.968
     encircled['F356W'] = 0.9618
     encircled['F410M'] = 0.9568
     encircled['F444W'] = 0.9546
+    encircled['F480M'] = 0.952
 
     # Normalize to correct for missing flux
     # Has to be done encircled! Ensquared were calibated to zero angle...

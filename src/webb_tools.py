@@ -16,11 +16,13 @@ PIXEL_SCALE=-99
 
 def compute_background(raw_img, mask, BACKTYPE, BACKPARAMS, DIR_OUTPUT=None, NICKNAME=None, HEADER=None):
     if BACKTYPE == 'VAR':
-        bkg = sep.Background(raw_img.byteswap().newbyteorder(), mask=mask, **BACKPARAMS)
+        raw_img = raw_img.astype(raw_img.dtype.newbyteorder('='))
+        bkg = sep.Background(raw_img, mask=mask, **BACKPARAMS)
         back = bkg.back()
         print(f'    Removing background with variable background')
     if BACKTYPE == 'GLOBAL':
-        bkg = sep.Background(raw_img.byteswap().newbyteorder(), mask=mask, **BACKPARAMS)
+        raw_img = raw_img.astype(raw_img.dtype.newbyteorder('='))
+        bkg = sep.Background(raw_img, mask=mask, **BACKPARAMS)
         back = bkg.globalback
         print(f'    Removing background with global background')
     elif BACKTYPE == 'MED':

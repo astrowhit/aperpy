@@ -443,10 +443,10 @@ if GAIA_USE:
         cra, cdec = np.mean(RA_RANGE)*u.deg, np.mean(DEC_RANGE)*u.deg
         coord = SkyCoord(ra=cra, dec=cdec, unit=(u.degree, u.degree), frame='icrs')
         radius = u.Quantity(0.15, u.deg)
-        j = Gaia.cone_search_async(coord, radius)
+        j = Gaia.cone_search_async(coord, radius=radius)
         gaia = j.get_results()
         # gaia.pprint()
-        tab_gaia = Table(gaia)['solution_id', 'SOURCE_ID', 'ra', 'dec', 'ref_epoch', 'pmra', 'pmdec']
+        tab_gaia = Table(gaia)['solution_id', 'source_id', 'ra', 'dec', 'ref_epoch', 'pmra', 'pmdec']
         tab_gaia.write(os.path.join(DIR_OUTPUT, 'gaia.fits'), format='fits', overwrite=True)
 
     from webb_tools import crossmatch

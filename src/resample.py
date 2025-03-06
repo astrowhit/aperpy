@@ -11,7 +11,7 @@ import sys
 PATH_CONFIG = sys.argv[1]
 sys.path.insert(0, PATH_CONFIG)
 
-from config import DIR_IMAGES, SW_FILTERS, WEBB_FILTERS, BLOCK_WHT_REPLACE, BORROW_HEADER_FILE
+from config import DIR_IMAGES, SW_FILTERS, BLOCK_WHT_REPLACE, BORROW_HEADER_FILE
 
 SCI_FILENAMES = list(glob.glob(DIR_IMAGES+f'/*_sci.fits*'))
 BORROW_HEADER = fits.getheader(BORROW_HEADER_FILE)

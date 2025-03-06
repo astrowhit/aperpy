@@ -4,7 +4,7 @@ from astropy.io import fits
 import numpy as np
 import os, sys
 from astropy.nddata import block_reduce
-from photutils.psf import create_matching_kernel, SplitCosineBellWindow
+from photutils.psf.matching import create_matching_kernel, SplitCosineBellWindow
 from scipy.ndimage import zoom
 from astropy.visualization import simple_norm
 from photutils.centroids import centroid_2dg
@@ -14,14 +14,11 @@ from astropy.convolution import convolve_fft
 PATH_CONFIG = sys.argv[1]
 sys.path.insert(0, PATH_CONFIG)
 
-from config import DIR_PSFS, PIXEL_SCALE, DIR_OUTPUT, PSF_FOV, FILTERS, PHOT_ZP, \
-                MATCH_BAND, SKYEXT, DIR_KERNELS, OVERSAMPLE, ALPHA, BETA, PYPHER_R, MAGLIM, LW_FILTERS
+from config import DIR_PSFS, PIXEL_SCALE, DIR_OUTPUT, FILTERS, PHOT_ZP, \
+                MATCH_BAND, SKYEXT, DIR_KERNELS, MAGLIM, PSF_DICT
 from psf_tools import *
 
-method = 'pypher'
-pypher_r = PYPHER_R
 
-oversample = OVERSAMPLE
 outdir = DIR_PSFS
 if not os.path.exists(outdir):
     os.mkdir(outdir)
@@ -34,8 +31,6 @@ image_dir = DIR_OUTPUT
 print('target filter',target_filter)
 hdr = fits.getheader(glob.glob(os.path.join(DIR_OUTPUT, f'*{target_filter}*sci{SKYEXT}.fits*'))[0])
 
-window = SplitCosineBellWindow(alpha=ALPHA, beta=BETA)
-
 use_filters = [MATCH_BAND] + [f for f in FILTERS if f != MATCH_BAND]
 for pfilt in use_filters:
     print()
@@ -45,35 +40,39 @@ for pfilt in use_filters:
     starname = filename.replace(suffix, '_star_cat.fits').replace(DIR_OUTPUT, DIR_PSFS)
     outname = os.path.join(DIR_PSFS, f'{pfilt}.fits')
 
-    if len(glob.glob(DIR_PSFS+'*'+pfilt.lower()+'*'+'psf.fits')) > 0:
-        # print(f'PSFs already exist for {pfilt} -- skipping!')
-        if pfilt == target_filter:
-            target_psf = fits.getdata(glob.glob(DIR_PSFS+'*'+target_filter.lower()+'*'+'psf.fits')[0])
+    # if len(glob.glob(DIR_PSFS+'*'+pfilt.lower()+'*'+'psf.fits')) > 0:
+    #     print(f'PSFs already exist for {pfilt} -- skipping!')
+    #     if pfilt == target_filter:
+    #         target_psf = fits.getdata(glob.glob(DIR_PSFS+'*'+target_filter.lower()+'*'+'psf.fits')[0])
 
     print(filename)
     print(starname)
 
-    # if pfilt=='f356w':
-    #     range=[0,3]
-    # else:
-    radii=np.array([0.5,1.,2.,4.,7.5])#*0.04/PIXEL_SCALE
-    print(radii)
+    radii=np.array([0.5,1.,2.,4.,7.5])*0.04/PIXEL_SCALE
+    print(f"apertures={radii}")
 
-    if pfilt in ['f606w','f814w']:
-        range=[0,3]
-        thresh=7
-    else:
-        range=[0,3]
-        thresh=10
+    range = PSF_DICT['range'][pfilt]
+    threshold_max = PSF_DICT['threshold_max'][pfilt]
+    mag_lim = PSF_DICT['mag_lim'][pfilt]
+    snr_lim = PSF_DICT['snr_lim'][pfilt]
+    sigma = PSF_DICT['sigma'][pfilt]
+
+    method = PSF_DICT['method'][pfilt]
+    oversample = PSF_DICT['oversample'][pfilt]
+    pypher_r = PSF_DICT['pypher_r'][pfilt]
+    alpha = PSF_DICT['alpha'][pfilt]
+    beta = PSF_DICT['beta'][pfilt]
+
+    showme = False
+
     peaks, stars = find_stars(filename, outdir=DIR_PSFS, plotdir=plotdir,
         label=pfilt, zp=PHOT_ZP[pfilt], range=range, radii=radii,
-        threshold_max=thresh)
+        threshold_max=threshold_max, mag_lim=mag_lim)
+    
+    regfile=filename.replace('.fits.gz','.reg')
+    os.rename(regfile,regfile.replace(DIR_OUTPUT,plotdir))
 
     print(f'Found {len(peaks)} bright sources')
-
-    snr_lim = 1000
-    sigma = 2.8 #if pfilt in ['f090w'] else 4.0
-    showme=False
 
     maglim = MAGLIM
     ok = (peaks['mag'] > maglim[0]) & ( peaks['mag'] < maglim[1] )
@@ -92,7 +91,6 @@ for pfilt in use_filters:
 
     psfmodel = renorm_psf(psf.psf_average, filt=pfilt)
     fits.writeto('_'.join([outname.replace('.fits',''), 'psf_norm.fits']), np.array(psfmodel),overwrite=True)
-
     imshow(psf.data[psf.ok],nsig=50,title=psf.cat['id'][psf.ok].data)
     plt.savefig(outname.replace('.fits','_stamps_used.pdf').replace(outdir,plotdir),dpi=300)
     show_cogs([psf.psf_average],title=pfilt, label=['oPSF'],outname=plotdir+pfilt)
@@ -100,10 +98,12 @@ for pfilt in use_filters:
     plots+=glob.glob(outdir+'*_cat.fits')
     for plot in plots:
         os.rename(plot,plot.replace(outdir,plotdir))
-
+    
     filt_psf = np.array(psf.psf_average)
     if pfilt == MATCH_BAND:
-        target_psf = filt_psf
+        continue
+
+    target_psf = fits.getdata(glob.glob(DIR_PSFS+'*'+target_filter.lower()+'*'+'psf.fits')[0])
 
     psfname = glob.glob(DIR_PSFS+'*'+pfilt.lower()+'*'+'psf.fits')[0]
     outname = DIR_KERNELS+os.path.basename(psfname).replace('psf','kernel')
@@ -112,15 +112,11 @@ for pfilt in use_filters:
     if oversample > 1:
         print(f'Oversampling PSF by {oversample}x...')
         filt_psf = zoom(filt_psf, oversample)
-        if pfilt == MATCH_BAND:
-            target_psf = zoom(target_psf, oversample)
+        target_psf = zoom(target_psf, oversample)
 
     print(f'Normalizing PSF to unity...')
     filt_psf /= filt_psf.sum()
-
-    if pfilt == MATCH_BAND:
-        target_psf /= target_psf.sum()
-        continue
+    target_psf /= target_psf.sum()
 
     print(f'Building {pfilt}-->{MATCH_BAND} kernel...')
     assert(filt_psf.shape == target_psf.shape, f'Shape of filter psf ({filt_psf.shape}) must match target psf ({target_psf.shape})')
@@ -134,8 +130,13 @@ for pfilt in use_filters:
         os.remove(DIR_KERNELS+'kernel_a_to_b.fits')
         os.remove(DIR_KERNELS+'kernel_a_to_b.log')
 
-    else:
+    elif method == 'photutils':
+        window = SplitCosineBellWindow(alpha=alpha,beta=beta)
         kernel =  create_matching_kernel(filt_psf, target_psf, window=window)
+    
+    else:
+        print("PSF_DICT['method'] must be 'pypher' or 'photutils'. See config.")
+        raise
 
     if oversample > 1:
         kernel = block_reduce(kernel,block_size=oversample, func=np.sum)
@@ -165,7 +166,7 @@ for i, pfilt in enumerate(use_filters[1:]):
 
     kernel = fits.getdata(outname.lower())
 
-    simple = simple_norm(kernel,stretch='linear',power=1, min_cut=-5e-4, max_cut=5e-4)
+    simple = simple_norm(kernel,stretch='linear',power=1, vmin=-5e-4, vmax=5e-4)
 
     plt.subplot(nfilt,npanel,1+i*npanel)
     plt.title('psf '+pfilt)
@@ -197,8 +198,8 @@ for i, pfilt in enumerate(use_filters[1:]):
     plt.ylim(0.95,1.05)
     if method == 'pypher':
         plt.title('pypher r={}'.format(pypher_r))
-    else:
-        plt.title('alpha={}, beta={}'.format(ALPHA, BETA))
+    elif method == 'photutils':
+        plt.title('alpha={}, beta={}'.format(alpha,beta))
     plt.axvline(x=0.16,ls=':')
     plt.xlabel('radius arcsec')
     plt.ylabel('ee_psf_conv / ee_psf_target')

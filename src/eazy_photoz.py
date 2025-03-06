@@ -171,7 +171,7 @@ ztest = diff / ez.efnu
 dmag = -2.5*np.log10(ez.fnu/ez.fmodel)
 
 for test, ylabel, fname in zip((rel_diff, ztest, dmag),
-                        ('Relative Flux $\\frac{\\rm{observed}-\\rm{model}}{\\rm{model}}$', '$f$-test $\\frac{\\rm{observed}-\\rm{model}}{\\rm{uncertainty}}$', '$\Delta$Mag observed - model (AB)'),
+                        ('Relative Flux $\\frac{\\rm{observed}-\\rm{model}}{\\rm{model}}$', '$f$-test $\\frac{\\rm{observed}-\\rm{model}}{\\rm{uncertainty}}$', '$\\Delta$Mag observed - model (AB)'),
                         ('reldiff_wav', 'ztest_wav', 'dmag_wav')
                         ):
 
@@ -181,7 +181,7 @@ for test, ylabel, fname in zip((rel_diff, ztest, dmag),
     if test is ztest:
         ax.set_ylim(-3, 3)
         hline = 1
-        ax.set_yticks((-2, 0, 2), ('$-2\sigma$', '$0\sigma$', '$2\sigma$'))
+        ax.set_yticks((-2, 0, 2), ('$-2\\sigma$', '$0\\sigma$', '$2\\sigma$'))
     else:
         ax.set_ylim(-0.35, 0.35)
         hline = 0.1
@@ -205,7 +205,7 @@ for test, ylabel, fname in zip((rel_diff, ztest, dmag),
 
     axt.boxplot(test_ls, vert=True, positions=ez.pivot*1e-4, widths=0.1, labels=FILTERS, flierprops={'marker':'.', 'markersize':2, 'alpha':0.1})
     axt.set(xlim=(0.05, 5))
-    ax.set(xlim=(0.1, 5), xlabel='Observed Wavelength ($\mu$m)', ylabel=ylabel)
+    ax.set(xlim=(0.1, 5), xlabel='Observed Wavelength ($\\mu$m)', ylabel=ylabel)
 
     fig.tight_layout()
     fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{PROJECT}_v{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_{nickname}_{is_zpiter}CATALOG_{TEMPLATES}_{fname}.pdf'))
@@ -218,7 +218,7 @@ ztest = diff / ez.efnu
 dmag = -2.5*np.log10(ez.fnu/ez.fmodel)
 
 for test, ylabel, fname in zip((rel_diff, ztest, dmag),
-                        ('Relative Flux $\\frac{\\rm{observed}-\\rm{model}}{\\rm{model}}$', '$f$-test $\\frac{\\rm{observed}-\\rm{model}}{\\rm{uncertainty}}$', '$\Delta$Mag observed - model (AB)'),
+                        ('Relative Flux $\\frac{\\rm{observed}-\\rm{model}}{\\rm{model}}$', '$f$-test $\\frac{\\rm{observed}-\\rm{model}}{\\rm{uncertainty}}$', '$\\Delta$Mag observed - model (AB)'),
                         ('reldiff_z', 'ztest_z', 'dmag_z')
                         ):
 
@@ -236,7 +236,7 @@ for test, ylabel, fname in zip((rel_diff, ztest, dmag),
         if test is ztest:
             ax.set_ylim(-3, 3)
             hline = 1
-            ax.set_yticks((-2, 0, 2), ('$-2\sigma$', '$0\sigma$', '$+2\sigma$'))
+            ax.set_yticks((-2, 0, 2), ('$-2\\sigma$', '$0\\sigma$', '$+2\\sigma$'))
         else:
             ax.set_ylim(-0.35, 0.35)
             hline = 0.1
@@ -258,7 +258,7 @@ for test, ylabel, fname in zip((rel_diff, ztest, dmag),
         ax.fill_between(bin_centers, bstd[0], bstd[1], color='royalblue', alpha=0.2)
 
         delta = np.nanmedian(test[sanity,i])
-        ax.text(0.65, 0.8, f'$\Delta={delta:2.3f}$', transform=ax.transAxes, fontsize=15)
+        ax.text(0.65, 0.8, f'$\\Delta={delta:2.3f}$', transform=ax.transAxes, fontsize=15)
 
     fig.tight_layout()
     fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{PROJECT}_v{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_{nickname}_{is_zpiter}CATALOG_{TEMPLATES}_{fname}.pdf'))
@@ -272,7 +272,7 @@ ztest = diff / ez.efnu
 dmag = -2.5*np.log10(ez.fnu/ez.fmodel)
 
 for test, ylabel, fname in zip((rel_diff, ztest, dmag),
-                        ('Relative Flux $\\frac{\\rm{observed}-\\rm{model}}{\\rm{model}}$', '$f$-test $\\frac{\\rm{observed}-\\rm{model}}{\\rm{uncertainty}}$', '$\Delta$Mag observed - model (AB)'),
+                        ('Relative Flux $\\frac{\\rm{observed}-\\rm{model}}{\\rm{model}}$', '$f$-test $\\frac{\\rm{observed}-\\rm{model}}{\\rm{uncertainty}}$', '$\\Delta$Mag observed - model (AB)'),
                         ('reldiff_mag', 'ztest_mag', 'dmag_mag')
                         ):
 
@@ -290,7 +290,7 @@ for test, ylabel, fname in zip((rel_diff, ztest, dmag),
         if test is ztest:
             ax.set_ylim(-3, 3)
             hline = 1
-            ax.set_yticks((-2, 0, 2), ('$-2\sigma$', '$0\sigma$', '$+2\sigma$'))
+            ax.set_yticks((-2, 0, 2), ('$-2\\sigma$', '$0\\sigma$', '$+2\\sigma$'))
         else:
             ax.set_ylim(-0.35, 0.35)
             hline = 0.1

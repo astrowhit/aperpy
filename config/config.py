@@ -23,8 +23,6 @@ PHOT_AUTOPARAMS = 2.5, 1.0 # Kron-scaling radius, mimumum kron factor
 PHOT_FLUXRADIUS = 0.5, 0.6 # FLUX_RADIUS at 50% and 60% of flux (always keep 0.5!)
 PHOT_KRONPARAM = 6.0 # SE hardcodes this as 6.0
 PHOT_USEMASK = True # masks out neighbors when measuring kron, auto fluxes, and flux radius (not circ apers)
-MATCH_BAND = 'f444w' # indicates band used to match PSFs
-PSF_REF_NAME = None
 
 PIXEL_SCALE = 0.04 # arcsec / px
 APPLY_MWDUST = 'MEDIAN'
@@ -54,8 +52,9 @@ IS_COMPRESSED = True # outputs files as .gz
 PATH_SW_ENERGY = '/path/to/config/Encircled_Energy_SW_ETCv2.txt'
 PATH_LW_ENERGY = '/path/to/config/Encircled_Energy_LW_ETCv2.txt'
 
-SKYEXT = ''
-WHT_REPLACE = ('sci', 'wht') # easy as it comes.
+SKYEXT = '_skysubvar'
+BLOCK_WHT_REPLACE = ('sci', 'wht') # for resampling images
+WHT_REPLACE = (f'sci{SKYEXT}', 'wht') # for pipeline steps after subtraction
 DIRWHT_REPLACE = (DIR_OUTPUT, DIR_IMAGES) #i.e. no change
 DIR_SFD = 'path/to/sfddata-master' # you need to install SFDMap! # pip install sfdmap + download maps
 ZSPEC = 'path/to/spec_z.fits'
@@ -66,19 +65,11 @@ ZCONF = 'zconf', (3, 4) # confidence flag
 MAX_SEP = 0.3 * u.arcsec
 
 ### MEDIAN FILTERING
-IS_CLUSTER = True  # if True, use median filtering
+IS_CLUSTER = False  # if True, use median filtering
 MED_CENTERS = [SkyCoord(3.587*u.deg, -30.40*u.deg)] # where to center the median filter regions
 MED_SIZE = 1.3*u.arcmin
 BLOCK_SIZE = 10 # pixels
 FILTER_SIZE = 8.3 # arcsec
-
-### PSF GENERATION
-OVERSAMPLE = 3
-ALPHA = 0.3
-BETA = 0.15
-PYPHER_R = 3e-3
-MAGLIM = (18.0, 24.0)
-PSF_FOV = 4 # arcsec
 
 ### BACKGROUNDS
 BACKPARAMS = dict(bw=32, bh=32, fw=8, fh=8, maskthresh=1, fthresh=0.)
@@ -110,26 +101,49 @@ for group in DETECTION_GROUPS:
             if ('sci.fits.gz' in path) & (filt in path):
                 DETECTION_IMAGES[filt] = path
 
+FILTERS = ['f435w', 'f606w', 'f814w','f090w','f105w','f115w','f125w','f140w',
+           'f150w','f160w','f200w','f277w','f356w','f410m','f444w']
+
 ### ZEROPOINTS
 PHOT_ZP = OrderedDict()
-PHOT_ZP['f435w'] = 28.9
-PHOT_ZP['f606w'] = 28.9
-PHOT_ZP['f814w'] = 28.9
-PHOT_ZP['f090w'] = 28.9
-PHOT_ZP['f105w'] = 28.9
-PHOT_ZP['f115w'] = 28.9
-PHOT_ZP['f125w'] = 28.9
-PHOT_ZP['f140w'] = 28.9
-PHOT_ZP['f150w'] = 28.9
-PHOT_ZP['f160w'] = 28.9
-PHOT_ZP['f200w'] = 28.9
-PHOT_ZP['f277w'] = 28.9
-PHOT_ZP['f356w'] = 28.9
-PHOT_ZP['f410m'] = 28.9
-PHOT_ZP['f444w'] = 28.9
-FILTERS = [x for x in list(PHOT_ZP.keys())]
 TARGET_ZP = 28.9
 FLUX_UNIT = '10*nJy'
+
+### PSF parameters
+MATCH_BAND = 'f444w' # indicates band used to match PSFs
+PSF_REF_NAME = f'{MATCH_BAND.lower()}_psf.fits'
+MAGLIM = (14,26)
+PSF_FOV = 4 # arcsec
+PSF_DICT = {
+    # oPSF generation
+    'range':{}, # range of flux ratios for determining point-source locus
+    'threshold_max':{}, # point source detection threshold
+    'mag_lim':{}, # magnitude limit for point source detection
+    'snr_lim':{}, # minimum S/N for a point-source to be included in oPSF
+    'sigma':{}, # standard deviation for sigma-clipping
+    # PSF homogenization
+    'method':{}, # method used to homogenize PSF ('pypher' or 'phoutils')
+    'pypher_r':{}, # pypher regularization parameter for PSF homogenization
+    'oversample':{}, # oversampling factor for PSF homogenization
+    'alpha':{}, # alpha parameter for photutils SplitCosineBellWindow
+    'beta':{}, # beta parameter for photutils SplitCosineBellWindow
+}
+
+# can edit these for filters of your choosing
+for filt in FILTERS:
+    PHOT_ZP[filt] = 28.9
+
+    PSF_DICT['range'][filt] = [1.2,3]
+    PSF_DICT['threshold_max'][filt] = 10
+    PSF_DICT['mag_lim'][filt] = 24.0
+    PSF_DICT['snr_lim'][filt] = 1000
+    PSF_DICT['sigma'][filt] = 2.8
+
+    PSF_DICT['method'][filt] = 'pypher'
+    PSF_DICT['pypher_r'][filt] = 3e-3
+    PSF_DICT['oversample'][filt] = 3
+    PSF_DICT['alpha'][filt] = 0.1
+    PSF_DICT['beta'][filt] = 0.15
 
 
 ### PHOTOZ
