@@ -533,7 +533,7 @@ if PS_WEBB_USE or PS_HST_USE or BP_USE:
         axes[0].vlines(PS_WEBB_MAGLIMIT, PS_WEBB_FLUXRATIO_RANGE[0], PS_WEBB_FLUXRATIO_RANGE[1], alpha=0.5, color='royalblue')
         axes[0].scatter(mag, size, s=3, alpha=0.2, c='grey')
         axes[0].invert_yaxis()
-        axes[0].set(xlim=(15.2, 30.2), ylim=(0, 5), ylabel=('$\mathcal{F}\,'+f'({PS_WEBB_FLUXRATIO[0]} / {PS_WEBB_FLUXRATIO[1]})$'), xlabel=f'${PS_WEBB_FILT}$ Mag (AB)')
+        axes[0].set(xlim=(15.2, 30.2), ylim=(0, 5), ylabel=('$\\mathcal{F}\,'+f'({PS_WEBB_FLUXRATIO[0]} / {PS_WEBB_FLUXRATIO[1]})$'), xlabel=f'${PS_WEBB_FILT}$ Mag (AB)')
         plot_elts.append((SEL_WEBB, 'royalblue', None))
 
     if PS_HST_USE:
@@ -543,7 +543,7 @@ if PS_WEBB_USE or PS_HST_USE or BP_USE:
         axes[1].vlines(PS_HST_MAGLIMIT, PS_HST_FLUXRATIO_RANGE[0], PS_HST_FLUXRATIO_RANGE[1], alpha=0.5, color='orange')
         axes[1].scatter(mag_hst, size_hst, s=3, alpha=0.2, c='grey')
         axes[1].invert_yaxis()
-        axes[1].set(xlim=(15.2, 30.2), ylim=(0, 5), xlabel=f'${PS_HST_FILT}$ Mag (AB)', ylabel=('$\mathcal{F}\,'+f'({PS_HST_FLUXRATIO[0]} / {PS_HST_FLUXRATIO[1]})$'))
+        axes[1].set(xlim=(15.2, 30.2), ylim=(0, 5), xlabel=f'${PS_HST_FILT}$ Mag (AB)', ylabel=('$\\mathcal{F}\,'+f'({PS_HST_FLUXRATIO[0]} / {PS_HST_FLUXRATIO[1]})$'))
         plot_elts.append((SEL_HST, 'orange', None))
 
     if GAIA_USE:
@@ -577,7 +577,7 @@ if PS_WEBB_USE or PS_HST_USE or BP_USE:
 
         axes[3].scatter(mag_bp[SEL_LWBADPIXEL], size_bp[SEL_LWBADPIXEL], s=12, alpha=0.8, c='firebrick')
         axes[3].invert_yaxis()
-        axes[3].set(xlim=(15.2, 30.2), ylim=(0, 2), ylabel=('$\mathcal{F}\,'+f'({BP_FLUXRATIO[0]} / {BP_FLUXRATIO[1]})$'), xlabel=f'${BP_FILT_SEL}$ Mag (AB)')
+        axes[3].set(xlim=(15.2, 30.2), ylim=(0, 2), ylabel=('$\\mathcal{F}\,'+f'({BP_FLUXRATIO[0]} / {BP_FLUXRATIO[1]})$'), xlabel=f'${BP_FILT_SEL}$ Mag (AB)')
 
 
     for stars, color, label in plot_elts:

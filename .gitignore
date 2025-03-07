@@ -103,3 +103,7 @@ target/
 # exclude external models from source control
 /src/external/
 .DS_Store
+
+# exclude eazy symlinks
+FILTER.RES.latest
+templates

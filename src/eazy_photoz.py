@@ -3,6 +3,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import eazy
+import eazy.utils
+import eazy.photoz
+import eazy.hdf5
 print(eazy.__version__)
 
 # Symlink templates & filters from the eazy-code repository
@@ -318,7 +321,7 @@ for test, ylabel, fname in zip((rel_diff, ztest, dmag),
         ax.fill_between(bin_centers, bstd[0], bstd[1], color='royalblue', alpha=0.2)
 
         delta = np.nanmedian(test[sanity,i])
-        ax.text(0.65, 0.8, f'$\Delta={delta:2.3f}$', transform=ax.transAxes, fontsize=15)
+        ax.text(0.65, 0.8, f'$\\Delta={delta:2.3f}$', transform=ax.transAxes, fontsize=15)
 
     fig.tight_layout()
     fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{PROJECT}_v{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_{nickname}_{is_zpiter}CATALOG_{TEMPLATES}_{fname}.pdf'))
