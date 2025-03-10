@@ -16,8 +16,8 @@ import sys
 PATH_CONFIG = sys.argv[1]
 sys.path.insert(0, PATH_CONFIG)
 
-from config import FILTERS, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, DIR_OUTPUT, \
-    MATCH_BAND, PIXEL_SCALE, PHOT_APER, DIR_KERNELS, DIR_PSFS, ZSPEC, \
+from config import FILTERS, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, DIR_OUTPUT, DIR_CONFIG,\
+    MATCH_BAND, PIXEL_SCALE, PHOT_APER, DIR_KERNELS, DIR_PSFS, ZSPEC, TRANSLATE_FNAME,\
     MAX_SEP, SCI_APER, MAKE_SCIREADY_ALL, TARGET_ZP, ZCONF, ZRA, ZDEC, ZCOL, FLUX_UNIT, \
     PS_WEBB_FLUXRATIO, PS_WEBB_FLUXRATIO_RANGE, PS_WEBB_FILT, PS_WEBB_MAGLIMIT, PS_WEBB_APERSIZE, \
     PS_HST_FLUXRATIO, PS_HST_FLUXRATIO_RANGE, PS_HST_FILT, PS_HST_MAGLIMIT, PS_HST_APERSIZE, \
@@ -286,7 +286,7 @@ for apersize in PHOT_APER:
     newcoln =f'{KRON_MATCH_BAND}_FLUXERR_REFTOTAL_MINDIAM{str_aper}'
     maincat.add_column(Column(sig_ref_total, newcoln))
 
-    for filter in USE_FILTERS:
+    for filter in USE_FILTERS:            
         f_aper =maincat[f'{filter}_FLUX_APER{str_aper}']
         f_total = flux_total(f_aper, tot_corr)  # f_aper * tot_corr
         wht = maincat[f'{filter}_SRC_MEDWHT']
@@ -329,31 +329,26 @@ elif APPLY_MWDUST == 'VAR':
 
 # Perform a MW correction (add new columns to the master)
 if APPLY_MWDUST is not None:
-    filter_table = vstack([SvoFps.get_filter_list('JWST'),\
-                        SvoFps.get_filter_list('HST')])
+    from eazy.filters import FilterFile
+    from eazy.param import TranslateFile
+    tr = TranslateFile(os.path.join(DIR_CONFIG,TRANSLATE_FNAME))
+    res = FilterFile(path=DIR_CONFIG)
     filter_pwav = OrderedDict()
     print('Building directory of pivot wavelengths')
     for filter in FILTERS:
-        if filter == 'f150w2-f162m':
-            filter = 'f162m'
-        filter_pwav[filter] = np.nan # ensures the order
-        for i, tryfilt in enumerate(filter_table['filterID']):
-
-            if filter == 'f160m':
-                print(filter, tryfilt)
-            if filter == 'f410m':
-                if 'NIRCam' in tryfilt:
-                    if tryfilt.endswith(filter.upper()):
-                        filter_pwav[filter] = filter_table[i]['WavelengthPivot']
-            if filter != 'f410m':
-                if 'ACS' in tryfilt or 'WFC3' in tryfilt or 'NIRCam' in tryfilt: # ADD OTHERS HERE
-                    if tryfilt.endswith(filter.upper()):
-                        filter_pwav[filter] = filter_table[i]['WavelengthPivot'] # angstrom
-                        # print(filter, filter_table[i]['filterID'], filter_pwav[filter])
+        for tryfilt in tr.trans:
+            if 'F' not in tr.trans[tryfilt]: continue
+            if tryfilt.endswith(filter):
+                num = int(tr.trans[tryfilt][1:])
+                filter_pwav[filter] = res[num].pivot
+                # print(filter, tryfilt, filter_pwav[filter])
+                break
 
     atten_mag = extinction.fm07(np.array(list(filter_pwav.values())), Av) # atten_mag in magnitudes from Fitzpatrick + Massa 2007
     atten_factor = 10** (-0.4 * atten_mag) # corresponds in order to FILTERS
     for i, filter in enumerate(FILTERS):
+        if np.isnan(atten_factor[i]):
+            print('No associated filter found in "Extinction": check eazy translate file (TRANSLATE_FNAME in config)')
         print(f'{filter} ::  {atten_factor[i]:2.5f}x or {atten_mag[i]:2.5f} AB')
 
     print('Applying Milky Way Attenuation correction (FM+07)')
@@ -778,7 +773,7 @@ for apersize in PHOT_APER:
 
         if XCAT_FILENAME is not None:
             # Crossmatch to DR1 and make a new column (ID + radius)
-            from catalog_tools import crossmatch
+            from webb_tools import crossmatch
             from astropy.table import Table, Column, MaskedColumn
             cat_old = Table.read(XCAT_FILENAME)
             mcat_new, mcat_old, idx1, idx2, dsky  = crossmatch(subcat, cat_old, thresh=[XCAT_RAD*u.arcsec], plot=True, return_idx=True)
@@ -791,7 +786,7 @@ for apersize in PHOT_APER:
 
         if XCAT2_FILENAME is not None:
             # Crossmatch to DR1 and make a new column (ID + radius)
-            from catalog_tools import crossmatch
+            from webb_tools import crossmatch
             from astropy.table import Table, Column, MaskedColumn
             cat_old = Table.read(XCAT2_FILENAME)
             mcat_new, mcat_old, idx1, idx2, dsky  = crossmatch(subcat, cat_old, thresh=[XCAT2_RAD*u.arcsec], plot=True, return_idx=True)
@@ -804,7 +799,7 @@ for apersize in PHOT_APER:
 
         if XCAT3_FILENAME is not None:
             # Crossmatch to DR1 and make a new column (ID + radius)
-            from catalog_tools import crossmatch
+            from webb_tools import crossmatch
             from astropy.table import Table, Column, MaskedColumn
             cat_old = Table.read(XCAT3_FILENAME)
             mcat_new, mcat_old, idx1, idx2, dsky  = crossmatch(subcat, cat_old, thresh=[XCAT3_RAD*u.arcsec], plot=True, return_idx=True)
