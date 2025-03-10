@@ -162,7 +162,6 @@ zout['flag_eazy'] = np.where( (zout['z_phot']>0) & np.isfinite(zout['mass']) & (
 
 zout.write(os.path.join(FULLDIR_CATALOGS, f'{PROJECT}_v{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_{nickname}_{is_zpiter}CATALOG_{TEMPLATES}.zout.fits'), overwrite=True)
 
-import eazy.hdf5
 eazy.hdf5.write_hdf5(ez, h5file=ez.param['MAIN_OUTPUT_FILE'] + '.h5')
 
 # Diagnostics
