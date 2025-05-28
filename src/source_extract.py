@@ -9,6 +9,7 @@ import os, sys, glob
 from astropy.convolution import Gaussian2DKernel, Tophat2DKernel
 from regions import EllipseSkyRegion, Regions, CircleSkyRegion
 from webb_tools import empty_apertures, compute_isofluxes, find_friends
+import gc
 
 import sys
 PATH_CONFIG = sys.argv[1]
@@ -149,18 +150,21 @@ bigreg = Regions(regs)
 bigreg.write(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_OBJECTS.reg'), overwrite=True, format='ds9')
 
 segmap[np.isnan(detsci)] = -99
+del detsci
 del detwht
 del detmask
 del deterr
 
+# WRITE OUT
+print(f'DONE. Writing out detection-only catalog.')
+DETCATALOG_NAME = f'{DET_NICKNAME}_DET_CATALOG.fits'
+if IS_COMPRESSED:
+    DETCATALOG_NAME += '.gz'
+catalog.write(os.path.join(FULLDIR_CATALOGS, DETCATALOG_NAME), overwrite=True)
+del catalog
+
 if FILTERS is None:
-    # WRITE OUT
-    print(f'DONE. Writing out catalog.')
-    DETCATALOG_NAME = f'{DET_NICKNAME}_DET_CATALOG.fits'
-    if IS_COMPRESSED:
-        DETCATALOG_NAME += '.gz'
-    catalog.write(os.path.join(FULLDIR_CATALOGS, DETCATALOG_NAME), overwrite=True)
-    sys.exit()
+   sys.exit()
 
 PATH_KRONSCI = None
 if (KERNEL != 'None') & (USE_COMBINED_KRON_IMAGE):
@@ -222,8 +226,8 @@ if (KERNEL != 'None') & (USE_COMBINED_KRON_IMAGE):
 for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
     for use_kernel in ('None', KERNEL):
 
-        areas = {}
-        stats = {}
+        # areas = {}
+        # stats = {}
 
         print(PHOT_NICKNAME)
         if PHOT_NICKNAME != KRON_MATCH_BAND:
@@ -291,14 +295,16 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
         # SOME BASIC INFO
         pixel_scale = utils.proj_plane_pixel_scales(photwcs)[0] * 3600
         print(f'Pixel scale: {pixel_scale}')
-        area = np.sum(np.isfinite(photwht) & (photwht > 0.) & ~np.isnan(detsci)) * (pixel_scale  / 3600)**2
+        area = np.sum(np.isfinite(photwht) & (photwht > 0.) & (segmap!=-99)) * (pixel_scale  / 3600)**2
         print(f'Usable area of photometry image: {area} deg2')
-        areas[PHOT_NICKNAME] = area
+        # areas[PHOT_NICKNAME] = area
+
+        catalog=Table.read(os.path.join(FULLDIR_CATALOGS, DETCATALOG_NAME))
 
         # Compute isophotal fluxes based on segmentation
         if use_kernel == KERNEL:
             print(f"{PHOT_NICKNAME} :: MEASURING PHOTOMETRY in isophotal segments...")
-            isofluxes = compute_isofluxes(segmap.ravel().astype(np.int64), photsci.ravel().astype(np.float64))
+            isofluxes = compute_isofluxes(segmap.ravel().astype(np.int32), photsci.ravel().astype(np.float32))
             catalog[f'FLUX_ISO'] = isofluxes * conv_flux(PHOT_ZPT)
 
         # Hack the x,y coords
@@ -426,15 +432,36 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
         plotname = os.path.join(FULLDIR_CATALOGS, f'figures/{PHOT_NICKNAME}_K{use_kernel}_emptyaper.pdf')
         noise_equal = photsci * np.sqrt(photwht)
         noise_equal[photwht<=0] = 0.
-        stats[PHOT_NICKNAME] = empty_apertures(noise_equal, photwht, segmap, N=int(1e4), pixscl=PIXEL_SCALE,
-                                            aper=empty_aper, plotname=plotname)
+        del photsci
+        del photerr
+        del photmask
+        del photwht_corr
+
 
         # WRITE OUT
-        print(f'DONE. Writing out catalog.')
+        print(f'DONE. Writing out {PHOT_NICKNAME}-K{use_kernel} catalog.')
         catalog.write(os.path.join(FULLDIR_CATALOGS, f'{PHOT_NICKNAME}_{DET_NICKNAME}_K{use_kernel}_PHOT_CATALOG.fits'), overwrite=True)
+        del catalog
 
-        np.save(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_{PHOT_NICKNAME.lower()}_emptyaper_stats.npy'), stats)
-        with open(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_{PHOT_NICKNAME.lower()}_AREAS.dat'), 'w') as f:
-            area = areas[PHOT_NICKNAME]
-            f.write(f'{PHOT_NICKNAME} {area}')
-            f.write('\n')
+        if use_kernel==KERNEL:
+            stats = empty_apertures(noise_equal, photwht, segmap, N=int(1e4), pixscl=PIXEL_SCALE,
+                                    aper=empty_aper, plotname=plotname)
+
+            stats_name = os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_{PHOT_NICKNAME.lower()}_emptyaper_stats.npy')
+            # if ind==0 and use_kernel=='None':
+            #     stats={}
+            # else:
+            #     stats=np.load(stats_name,allow_pickle=True).item()
+            # stats[PHOT_NICKNAME]=ea_stat
+            # del ea_stat
+            np.save(stats_name, stats)
+            del stats
+            
+            with open(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_{PHOT_NICKNAME.lower()}_AREAS.dat'), 'w') as f:
+                # area = areas[PHOT_NICKNAME]
+                f.write(f'{PHOT_NICKNAME} {area}')
+                f.write('\n')
+
+        del noise_equal
+        del photwht
+        gc.collect()

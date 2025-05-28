@@ -593,7 +593,7 @@ class PSF():
         self.cat['ok_snr'] = (self.cat['snr'] > snr_lim)
         self.cat['ok_frac_mask'] = (self.cat['frac_mask'] < mask_lim)
         self.cat['ok_phot_frac_mask'] = (self.cat['phot_frac_mask'] > phot_frac_mask_lim)
-        
+
         for c in self.cat.colnames:
             if 'id' not in c: self.cat[c].format='.3g'
 

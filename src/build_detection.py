@@ -61,6 +61,7 @@ def noise_equalized(bands, outname, science_fnames, weight_fnames, is_compressed
             top = raw_img
             bot = wht
             del raw_img
+            del wht
         else:
             raw_img = fits.getdata(fn_sci)
             wht = fits.getdata(fn_wht)
@@ -68,10 +69,13 @@ def noise_equalized(bands, outname, science_fnames, weight_fnames, is_compressed
             top += raw_img
             bot += wht
             del raw_img
+            del wht
 
     optavg = np.where(bot==0., 0., top / bot)
     opterr = np.sqrt(np.where(bot<=0, 0., 1. / bot))
     comb = optavg / opterr # signal / noise
+    del top
+    del bot
 
     avgout = f'{outname}_optavg.fits'
     errout = f'{outname}_opterr.fits'
@@ -80,9 +84,13 @@ def noise_equalized(bands, outname, science_fnames, weight_fnames, is_compressed
         avgout += '.gz'
         errout += '.gz'
         neqout += '.gz'
+
     fits.PrimaryHDU(data=optavg.astype(np.float32), header=head).writeto(avgout, overwrite=True)
+    del optavg
     fits.PrimaryHDU(data=opterr.astype(np.float32), header=head).writeto(errout, overwrite=True)
+    del opterr
     fits.PrimaryHDU(data=comb.astype(np.float32), header=head).writeto(neqout, overwrite=True)
+    del comb
 
 
 def sumstack(bands, outname, science_fnames, weight_fnames, is_compressed=True):

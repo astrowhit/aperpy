@@ -354,14 +354,15 @@ def measure_cog(sci_cutout, pos):
     return radii, cog
 
 # Compute COG for PSF
-def psf_cog(psfmodel, filt, nearrad=None, fix_extrapolation=True, pixel_scale=None, norm_rad=1.0):
+def psf_cog(psfmodel, filt, nearrad=None, fix_extrapolation=True, pixel_scale=None, norm_rad=1.0, dir_config=None):
     pos = np.shape(psfmodel)[0]/2.,  np.shape(psfmodel)[1]/2.
     radii, cog = measure_cog(psfmodel, pos)
     radii *= pixel_scale
 
     if fix_extrapolation:
-        sys.path.append('/Volumes/2TB_Weaver/Projects/Current/UNCOVER/scripts/')
-        from config import SW_FILTERS, LW_FILTERS, PATH_SW_ENERGY, PATH_LW_ENERGY, PIXEL_SCALE
+        sys.path.append(dir_config)
+        from config import SW_FILTERS, LW_FILTERS, HST_FILTERS,\
+            PATH_SW_ENERGY, PATH_LW_ENERGY, PATH_HST_ENERGY, PIXEL_SCALE
         if pixel_scale is None: pixel_scale = PIXEL_SCALE
         from astropy.io import ascii
         # Check if filter is valid and get correction term
@@ -369,6 +370,8 @@ def psf_cog(psfmodel, filt, nearrad=None, fix_extrapolation=True, pixel_scale=No
             encircled = ascii.read(PATH_SW_ENERGY)
         elif filt in LW_FILTERS:
             encircled = ascii.read(PATH_LW_ENERGY)
+        elif filt in HST_FILTERS:
+            encircled = ascii.read(PATH_HST_ENERGY)
         else:
             print(f'{filt} is NOT a valid NIRCam filter!')
             return

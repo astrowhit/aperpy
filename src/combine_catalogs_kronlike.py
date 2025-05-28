@@ -16,7 +16,7 @@ import sys
 PATH_CONFIG = sys.argv[1]
 sys.path.insert(0, PATH_CONFIG)
 
-from config import FILTERS, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, DIR_OUTPUT, DIR_CONFIG,\
+from config import FILTERS, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, DIR_OUTPUT,\
     MATCH_BAND, PIXEL_SCALE, PHOT_APER, DIR_KERNELS, DIR_PSFS, ZSPEC, TRANSLATE_FNAME,\
     MAX_SEP, SCI_APER, MAKE_SCIREADY_ALL, TARGET_ZP, ZCONF, ZRA, ZDEC, ZCOL, FLUX_UNIT, \
     PS_WEBB_FLUXRATIO, PS_WEBB_FLUXRATIO_RANGE, PS_WEBB_FILT, PS_WEBB_MAGLIMIT, PS_WEBB_APERSIZE, \
@@ -183,7 +183,10 @@ if PHOT_USEMASK:
 # Get some static refband stuff
 plotname = os.path.join(FULLDIR_CATALOGS, f'figures/aper_{KRON_MATCH_BAND}_nmad.pdf')
 stats_matchband = np.load(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_{KRON_MATCH_BAND.lower()}_emptyaper_stats.npy'), allow_pickle=True).item()
-p, pcov, sigma1 = fit_apercurve(stats_matchband[KRON_MATCH_BAND], plotname=plotname, stat_type=['fit_std'], pixelscale=PIXEL_SCALE)
+if KRON_MATCH_BAND in stats_matchband.keys():
+    stats_matchband = stats_matchband[KRON_MATCH_BAND]
+# p, pcov, sigma1 = fit_apercurve(stats_matchband[KRON_MATCH_BAND], plotname=plotname, stat_type=['fit_std'], pixelscale=PIXEL_SCALE)
+p, pcov, sigma1 = fit_apercurve(stats_matchband, plotname=plotname, stat_type=['fit_std'], pixelscale=PIXEL_SCALE)
 alpha, beta = p['fit_std']
 sig1 = sigma1['fit_std']
 wht_ref = maincat[f'{KRON_MATCH_BAND}_SRC_MEDWHT']
@@ -237,14 +240,14 @@ for apersize in PHOT_APER:
     f_ref_auto[use_circle] = f_ref_aper[use_circle]
     f_ref_auto[~np.isfinite(maincat[f'{KRON_MATCH_BAND}_RELWHT'])] = np.nan # if you don't have a weight then you don't have a flux_err, so you don't have flux, and so you shouldn't show auto either.
 
-    psffrac_ref_auto = psf_cog(conv_psfmodel, MATCH_BAND.upper(), nearrad = kronrad_circ * PIXEL_SCALE, pixel_scale = PIXEL_SCALE) # in pixels
+    psffrac_ref_auto = psf_cog(conv_psfmodel, MATCH_BAND.upper(), nearrad = kronrad_circ * PIXEL_SCALE, pixel_scale = PIXEL_SCALE, dir_config = PATH_CONFIG) # in pixels
     # F160W kernel convolved MATCH_BAND PSF + missing flux from F160W beyond 2" radius
     f_ref_total = f_ref_auto / psffrac_ref_auto # equation 9
     # if apersize == PHOT_APER[0]:
     newcoln =f'{KRON_MATCH_BAND}_FLUX_REF_AUTO_APER{str_aper}'
     maincat.add_column(Column(f_ref_auto, newcoln))
 
-    min_corr = 1. / psf_cog(conv_psfmodel, MATCH_BAND.upper(), nearrad=(apersize / 2.), pixel_scale = PIXEL_SCALE) # defaults to EE(<R_aper)
+    min_corr = 1. / psf_cog(conv_psfmodel, MATCH_BAND.upper(), nearrad=(apersize / 2.), pixel_scale = PIXEL_SCALE, dir_config = PATH_CONFIG) # defaults to EE(<R_aper)
     tot_corr = f_ref_total / f_ref_aper
 
     use_circle |= tot_corr < min_corr
@@ -315,12 +318,10 @@ for apersize in PHOT_APER:
         # newcoln =f'{filter}_FLUXERR_APER{str_aper}_FULL'
         # maincat.add_column(Column(sig_full, newcoln))
 
-
 # ADD SFD maps (2011 scales by 0.86, which is default. otherwise use scaling=1.0)
 m = sfdmap.SFDMap(DIR_SFD)
 ebmv = m.ebv(maincat['RA'], maincat['DEC'])
 maincat.add_column(Column(ebmv, name='EBV'), 1+np.where(np.array(maincat.colnames) == 'DEC')[0][0])
-
 
 if APPLY_MWDUST == 'MEDIAN':
     Av = np.median(ebmv)*3.1
@@ -331,8 +332,20 @@ elif APPLY_MWDUST == 'VAR':
 if APPLY_MWDUST is not None:
     from eazy.filters import FilterFile
     from eazy.param import TranslateFile
-    tr = TranslateFile(os.path.join(DIR_CONFIG,TRANSLATE_FNAME))
-    res = FilterFile(path=DIR_CONFIG)
+    # Symlink templates & filters from the eazy-code repository
+    import eazy
+    from eazy.utils import path_to_eazy_data
+    envpath = os.getenv('EAZYCODE')
+    if envpath is None:
+        envpath = os.path.join(path_to_eazy_data(), 'eazy-photoz')
+    print('EAZYCODE = '+envpath)
+    try:
+        eazy.symlink_eazy_inputs()
+    except:
+        Warning('Could not add symlinks...might be OK.')
+
+    tr = TranslateFile(os.path.join(PATH_CONFIG,TRANSLATE_FNAME))
+    res = FilterFile()
     filter_pwav = OrderedDict()
     print('Building directory of pivot wavelengths')
     for filter in FILTERS:
@@ -384,6 +397,7 @@ if PS_HST_USE:
     SEL_HST = (size_hst > PS_HST_FLUXRATIO_RANGE[0]) & (size_hst < PS_HST_FLUXRATIO_RANGE[1]) & (mag_hst < PS_HST_MAGLIMIT)
     print(f'Flagged {np.sum(SEL_HST)} objects as point-like (stars) from {PS_HST_FILT}')
     maincat.add_column(Column(SEL_HST.astype(int), name='star_hst_flag'))
+    fsize_hst = maincat[f'{PS_HST_FILT}_FLUX_RADIUS_FRAC0_5{mask}'] * PIXEL_SCALE
     SEL_STAR |= SEL_HST
 
 # star-galaxy flag
@@ -414,7 +428,6 @@ if AUTOSTAR_USE:
     starcat = Table([])
     for filt in AUTOSTAR_BANDS:
         print(filt)
-        if filt == 'f160w': continue
         startab = Table.read(glob.glob(os.path.join(DIR_PSFS, f'../diagnostics/*{filt}*_star_cat.fits'))[0])
         mCATALOG_autostar, mtab_autostar = crossmatch(maincat, startab, [AUTOSTAR_XMATCH_RADIUS], plot=True)
         SEL_AUTOSTAR_FILTER = np.isin(maincat['ID'], mCATALOG_autostar['ID'])
@@ -528,7 +541,7 @@ if PS_WEBB_USE or PS_HST_USE or BP_USE:
         axes[0].vlines(PS_WEBB_MAGLIMIT, PS_WEBB_FLUXRATIO_RANGE[0], PS_WEBB_FLUXRATIO_RANGE[1], alpha=0.5, color='royalblue')
         axes[0].scatter(mag, size, s=3, alpha=0.2, c='grey')
         axes[0].invert_yaxis()
-        axes[0].set(xlim=(15.2, 30.2), ylim=(0, 5), ylabel=('$\\mathcal{F}\,'+f'({PS_WEBB_FLUXRATIO[0]} / {PS_WEBB_FLUXRATIO[1]})$'), xlabel=f'${PS_WEBB_FILT}$ Mag (AB)')
+        axes[0].set(xlim=(15.2, 30.2), ylim=(0, 5), ylabel=(f'$\\mathcal{{F}}~({PS_WEBB_FLUXRATIO[0]} / {PS_WEBB_FLUXRATIO[1]})$'), xlabel=f'${PS_WEBB_FILT}$ Mag (AB)')
         plot_elts.append((SEL_WEBB, 'royalblue', None))
 
     if PS_HST_USE:
@@ -538,7 +551,7 @@ if PS_WEBB_USE or PS_HST_USE or BP_USE:
         axes[1].vlines(PS_HST_MAGLIMIT, PS_HST_FLUXRATIO_RANGE[0], PS_HST_FLUXRATIO_RANGE[1], alpha=0.5, color='orange')
         axes[1].scatter(mag_hst, size_hst, s=3, alpha=0.2, c='grey')
         axes[1].invert_yaxis()
-        axes[1].set(xlim=(15.2, 30.2), ylim=(0, 5), xlabel=f'${PS_HST_FILT}$ Mag (AB)', ylabel=('$\\mathcal{F}\,'+f'({PS_HST_FLUXRATIO[0]} / {PS_HST_FLUXRATIO[1]})$'))
+        axes[1].set(xlim=(15.2, 30.2), ylim=(0, 5), xlabel=f'${PS_HST_FILT}$ Mag (AB)', ylabel=(f'$\\mathcal{{F}}~({PS_HST_FLUXRATIO[0]} / {PS_HST_FLUXRATIO[1]})$'))
         plot_elts.append((SEL_HST, 'orange', None))
 
     if GAIA_USE:
@@ -554,15 +567,20 @@ if PS_WEBB_USE or PS_HST_USE or BP_USE:
         plot_elts.append((SEL_AUTOSTAR, 'gold', f'Automatically-selected stars'))
 
     if BP_USE:
-        axes[0].scatter(mag[SEL_LWBADPIXEL], size[SEL_LWBADPIXEL], s=12, alpha=0.8, c='firebrick', label='Bad LW pixel')
+        if PS_WEBB_USE:
+            axes[0].scatter(mag[SEL_LWBADPIXEL], size[SEL_LWBADPIXEL], s=12, alpha=0.8, c='firebrick', label='Bad LW pixel')
+            axes[2].scatter(mag, fsize, s=3, alpha=0.2, c='grey')
+            axes[2].scatter(mag[SEL_LWBADPIXEL], fsize[SEL_LWBADPIXEL], s=12, alpha=0.8, c='firebrick', label='Bad LW pixel')
+            axes[2].invert_yaxis()
+            axes[2].set(xlim=(15.2, 32), ylim=(0, 0.4), ylabel=(f'${PS_WEBB_FILT}$ Flux Radius (arcsec)'), xlabel=f'${PS_WEBB_FILT}$ Mag (AB)')
+        
         if PS_HST_USE:
             axes[1].scatter(mag_hst[SEL_LWBADPIXEL], size_hst[SEL_LWBADPIXEL], s=12, alpha=0.8, c='firebrick')
-
-        axes[2].scatter(mag, fsize, s=3, alpha=0.2, c='grey')
-        axes[2].scatter(mag[SEL_LWBADPIXEL], fsize[SEL_LWBADPIXEL], s=12, alpha=0.8, c='firebrick', label='Bad LW pixel')
-        axes[2].invert_yaxis()
-        axes[2].set(xlim=(15.2, 32), ylim=(0, 0.4), ylabel=(f'${PS_WEBB_FILT}$ Flux Radius (arcsec)'), xlabel=f'${PS_WEBB_FILT}$ Mag (AB)')
-
+            axes[2].scatter(mag_hst, fsize_hst, s=3, alpha=0.2, c='grey')
+            axes[2].scatter(mag_hst[SEL_LWBADPIXEL], fsize_hst[SEL_LWBADPIXEL], s=12, alpha=0.8, c='firebrick', label='Bad LW pixel')
+            axes[2].invert_yaxis()
+            axes[2].set(xlim=(15.2, 32), ylim=(0, 0.4), ylabel=(f'${PS_HST_FILT}$ Flux Radius (arcsec)'), xlabel=f'${PS_HST_FILT}$ Mag (AB)')
+        
         axes[3].text(17, 1.13, 'Bad Pixels in LW bands', fontsize=15, color='firebrick')
         axes[3].hlines(BP_FLUXRATIO_RANGE[0], 0, BP_MAGLIMIT, alpha=0.5, color='firebrick')
         axes[3].hlines(BP_FLUXRATIO_RANGE[1], 0, BP_MAGLIMIT, alpha=0.5, color='firebrick')
@@ -572,7 +590,7 @@ if PS_WEBB_USE or PS_HST_USE or BP_USE:
 
         axes[3].scatter(mag_bp[SEL_LWBADPIXEL], size_bp[SEL_LWBADPIXEL], s=12, alpha=0.8, c='firebrick')
         axes[3].invert_yaxis()
-        axes[3].set(xlim=(15.2, 30.2), ylim=(0, 2), ylabel=('$\\mathcal{F}\,'+f'({BP_FLUXRATIO[0]} / {BP_FLUXRATIO[1]})$'), xlabel=f'${BP_FILT_SEL}$ Mag (AB)')
+        axes[3].set(xlim=(15.2, 30.2), ylim=(0, 2), ylabel=(f'$\\mathcal{{F}}~{BP_FLUXRATIO[0]} / {BP_FLUXRATIO[1]})$'), xlabel=f'${BP_FILT_SEL}$ Mag (AB)')
 
 
     for stars, color, label in plot_elts:
@@ -581,10 +599,16 @@ if PS_WEBB_USE or PS_HST_USE or BP_USE:
         if PS_HST_USE:
             axes[1].scatter(mag_hst[stars], size_hst[stars], s=12, alpha=1, c=color)
         if BP_USE:
-            axes[2].scatter(mag[stars], fsize[stars], s=12, alpha=1, c=color)
+            if PS_WEBB_USE:
+                axes[2].scatter(mag[stars], fsize[stars], s=12, alpha=1, c=color)
+            if PS_HST_USE:
+                axes[2].scatter(mag_hst[stars], fsize_hst[stars], s=12, alpha=1, c=color)
             axes[3].scatter(mag_bp[stars], size_bp[stars], s=12, alpha=1, c=color)
         if AUTOSTAR_USE:
-            axes[2].scatter(mag[stars], fsize[stars], s=12, alpha=1, c=color)
+            if PS_WEBB_USE:
+                axes[2].scatter(mag[stars], fsize[stars], s=12, alpha=1, c=color)
+            if PS_HST_USE:
+                axes[2].scatter(mag_hst[stars], fsize_hst[stars], s=12, alpha=1, c=color)
             axes[3].scatter(mag_bp[stars], size_bp[stars], s=12, alpha=1, c=color)
 
     axes[0].legend(loc='upper left', ncol=1, fontsize=11, markerscale=1.5)

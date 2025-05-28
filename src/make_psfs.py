@@ -22,6 +22,8 @@ from psf_tools import *
 outdir = DIR_PSFS
 if not os.path.exists(outdir):
     os.mkdir(outdir)
+if not os.path.exists(DIR_KERNELS):
+    os.mkdir(DIR_KERNELS)
 plotdir = os.path.join(outdir,'../diagnostics/')
 if not os.path.exists(plotdir):
     os.mkdir(plotdir)
@@ -48,7 +50,7 @@ for pfilt in use_filters:
     print(filename)
     print(starname)
 
-    radii=np.array([0.5,1.,2.,4.,7.5])*0.04/PIXEL_SCALE
+    radii=np.array([0.5,1.,2.,4.,7.5])#*0.04/PIXEL_SCALE
     print(f"apertures={radii}")
 
     range = PSF_DICT['range'][pfilt]
@@ -56,6 +58,7 @@ for pfilt in use_filters:
     mag_lim = PSF_DICT['mag_lim'][pfilt]
     snr_lim = PSF_DICT['snr_lim'][pfilt]
     sigma = PSF_DICT['sigma'][pfilt]
+    npeaks = PSF_DICT['npeaks'][pfilt]
 
     method = PSF_DICT['method'][pfilt]
     oversample = PSF_DICT['oversample'][pfilt]
@@ -67,7 +70,7 @@ for pfilt in use_filters:
 
     peaks, stars = find_stars(filename, outdir=DIR_PSFS, plotdir=plotdir,
         label=pfilt, zp=PHOT_ZP[pfilt], range=range, radii=radii,
-        threshold_max=threshold_max, mag_lim=mag_lim)
+        threshold_max=threshold_max, mag_lim=mag_lim, npeaks=npeaks)
     
     regfile=filename.replace('.fits.gz','.reg')
     os.rename(regfile,regfile.replace(DIR_OUTPUT,plotdir))
@@ -81,12 +84,13 @@ for pfilt in use_filters:
     print(f'Processing PSF...')
     pixsize=int(4/PIXEL_SCALE)
     if pixsize % 2 == 0: pixsize+=1
-    psf = PSF(image=filename, x=ra, y=dec, ids=ids, pixsize=pixsize)
+    if pixsize < 101: pixsize=101
+    psf = PSF(image=filename, x=ra, y=dec, ids=ids, pixsize=pixsize, pixelscale=PIXEL_SCALE)
     psf.center()
     psf.measure()
     psf.select(snr_lim=snr_lim, dshift_lim=3, mask_lim=0.99, showme=showme, nsig=30)
     psf.stack(sigma=sigma)
-    psf.select(snr_lim=snr_lim, dshift_lim=3, mask_lim=0.4, showme=True, nsig=30)
+    # psf.select(snr_lim=snr_lim, dshift_lim=3, mask_lim=0.4, showme=True, nsig=30)
     psf.save(outname.replace('.fits',''))
 
     psfmodel = renorm_psf(psf.psf_average, filt=pfilt)
