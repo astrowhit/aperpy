@@ -48,7 +48,6 @@ for filename in SCI_FILENAMES:
     print(band)
     print('  science image: ', filename)
     print('  weight image: ', fn_weight)
-    hdul = fits.open(filename)
     
     if band != KERNEL:
         print(f'  PSF-matching sci {band} to {KERNEL}')
@@ -59,6 +58,7 @@ for filename in SCI_FILENAMES:
         kernel /= np.sum(kernel)
 
         if not os.path.exists(outsciname):
+            hdul = fits.open(filename)
             print('Running science image convolution...')
             hdul[0].data = convolve_func(hdul[0].data, kernel, **convolve_kwargs).astype(np.float32)
             print('convolved...')
@@ -67,10 +67,10 @@ for filename in SCI_FILENAMES:
             hdul_wht.close()
             hdul.writeto(outsciname, overwrite=True)
             print('Wrote file to ', outsciname)
+            hdul.close()
         else:
             print(outsciname)
             print(f'{band.upper()} convolved science image exists, I will not overwrite')
-        hdul.close()
         if not os.path.exists(outwhtname):
             hdul_wht = fits.open(fn_weight)
             weight = hdul_wht[0].data
@@ -84,14 +84,21 @@ for filename in SCI_FILENAMES:
             print('Wrote weight file to ', outwhtname)
             del err
             del err_conv
+            hdul_wht.close()
         else:
             print(outwhtname)
             print(f'{band.upper()} convolved weight image exists, I will not overwrite')
 
-        hdul_wht.close()
         print(f'Finished in {time.time()-tstart:2.2f}s')
 
     else:
-        hdul.writeto(filename.replace(DIR_IMAGES, DIR_OUTPUT).replace(f'{SKYEXT}.fits', f'{SKYEXT}_{KERNEL}-matched.fits'), overwrite=True)
-        hdul_wht.writeto(filename.replace(DIR_IMAGES, DIR_OUTPUT).replace(f'_sci{SKYEXT}.fits', f'_wht_{KERNEL}-matched.fits'), overwrite=True)
-
+        if not os.path.exists(outsciname):
+            hdul = fits.open(filename)
+            hdul.writeto(outsciname, overwrite=True)
+            # hdul.writeto(filename.replace(DIR_IMAGES, DIR_OUTPUT).replace(f'{SKYEXT}.fits', f'{SKYEXT}_{KERNEL}-matched.fits'), overwrite=True)
+            hdul.close()
+        if not os.path.exists(outwhtname):
+            hdul_wht = fits.open(fn_weight)
+            hdul_wht.writeto(outwhtname, overwrite=True)
+            # hdul_wht.writeto(filename.replace(DIR_IMAGES, DIR_OUTPUT).replace(f'_sci{SKYEXT}.fits', f'_wht_{KERNEL}-matched.fits'), overwrite=True)
+            hdul_wht.close()
