@@ -17,7 +17,7 @@ sys.path.insert(0, PATH_CONFIG)
 
 from config import TARGET_ZP, PHOT_APER, PHOT_AUTOPARAMS, PHOT_FLUXRADIUS, DETECTION_PARAMS, SKYEXT,\
          DIR_IMAGES, PHOT_ZP, FILTERS, DIR_OUTPUT, DIR_CATALOGS, IS_COMPRESSED, PIXEL_SCALE, PHOT_KRONPARAM,\
-             USE_COMBINED_KRON_IMAGE, KRON_COMBINED_BANDS, KRON_ZPT, PHOT_EMPTYAPER_DIAMS
+             USE_COMBINED_KRON_IMAGE, KRON_COMBINED_BANDS, KRON_ZPT, PHOT_EMPTYAPER_DIAMS, USE_EXPTIME
 
 # MAIN PARAMETERS
 DET_NICKNAME = sys.argv[2]
@@ -238,11 +238,9 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
                 ext=f'_{use_kernel}-matched'
                 dir_weight = DIR_OUTPUT
             print(DIR_OUTPUT)
-            PHOTSCI_NAME = f'*{PHOT_NICKNAME}*_sci{skyext}{ext}.fits'
-            PHOTWHT_NAME = f'*{PHOT_NICKNAME}*_wht{ext}.fits'
-            if IS_COMPRESSED:
-                PHOTSCI_NAME += '.gz'
-                PHOTWHT_NAME += '.gz'
+            PHOTSCI_NAME = f'*{PHOT_NICKNAME}*_sci{skyext}{ext}.fits*'
+            PHOTWHT_NAME = f'*{PHOT_NICKNAME}*_wht{ext}.fits*'
+
             print(PHOTSCI_NAME)
             PATH_PHOTSCI = glob.glob(os.path.join(DIR_OUTPUT, PHOTSCI_NAME))[0]
             PATH_PHOTHEAD = PATH_PHOTSCI
@@ -261,12 +259,18 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
             photwht = fits.getdata(PATH_PHOTWHT)#.byteswap().newbyteorder()
             photwht = photwht.astype(photwht.dtype.newbyteorder('='))
             photmask = np.where((photwht<=0.)|~np.isfinite(photwht), 1., 0.)
+            
             print(PATH_PHOTWHT)
             if PATH_PHOTMASK != 'None':
                 photmask_user = fits.getdata(PATH_PHOTMASK)#.byteswap().newbyteorder().astype(float)
                 photmask_user = photmask_user.astype(photmask_user.dtype.newbyteorder('=')).astype(float)
                 print(PATH_PHOTMASK)
                 photmask[photmask_user] = 1.
+
+            if USE_EXPTIME:
+                PHOTEXP_NAME = f'*{PHOT_NICKNAME}*_exp.fits*'
+                PATH_PHOTEXP = glob.glob(os.path.join(DIR_IMAGES, PHOTEXP_NAME))[0]
+                photexp = fits.getdata(PATH_PHOTEXP)
 
             phothead = fits.getheader(PATH_PHOTHEAD, 0)
             photwcs = WCS(phothead)
@@ -290,7 +294,8 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
                 print(photwcs)
                 PHOT_ZPT = KRON_ZPT
                 photmask = np.where((photerr<=0.)|~np.isfinite(photerr), 1., 0.)
-
+                
+                if USE_EXPTIME: photexp = None
 
         # SOME BASIC INFO
         pixel_scale = utils.proj_plane_pixel_scales(photwcs)[0] * 3600
@@ -412,11 +417,20 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
         photwht_corr = photwht / (conv_flux(PHOT_ZPT)**2) # puts all weights (incl. errors later on) in the requested target units!
         srcmedwht = np.nan * np.ones(len(catalog))
         srcmeanwht = np.nan * np.ones(len(catalog))
+        if PHOT_NICKNAME != KRON_MATCH_BAND and USE_EXPTIME:
+            srcmedexp = np.nan * np.ones(len(catalog))
+            srcmeanexp = np.nan * np.ones(len(catalog))
+
         for i, (ixphot, iyphot) in enumerate(zip(xphot, yphot)):
             intx, inty = int(ixphot), int(iyphot)
             boxwht = photwht_corr[inty-4:inty+5, intx-4:intx+5]
             srcmedwht[i] = np.nanmedian(boxwht[boxwht>0])
             srcmeanwht[i] = np.nanmean(boxwht[boxwht>0])
+            
+            if PHOT_NICKNAME != KRON_MATCH_BAND and USE_EXPTIME:
+                boxexp = photexp[inty-4:inty+5, intx-4:intx+5]
+                srcmedexp[i] = np.nanmedian(boxexp[boxexp>0])
+                srcmeanexp[i] = np.nanmean(boxexp[boxexp>0])
 
         srcmeanwht[srcmeanwht<=0.] = np.nan
         srcmedwht[srcmedwht<=0.] = np.nan
@@ -425,6 +439,13 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
         catalog['SRC_MEANWHT'] = srcmeanwht
         catalog['MED_WHT'] = np.nanmedian(photwht_corr[photwht_corr>0])
         catalog['MAX_WHT'] = np.nanpercentile(photwht_corr[photwht_corr>0], 99)
+
+        if PHOT_NICKNAME != KRON_MATCH_BAND and USE_EXPTIME:
+            srcmeanexp[srcmeanexp<=0.] = np.nan
+            srcmedexp[srcmedexp<=0.] = np.nan
+            catalog['SRC_MEDEXP'] = srcmedexp
+            catalog['SRC_MEANEXP'] = srcmeanexp
+            
 
         # COMPUTE EMPTY APERTURE ERRORS + SAVE TO MASTER FILE
         empty_aper = list(PHOT_APER)+list(PHOT_EMPTYAPER_DIAMS)

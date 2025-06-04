@@ -39,6 +39,7 @@ for filename in SCI_FILENAMES:
     mask = None
 
     back = compute_background(img, mask, BACKTYPE.upper(), BACKPARAMS)
+    img[wht<=0.] = 0.
     back[wht<=0.] = 0.
 
     if IS_CLUSTER:

@@ -50,15 +50,16 @@ for pfilt in use_filters:
     print(filename)
     print(starname)
 
-    radii=np.array([0.5,1.,2.,4.,7.5])#*0.04/PIXEL_SCALE
-    print(f"apertures={radii}")
-
     range = PSF_DICT['range'][pfilt]
     threshold_max = PSF_DICT['threshold_max'][pfilt]
     mag_lim = PSF_DICT['mag_lim'][pfilt]
     snr_lim = PSF_DICT['snr_lim'][pfilt]
     sigma = PSF_DICT['sigma'][pfilt]
     npeaks = PSF_DICT['npeaks'][pfilt]
+    aper_scale = PSF_DICT['aper_scale'][pfilt]
+
+    radii=np.array([0.5,1.,2.,4.,7.5]) * aper_scale
+    print(f"apertures={radii}")
 
     method = PSF_DICT['method'][pfilt]
     oversample = PSF_DICT['oversample'][pfilt]
@@ -72,9 +73,6 @@ for pfilt in use_filters:
         label=pfilt, zp=PHOT_ZP[pfilt], range=range, radii=radii,
         threshold_max=threshold_max, mag_lim=mag_lim, npeaks=npeaks)
     
-    regfile=filename.replace('.fits.gz','.reg')
-    os.rename(regfile,regfile.replace(DIR_OUTPUT,plotdir))
-
     print(f'Found {len(peaks)} bright sources')
 
     maglim = MAGLIM
@@ -100,6 +98,7 @@ for pfilt in use_filters:
     show_cogs([psf.psf_average],title=pfilt, label=['oPSF'],outname=plotdir+pfilt)
     plots=glob.glob(outdir+'*.pdf')
     plots+=glob.glob(outdir+'*_cat.fits')
+    plots+=glob.glob(outdir+'*_loc.reg')
     for plot in plots:
         os.rename(plot,plot.replace(outdir,plotdir))
     

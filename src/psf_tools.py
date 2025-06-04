@@ -21,6 +21,7 @@ from photutils.centroids import centroid_com
 from astropy.modeling.fitting import LinearLSQFitter, FittingWithOutlierRemoval
 from astropy.modeling.models import Linear1D
 import astropy.units as u
+import re
 import os
 import glob
 
@@ -38,6 +39,9 @@ import matplotlib.scale as mscale
 import matplotlib.transforms as mtransforms
 import matplotlib.ticker as ticker
 
+import warnings
+from astropy.utils.exceptions import AstropyUserWarning
+warnings.filterwarnings("ignore",category=AstropyUserWarning)
 
 def plot_profile(psf, target):
     shape = psf.shape
@@ -300,6 +304,8 @@ def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,
                threshold_min = -0.5, threshold_max = 10, threshold_mode=[-0.2,0.2], shift_lim=2, zp=28.9, instars=None,
                showme=True, label='', outdir='./', plotdir='./'):
 
+    filt=re.search('f[0-9][0-9][0-9][a-z]*_',filename).group()[:-1]
+
     img, hdr = fits.getdata(filename, header=True)
     wcs = WCS(hdr)
 
@@ -345,7 +351,7 @@ def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,
         for rr in radii:
             regs.append(CirclePixelRegion(PixCoord(x=p['x'],y=p['y']),radius=rr))
     bigreg = Regions(regs)
-    bigreg.write(filename.replace('.fits.gz','.reg'), overwrite=True, format='ds9')
+    bigreg.write(f'{outdir}{filt}_star_loc.reg', overwrite=True, format='ds9')
 
 
     stars = np.array(stars)
@@ -436,16 +442,19 @@ def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,
         plt.axis('scaled')
         plt.title('position (pix)')
         plt.tight_layout()
-        suffix = '.fits' + filename.split('.fits')[-1]
-        plt.savefig(outdir+'/'+os.path.basename(filename).replace(suffix,'_diagnostic.pdf'))
+        # suffix = '.fits' + filename.split('.fits')[-1]
+        # plt.savefig(outdir+'/'+os.path.basename(filename).replace(suffix,'_diagnostic.pdf'))
+        plt.savefig(f'{outdir}{filt}_psf_diagnostic.pdf')
 
         dd = [st.data for st in stars[ok]]
         title = ['{} {:.1f} {:.2f} {:.2f} {:.1f} {:.1f}'.format(ii, mm, pp,qq,xx,yy) for ii,mm,pp,qq,xx,yy in zip(peaks['id'][ok],mags[ok],peaks['p1'][ok],peaks['minv'][ok],peaks['x0'][ok],peaks['y0'][ok])]
         imshow(dd,nsig=30,title=title)
         plt.tight_layout()
-        plt.savefig(outdir+'/'+os.path.basename(filename).replace(suffix,'_star_stamps.pdf'))
+        # plt.savefig(outdir+'/'+os.path.basename(filename).replace(suffix,'_star_stamps.pdf'))
+        plt.savefig(f'{outdir}{filt}_star_stamps.pdf')
 
-    peaks[ok].write(outdir+'/'+os.path.basename(filename).replace(suffix,'_star_cat.fits'),overwrite=True)
+    # peaks[ok].write(outdir+'/'+os.path.basename(filename).replace(suffix,'_star_cat.fits'),overwrite=True)
+    peaks[ok].write(f'{outdir}{filt}_star_cat.fits',overwrite=True)
 
     return peaks[ok], stars[ok]
 

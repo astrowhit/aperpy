@@ -37,7 +37,9 @@ else:
     APERSIZE = 'SUPER'
 TEMPLATES = sys.argv[5]
 
-from config import DIR_CATALOGS, DET_TYPE, TRANSLATE_FNAME, TARGET_ZP, ITERATE_ZP, FILTERS, MATCH_BAND, PROJECT, VERSION
+from config import DIR_CATALOGS, DET_TYPE, TRANSLATE_FNAME, TARGET_ZP, \
+                   ITERATE_ZP, FILTERS, MATCH_BAND, PROJECT, VERSION, \
+                   COVERAGE_USE, COV_NAME, COV_SEL_EAZY
 
 FULLDIR_CATALOGS = os.path.join(DIR_CATALOGS, f'{DET_NICKNAME}_{DET_TYPE}/{KERNEL}/')
 
@@ -123,7 +125,11 @@ sample = ez.idx # all
 
 ez.fit_parallel(sample, n_proc=8, prior=False, beta_prior=False)
 
-ez.zphot_zspec(include_errors=True, zmax=6.5, selection=ez.cat['use_phot']==1)
+comp_sel = ez.cat['use_phot']==1
+if COVERAGE_USE and COV_SEL_EAZY:
+    comp_sel &= ez.cat[f'flag_{COV_NAME}_coverage']==1
+
+ez.zphot_zspec(include_errors=False, zmax=6.5, selection=comp_sel)
 fig = plt.gcf()
 fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{PROJECT}_v{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_{nickname}_{is_zpiter}CATALOG_{TEMPLATES}.photoz-specz.pdf'))
 

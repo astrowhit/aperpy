@@ -29,7 +29,8 @@ from config import FILTERS, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, DIR_OUTPUT,\
     XCAT_FILENAME, XCAT_NAME, XCAT2_FILENAME, XCAT2_NAME, XCAT3_FILENAME, XCAT3_NAME, \
     ANBP_USE, ANBP_XMATCH_RADIUS, IS_COMPRESSED, ANBP_MIN_NPIX, ANBP_MAX_NPIX, \
     PSF_REF_NAME, EXTERNALSTARS_USE, FN_EXTERNALSTARS, EXTERNALSTARS_XMATCH_RADIUS, REGMASK_USE, FN_REGMASK, \
-    AUTOSTAR_USE, AUTOSTAR_BANDS, AUTOSTAR_XMATCH_RADIUS, AUTOSTAR_NFILT, XCAT_RAD, XCAT2_RAD, XCAT3_RAD
+    AUTOSTAR_USE, AUTOSTAR_BANDS, AUTOSTAR_XMATCH_RADIUS, AUTOSTAR_NFILT, XCAT_RAD, XCAT2_RAD, XCAT3_RAD, \
+    USE_EXPTIME, COVERAGE_USE, COV_FILTS, COV_APERSIZE, COV_NAME
 
 
 DET_NICKNAME =  sys.argv[2] #'LW_f277w-f356w-f444w'
@@ -107,7 +108,7 @@ for filter in USE_FILTERS:
 
     # rename columns if needed:
     for coln in cat.colnames:
-        if 'RADIUS' in coln or 'APER' in coln or 'FLAG' in coln or 'AUTO' in coln or 'WHT' in coln or 'ISO' in coln:
+        if 'RADIUS' in coln or 'APER' in coln or 'FLAG' in coln or 'AUTO' in coln or 'WHT' in coln or 'ISO' in coln or 'EXP' in coln:
 
             newcol = f'{filter}_{coln}'.replace('.', '_')
             # print(f'   {cat[coln].name} --> {newcol}')
@@ -350,7 +351,9 @@ if APPLY_MWDUST is not None:
     print('Building directory of pivot wavelengths')
     for filter in FILTERS:
         for tryfilt in tr.trans:
-            if 'F' not in tr.trans[tryfilt]: continue
+            if 'F' not in tr.trans[tryfilt]: 
+                print(f'{filter} not found, check translate file')
+                continue
             if tryfilt.endswith(filter):
                 num = int(tr.trans[tryfilt][1:])
                 filter_pwav[filter] = res[num].pivot
@@ -513,6 +516,14 @@ if ANBP_USE:
 SEL_GEN = SEL_LOWSNR | SEL_STAR
 if ANBP_USE:
     SEL_GEN |= SEL_ANBP
+
+# coverage flag for chosen filters
+if COVERAGE_USE:
+    str_aper = str(COV_APERSIZE).replace('.', '_')
+    SEL_COV = np.ones(len(maincat), dtype=bool)
+    for filt in COV_FILTS:
+        SEL_COV &= np.isfinite(maincat[f'{filt}_FLUX_APER{str_aper}'])
+    maincat.add_column(Column(SEL_COV.astype(int), name=f'{COV_NAME}_coverage_flag'))
 
 # bad pixel flag
 if BP_USE:
@@ -766,6 +777,8 @@ for apersize in PHOT_APER:
             cols[f'{filter}_FLUX_APER{str_aper}_TOTAL'] = f'f_{filter}'
             cols[f'{filter}_FLUXERR_APER{str_aper}_TOTAL'] = f'e_{filter}'
             cols[f'{filter}_RELWHT'] = f'w_{filter}'
+            if USE_EXPTIME:
+                cols[f'{filter}_SRC_MEDEXP'] = f't_{filter}'
 
         cols[f'TOTAL_CORR_APER{str_aper}'] = 'tot_cor'
 
@@ -785,6 +798,8 @@ for apersize in PHOT_APER:
         cols['combined_artifact_flag'] = 'flag_artifact'
         if EXTRABAD_USE:
             cols['extrabad_flag'] = 'flag_nearbcg'
+        if COVERAGE_USE:
+            cols[f'{COV_NAME}_coverage_flag'] = f'flag_{COV_NAME}_coverage'
         cols['z_spec'] = 'z_spec'
 
         subcat = maincat[list(cols.keys())].copy()
