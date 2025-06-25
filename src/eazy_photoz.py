@@ -1,6 +1,7 @@
 import os, sys
 import numpy as np
 import matplotlib.pyplot as plt
+from astropy.table import Table
 
 import eazy
 import eazy.utils
@@ -36,11 +37,13 @@ if 'SUPER' not in sys.argv[4]:
 else:
     APERSIZE = 'SUPER'
 TEMPLATES = sys.argv[5]
+ITERATE_ZP = sys.argv[6] 
 
-from config import DIR_CATALOGS, DET_TYPE, TRANSLATE_FNAME, TARGET_ZP, \
-                   ITERATE_ZP, FILTERS, MATCH_BAND, PROJECT, VERSION, \
-                   COVERAGE_USE, COV_NAME, COV_SEL_EAZY
+from config import DIR_CATALOGS, DETECTION_GROUPS, TRANSLATE_FNAME, TARGET_ZP, \
+                   FILTERS, MATCH_BAND, PROJECT, VERSION, \
+                   COVERAGE_USE, COV_NAME, COV_SEL_EAZY, EAZY_FLOOR
 
+DET_TYPE = DETECTION_GROUPS[DET_NICKNAME.split('_')[0]]['method']
 FULLDIR_CATALOGS = os.path.join(DIR_CATALOGS, f'{DET_NICKNAME}_{DET_TYPE}/{KERNEL}/')
 
 translate_file = os.path.join(DIR_CONFIG, TRANSLATE_FNAME)
@@ -59,7 +62,23 @@ is_zpiter = ''
 if ITERATE_ZP:
     is_zpiter = 'zpiter_'
 
-params['CATALOG_FILE'] = os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_{nickname}_CATALOG.fits")
+catalog_path = os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_{nickname}_CATALOG.ezinput.fits")
+if EAZY_FLOOR: 
+    catalog = Table.read(catalog_path)
+
+    # set 5% error floor for sources with err<0.05*phot
+    for col in catalog.colnames:
+        if 'f_' in col:
+            SN_mask = (catalog[col]/catalog[col.replace('f_','e_')]) > 20
+            catalog[col.replace('f_','e_')][SN_mask] = catalog[col][SN_mask]/20
+
+    catalog.write(catalog_path.replace('.fits','.ezinput.fits'))
+    params['SYS_ERR'] = 0
+
+else: params['SYS_ERR'] = 0.05
+
+
+params['CATALOG_FILE'] = catalog_path
 params['MAIN_OUTPUT_FILE'] = os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_{nickname}_{is_zpiter}CATALOG.{TEMPLATES}.eazypy")
 
 
@@ -70,7 +89,6 @@ params['CAT_HAS_EXTCORR'] = 'y'
 params['N_MIN_COLORS'] = 2
 params['Z_COLUMN'] = 'z_phot'
 params['USE_ZSPEC_FOR_REST'] = 'n'
-params['SYS_ERR'] = 0.05
 
 
 params['Z_MAX'] = 20. #30.
@@ -84,6 +102,8 @@ elif TEMPLATES == 'sfhz_blue':
     params['TEMPLATES_FILE'] = 'templates/sfhz/blue_sfhz_13.param'
 elif TEMPLATES == 'sfhz_blue_agn':
     params['TEMPLATES_FILE'] = 'templates/sfhz/agn_blue_sfhz_13.param'
+elif TEMPLATES == 'larson':
+    params['TEMPLATES_FILE'] = 'templates/LarsonTemp/newtemp_fsps_L22tweaked_v2.param'
 
 params['VERBOSITY'] = 1
 
@@ -132,7 +152,6 @@ if COVERAGE_USE and COV_SEL_EAZY:
 ez.zphot_zspec(include_errors=False, zmax=6.5, selection=comp_sel)
 fig = plt.gcf()
 fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{PROJECT}_v{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_{nickname}_{is_zpiter}CATALOG_{TEMPLATES}.photoz-specz.pdf'))
-
 
 zout, hdu = ez.standard_output(rf_pad_width=0.5, rf_max_err=2, n_proc=2,
                                  prior=False, beta_prior=False)

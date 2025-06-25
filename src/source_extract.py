@@ -17,13 +17,13 @@ sys.path.insert(0, PATH_CONFIG)
 
 from config import TARGET_ZP, PHOT_APER, PHOT_AUTOPARAMS, PHOT_FLUXRADIUS, DETECTION_PARAMS, SKYEXT,\
          DIR_IMAGES, PHOT_ZP, FILTERS, DIR_OUTPUT, DIR_CATALOGS, IS_COMPRESSED, PIXEL_SCALE, PHOT_KRONPARAM,\
-             USE_COMBINED_KRON_IMAGE, KRON_COMBINED_BANDS, KRON_ZPT, PHOT_EMPTYAPER_DIAMS, USE_EXPTIME
+             USE_COMBINED_KRON_IMAGE, KRON_COMBINED_BANDS, KRON_ZPT, PHOT_EMPTYAPER_DIAMS, USE_EXPTIME, DETECTION_GROUPS
 
 # MAIN PARAMETERS
 DET_NICKNAME = sys.argv[2]
 KERNEL = sys.argv[3]
 
-DET_TYPE = 'noise-equal'
+DET_TYPE = DETECTION_GROUPS[DET_NICKNAME.split('_')[0]]['method']
 FULLDIR_CATALOGS = os.path.join(DIR_CATALOGS, f'{DET_NICKNAME}_{DET_TYPE}/{KERNEL}/')
 if not os.path.exists(FULLDIR_CATALOGS):
     os.mkdir(FULLDIR_CATALOGS)
@@ -217,9 +217,13 @@ if (KERNEL != 'None') & (USE_COMBINED_KRON_IMAGE):
 KRON_MATCH_BAND = None
 USE_FILTERS = FILTERS
 if (KERNEL != 'None') & (USE_COMBINED_KRON_IMAGE):
-    KRON_MATCH_BAND = '+'.join(KRON_COMBINED_BANDS[DET_NICKNAME.split('_')[0]])
-    if '+' not in KRON_MATCH_BAND:
-        KRON_MATCH_BAND = 'sb-' + KRON_MATCH_BAND
+    kron_bands = KRON_COMBINED_BANDS[DET_NICKNAME.split('_')[0]]
+    if len(kron_bands)<=3:
+        KRON_MATCH_BAND = '+'.join(kron_bands)
+        if '+' not in KRON_MATCH_BAND:
+            KRON_MATCH_BAND = 'sb-' + KRON_MATCH_BAND
+    else:
+        KRON_MATCH_BAND = 'KRON'
     USE_FILTERS = [KRON_MATCH_BAND, ] + list(FILTERS)
 
 
@@ -307,10 +311,12 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
         catalog=Table.read(os.path.join(FULLDIR_CATALOGS, DETCATALOG_NAME))
 
         # Compute isophotal fluxes based on segmentation
-        if use_kernel == KERNEL:
-            print(f"{PHOT_NICKNAME} :: MEASURING PHOTOMETRY in isophotal segments...")
-            isofluxes = compute_isofluxes(segmap.ravel().astype(np.int32), photsci.ravel().astype(np.float32))
-            catalog[f'FLUX_ISO'] = isofluxes * conv_flux(PHOT_ZPT)
+        # if use_kernel == KERNEL:
+        print(f"{PHOT_NICKNAME} :: MEASURING PHOTOMETRY in isophotal segments...")
+        isofluxes = compute_isofluxes(segmap.ravel().astype(np.int32), photsci.ravel().astype(np.float32))
+        isoerrors = compute_isofluxes(segmap.ravel().astype(np.int32), (photerr**2).ravel().astype(np.float32))
+        catalog[f'FLUX_ISO'] = isofluxes * conv_flux(PHOT_ZPT)
+        catalog[f'FLUXERR_ISO'] = (isoerrors) * conv_flux(PHOT_ZPT)
 
         # Hack the x,y coords
         xphot,yphot = photwcs.wcs_world2pix(catalog['RA'], catalog['DEC'],1)

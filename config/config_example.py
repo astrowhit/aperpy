@@ -6,11 +6,6 @@ from astropy.io import fits
 import numpy as np
 APERPY = '/Users/secutler/Documents/aperpy/'
 
-# SPLIT MOSAIC INFO
-NSUB = 1 # number of subimages (1=no subimages)
-VERT = True # vertical image orientation (e.g. COSMOS)
-OVERLAP = 0 # size of subimage overlap in pixels
-
 ### GENERAL
 KERNELS = {}
 KERNELS['f444w'] = 'regularization'
@@ -26,11 +21,10 @@ DETECTION_PARAMS = dict(
     )
 
 PHOT_APER = [0.32, 0.48, 0.7, 1.0, 1.4] # diameter in arcsec
-PHOT_AUTOPARAMS = 2.5, 1.0 # Kron-scaling radius, mimumum kron factor
+PHOT_AUTOPARAMS = 2.5, 1.0 # Kron-scaling radius, minimum kron factor
 PHOT_FLUXRADIUS = 0.5, 0.6 # FLUX_RADIUS at 50% and 60% of flux (always keep 0.5!)
 PHOT_KRONPARAM = 6.0 # SE hardcodes this as 6.0
 PHOT_USEMASK = True # masks out neighbors when measuring kron, auto fluxes, and flux radius (not circ apers)
-MATCH_BAND = 'f444w' # indicates band used to match PSFs
 
 PIXEL_SCALE = 0.04 # arcsec / px
 APPLY_MWDUST = 'MEDIAN'
@@ -46,7 +40,7 @@ MAKE_SCIREADY_ALL = True # make aperture corrected catalogs for all apertures
 ### DIRECTORIES
 PROJECT = 'MINERVA-UDS'
 REDUCTION = 'grizli'
-VERSION = '0.0'
+VERSION = '0.1'
 DRIVE = '/Volumes/SanDisk3/'
 WORKING_DIR = DRIVE + f'MINERVA/UDS/v{VERSION}'
 DIR_IMAGES = os.path.join(WORKING_DIR, 'external/')
@@ -61,9 +55,9 @@ USE_EXPTIME = True # use exposure time maps to get median exposure time for each
 
 BORROW_HEADER_FILE = glob.glob(DIR_IMAGES+'*f444w*sci.fits*')[0]
 
-PATH_SW_ENERGY = APERPY+'config/Encircled_Energy_SW_ETCv2.txt'
-PATH_LW_ENERGY = APERPY+'config/Encircled_Energy_LW_ETCv2.txt'
-PATH_HST_ENERGY = APERPY+'config/Encircled_Energy_HST_ETCv2.txt'
+PATH_SW_ENERGY = os.path.join(APERPY,'config/Encircled_Energy_SW_ETCv2.txt')
+PATH_LW_ENERGY = os.path.join(APERPY,'config/Encircled_Energy_LW_ETCv2.txt')
+PATH_HST_ENERGY = os.path.join(APERPY,'config/Encircled_Energy_HST_ETCv2.txt')
 
 SKYEXT = '_skysubvar'
 BLOCK_WHT_REPLACE = ('sci', 'wht')
@@ -95,32 +89,6 @@ BLOCK_SIZE = 4 # pixels
 BACKPARAMS = dict(bw=128, bh=128, fw=8, fh=8, maskthresh=1, fthresh=0.)
 BACKTYPE = 'var'
 
-### DETECTION COADD # use '-' in nicknames, NOT '_'
-DETECTION_GROUPS = {}
-DETECTION_GROUPS['LW'] = ('f277w', 'f356w', 'f444w')
-
-USE_COMBINED_KRON_IMAGE = True   # uses a REF_BAND PSF-matched NE image for kron radius/flux + flux radius
-KRON_COMBINED_BANDS = {}
-KRON_COMBINED_BANDS['LW'] = ('f277w', 'f356w', 'f444w')
-KRON_ZPT = 28.9 # I hope it's the same as all of your combined mosaics!
-
-DET_TYPE = 'noise-equal'
-DETECTION_NICKNAMES = []
-for nickname in DETECTION_GROUPS:
-    if len(nickname) > 1:
-        joined = '-'.join(DETECTION_GROUPS[nickname])
-    else:
-        joined = nickname
-    DETECTION_NICKNAMES.append(f'{nickname}_{joined}')
-
-DETECTION_IMAGES = OrderedDict()
-for group in DETECTION_GROUPS:
-    for filt in DETECTION_GROUPS[group]:
-        for path in glob.glob(DIR_OUTPUT+'*'):
-            if ('sci_skysubvar.fits' in path) & (filt in path):
-                DETECTION_IMAGES[filt] = path
-
-
 FILTERS_ACS = ['F435W','F606W','F775W','F814W','F850LP']
 FILTERS_WFC = ['F098M','F105W','F125W','F140W','F160W']
 HST_FILTERS = FILTERS_ACS + FILTERS_WFC
@@ -134,6 +102,40 @@ WEBB_FILTERS = SW_FILTERS + LW_FILTERS
 
 FILTERS = HST_FILTERS + WEBB_FILTERS
 FILTERS = [filt.lower() for filt in FILTERS]
+
+### DETECTION COADD # use '-' in nicknames, NOT '_'
+DETECTION_GROUPS = {'ACS+WEBB':{},'LW':{}}
+
+CHI_MEAN_FILTS = [filt for filt in FILTERS if filt.upper() not in FILTERS_WFC]
+DETECTION_GROUPS['ACS+WEBB']['filters'] = tuple(CHI_MEAN_FILTS)
+DETECTION_GROUPS['ACS+WEBB']['method'] = 'chi-mean'
+DETECTION_GROUPS['ACS+WEBB']['n_regions'] = 3
+
+DETECTION_GROUPS['LW']['filters'] = ('f277w', 'f356w', 'f444w')
+DETECTION_GROUPS['LW']['method'] = 'noise-equal'
+
+USE_COMBINED_KRON_IMAGE = True   # uses a REF_BAND PSF-matched NE image for kron radius/flux + flux radius
+KRON_COMBINED_BANDS = {}
+KRON_COMBINED_BANDS['ACS+WEBB'] = tuple(CHI_MEAN_FILTS)
+KRON_COMBINED_BANDS['LW'] = ('f277w', 'f356w', 'f444w')
+KRON_ZPT = 28.9 # I hope it's the same as all of your combined mosaics!
+
+DETECTION_NICKNAMES = []
+for nickname in DETECTION_GROUPS:
+    if len(DETECTION_GROUPS[nickname]['filters'])<=3:
+        joined = '-'.join(DETECTION_GROUPS[nickname]['filters'])
+        DETECTION_NICKNAMES.append(f'{nickname}_{joined}')
+    else:
+        DETECTION_NICKNAMES.append(nickname)
+
+
+DETECTION_IMAGES = OrderedDict()
+for group in DETECTION_GROUPS:
+    for filt in DETECTION_GROUPS[group]['filters']:
+        for path in glob.glob(DIR_OUTPUT+'*'):
+            if ('sci_skysubvar.fits' in path) & (filt in path):
+                DETECTION_IMAGES[filt] = path
+
 
 ### ZEROPOINTS
 PHOT_ZP = OrderedDict()
@@ -172,7 +174,8 @@ for filt in FILTERS:
     PSF_DICT['snr_lim'][filt] = 1000
     PSF_DICT['sigma'][filt] = 2.8
     PSF_DICT['npeaks'][filt] = 1000
-
+    PSF_DICT['aper_scale'][filt] = 0.04/PIXEL_SCALE
+    
     if filt == 'f160w':
         PSF_DICT['range'][filt] = [1.2,3.5]
     
@@ -187,8 +190,9 @@ for filt in FILTERS:
 
 ### PHOTOZ
 TRANSLATE_FNAME = '/Users/secutler/Documents/MINERVA/uds/minerva_uds.translate'
-ITERATE_ZP = False
-TEMPLATE_SETS = ['sfhz', 'fsps_full']
+ITERATE_ZP = True
+EAZY_FLOOR = True
+TEMPLATE_SETS = ['larson', 'sfhz_agn_blue']
 
 ### AREA CALCULATIONS
 FNAME = glob.glob(f'{DIR_IMAGES}*{LW_FILTERS[-1].lower()}*sci.fits*')[0]
@@ -243,6 +247,12 @@ COV_APERSIZE = 0.7
 COV_NAME = 'acs'
 COV_SEL_EAZY = True
 
+# NUMBER OF BANDS (can choose to use specific bands; e.g. medium bands, etc.)
+NBANDS_USE = True
+NBANDS_APERSIZE = 0.7
+NBANDS_FILTS = SW_FILTERS # Set to None to use all bands
+NBANDS_NAME = 'NIRCAM_SW'
+
 # BADWHT
 BADWHT_USE = True
 FN_BADWHT = glob.glob(DIR_IMAGES+'*f200w*wht.fits*')[0]
@@ -264,7 +274,7 @@ FN_REGMASK = ''
 BP_USE = True
 BP_FLUXRATIO = (0.7, 0.32)
 BP_FLUXRATIO_RANGE = (0, 1.1)
-BP_FILT = {'LW':'f444w','SW':'f814w'}
+BP_FILT = {'LW':'f444w','ACS+WEBB':'f444w'}
 BP_MAGLIMIT = 26.
 BP_APERSIZE = 0.7
 
@@ -296,25 +306,3 @@ XCAT2_RAD = 0.08
 XCAT3_FILENAME = None
 XCAT3_NAME = 'id_msa', 'msa'
 XCAT3_RAD = 0.24
-
-# ----------------
-
-### PIVOT WAVELENGTHS (IN ANGSTROMS)
-PIVOT = OrderedDict([('f275w', 2708.6),
-             ('f336w', 3353.7),
-             ('f435w', 4318.828102108889),
-             ('f606w', 5920.818879556311),
-             ('f775w', 7692.4),
-             ('f814w', 8056.879509287926),
-             ('f850lp', 9033.1),
-             ('f105w', 10543.523234897353),
-             ('f125w', 12470.520322831206),
-             ('f140w', 13924.163916315556),
-             ('f160w', 15396.616154585481),
-             ('f115w', 11540.),
-             ('f150w', 15007.454908178013),
-             ('f200w', 19886.478139793544),
-             ('f277w', 27577.958764384803),
-             ('f356w', 35682.27763839694),
-             ('f410m', 40820.),
-             ('f444w', 44036.71097714713)])

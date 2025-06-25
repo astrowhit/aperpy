@@ -30,13 +30,14 @@ from config import FILTERS, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, DIR_OUTPUT,\
     ANBP_USE, ANBP_XMATCH_RADIUS, IS_COMPRESSED, ANBP_MIN_NPIX, ANBP_MAX_NPIX, \
     PSF_REF_NAME, EXTERNALSTARS_USE, FN_EXTERNALSTARS, EXTERNALSTARS_XMATCH_RADIUS, REGMASK_USE, FN_REGMASK, \
     AUTOSTAR_USE, AUTOSTAR_BANDS, AUTOSTAR_XMATCH_RADIUS, AUTOSTAR_NFILT, XCAT_RAD, XCAT2_RAD, XCAT3_RAD, \
-    USE_EXPTIME, COVERAGE_USE, COV_FILTS, COV_APERSIZE, COV_NAME
+    USE_EXPTIME, COVERAGE_USE, COV_FILTS, COV_APERSIZE, COV_NAME, DETECTION_GROUPS, \
+    NBANDS_USE, NBANDS_APERSIZE, NBANDS_FILTS, NBANDS_NAME
 
 
 DET_NICKNAME =  sys.argv[2] #'LW_f277w-f356w-f444w'
 KERNEL = sys.argv[3] #'f444w'
 
-DET_TYPE = 'noise-equal'
+DET_TYPE = DETECTION_GROUPS[DET_NICKNAME.split('_')[0]]['method']
 FULLDIR_CATALOGS = os.path.join(DIR_CATALOGS, f'{DET_NICKNAME}_{DET_TYPE}/{KERNEL}/')
 
 def DIR_KERNEL(band):
@@ -87,16 +88,19 @@ def flux_total(flux_aper, tot_cor):
     # equation 10
     return flux_aper * tot_cor
 
-
-# loop over filters
 KRON_MATCH_BAND = None
 USE_FILTERS = FILTERS
 if (KERNEL != 'None') & (USE_COMBINED_KRON_IMAGE):
-    KRON_MATCH_BAND = '+'.join(KRON_COMBINED_BANDS[DET_NICKNAME.split('_')[0]])
-    if '+' not in KRON_MATCH_BAND:
-        KRON_MATCH_BAND = 'sb-' + KRON_MATCH_BAND
+    kron_bands = KRON_COMBINED_BANDS[DET_NICKNAME.split('_')[0]]
+    if len(kron_bands)<=3:
+        KRON_MATCH_BAND = '+'.join(kron_bands)
+        if '+' not in KRON_MATCH_BAND:
+            KRON_MATCH_BAND = 'sb-' + KRON_MATCH_BAND
+    else:
+        KRON_MATCH_BAND = 'KRON'
     USE_FILTERS = [KRON_MATCH_BAND, ] + list(FILTERS)
 
+# loop over filters
 for filter in USE_FILTERS:
     filename = os.path.join(FULLDIR_CATALOGS, f'{filter}_{DET_NICKNAME}_K{KERNEL}_PHOT_CATALOG.fits')
     if not os.path.exists(filename):
@@ -162,9 +166,13 @@ outfilename = os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_COMBINED
 # print(maincat.colnames)
 
 if USE_COMBINED_KRON_IMAGE:
-    KRON_MATCH_BAND = '+'.join(KRON_COMBINED_BANDS[DET_NICKNAME.split('_')[0]])
-    if '+' not in KRON_MATCH_BAND:
-        KRON_MATCH_BAND = 'sb-' + KRON_MATCH_BAND
+    kron_bands = KRON_COMBINED_BANDS[DET_NICKNAME.split('_')[0]]
+    if len(kron_bands)<=3:
+        KRON_MATCH_BAND = '+'.join(kron_bands)
+        if '+' not in KRON_MATCH_BAND:
+            KRON_MATCH_BAND = 'sb-' + KRON_MATCH_BAND
+    else:
+        KRON_MATCH_BAND = 'KRON'
 else:
     KRON_MATCH_BAND = MATCH_BAND # behaves as usual with a single ref band
 
@@ -487,13 +495,13 @@ if BADWHT_USE:
 maincat.add_column(Column(np.zeros(len(maincat)).astype(int), name='combined_artifact_flag'))
 # artifacts near saturated objects
 if ANBP_USE:
-    DETERR_NAME = f'{DET_NICKNAME}_{DET_TYPE}/{DET_NICKNAME}_opterr.fits'
+    DETIMG_NAME = f'{DET_NICKNAME}_{DET_TYPE}/{DET_NICKNAME}_{DET_TYPE}.fits'
     if IS_COMPRESSED:
-        DETERR_NAME +='.gz'
+        DETIMG_NAME +='.gz'
     from astropy.wcs import WCS
-    wcs = WCS(fits.getheader(os.path.join(DIR_CATALOGS, DETERR_NAME)))
-    det_err = fits.getdata(os.path.join(DIR_CATALOGS, DETERR_NAME))
-    badmap = np.where(det_err == 0, 1, 0)
+    wcs = WCS(fits.getheader(os.path.join(DIR_CATALOGS, DETIMG_NAME)))
+    det_img = fits.getdata(os.path.join(DIR_CATALOGS, DETIMG_NAME))
+    badmap = np.where((det_img == 0)|(~np.isfinite(det_img)), 1, 0)
     from scipy.ndimage import label, center_of_mass
     labels, __ = label(badmap)
     ulabels, npix = np.unique(labels, return_counts=True)
@@ -511,7 +519,7 @@ if ANBP_USE:
     maincat.add_column(Column(SEL_ANBP.astype(int), name='artifacts_near_badpixels_flag'))
     maincat['combined_artifact_flag'][SEL_ANBP] = 1
     print(f'Flagged {np.sum(SEL_ANBP)} objects as being artifacts near staturated pixels (stars) or edges')
-    del det_err, labels, badmap
+    del det_img, labels, badmap
 
 SEL_GEN = SEL_LOWSNR | SEL_STAR
 if ANBP_USE:
@@ -524,6 +532,19 @@ if COVERAGE_USE:
     for filt in COV_FILTS:
         SEL_COV &= np.isfinite(maincat[f'{filt}_FLUX_APER{str_aper}'])
     maincat.add_column(Column(SEL_COV.astype(int), name=f'{COV_NAME}_coverage_flag'))
+
+# report number of bands for chosen filters
+if NBANDS_USE:
+    str_aper = str(NBANDS_APERSIZE).replace('.', '_')
+    NBANDS = np.zeros(len(maincat), dtype=int)
+    if NBANDS_FILTS == None:
+        NBANDS_FILTS = FILTERS
+        NBANDS_NAME = ''
+    else:
+        NBANDS_NAME = f'_{NBANDS_NAME}'
+    for filt in NBANDS_FILTS:
+        NBANDS += np.isfinite(maincat[f'{filt}_FLUX_APER{str_aper}']).astype(int)
+    maincat.add_column(Column(NBANDS.astype(int), name=f'n_bands{NBANDS_NAME}'))
 
 # bad pixel flag
 if BP_USE:

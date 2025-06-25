@@ -373,7 +373,7 @@ def psf_cog(psfmodel, filt, nearrad=None, fix_extrapolation=True, pixel_scale=No
         elif filt in HST_FILTERS:
             encircled = ascii.read(PATH_HST_ENERGY)
         else:
-            print(f'{filt} is NOT a valid NIRCam filter!')
+            print(f'{filt} is NOT a valid filter!')
             return
 
         # max_rad = radius[-1]

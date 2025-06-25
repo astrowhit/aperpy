@@ -8,12 +8,13 @@ from astropy.table import hstack
 import astropy.units as u
 from astropy.table import Table
 
-from config import DIR_CATALOGS, PHOT_APER, VERSION, PROJECT, BLEND_SHRINK_FACTOR, PIXEL_SCALE
+from config import DIR_CATALOGS, PHOT_APER, VERSION, PROJECT, BLEND_SHRINK_FACTOR, \
+                   PIXEL_SCALE, DETECTION_GROUPS
 
 DET_NICKNAME =  sys.argv[2]
 KERNEL = sys.argv[3]
 
-DET_TYPE = 'noise-equal'
+DET_TYPE = DETECTION_GROUPS[DET_NICKNAME.split('_')[0]]['method']
 FULLDIR_CATALOGS = os.path.join(DIR_CATALOGS, f'{DET_NICKNAME}_{DET_TYPE}/{KERNEL}/')
 
 

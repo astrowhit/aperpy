@@ -6,7 +6,7 @@ DIR_CONFIG = '/path/to/here/scripts/'
 PATH_APERPY = '/path/to/software/aperpy/src'
 
 sys.path.insert(0, DIR_CONFIG)
-from config import DETECTION_NICKNAMES, KERNELS, PHOT_APER, TEMPLATE_SETS
+from config import DETECTION_NICKNAMES, KERNELS, PHOT_APER, TEMPLATE_SETS, ITERATE_ZP
 
 # Re-sample SW to 40mas
 os.system(f'python {PATH_APERPY}/resample.py {DIR_CONFIG}')
@@ -14,9 +14,6 @@ os.system(f'python {PATH_APERPY}/resample.py {DIR_CONFIG}')
 # Subtract Sky or subtract cluster (+ sky)
 os.system(f'python {PATH_APERPY}/subtract_background.py {DIR_CONFIG}')
 
-# # Make detection
-for det_nickname in DETECTION_NICKNAMES:
-    os.system(f'python {PATH_APERPY}/build_detection.py {DIR_CONFIG} {det_nickname}')
 
 # Make PSFs
 os.system(f'python {PATH_APERPY}/make_psfs.py {DIR_CONFIG}')
@@ -25,9 +22,11 @@ os.system(f'python {PATH_APERPY}/make_psfs.py {DIR_CONFIG}')
 for kern in KERNELS:
     os.system(f'python {PATH_APERPY}/convolve_images.py {DIR_CONFIG} {kern}') 
 
-# Extract on raw images + make catalogs + run photo-z (a)
-for kern in KERNELS:
-    for det_nickname in DETECTION_NICKNAMES:
+for det_nickname in DETECTION_NICKNAMES:
+    # # Make detection
+    os.system(f'python {PATH_APERPY}/build_detection.py {DIR_CONFIG} {det_nickname}')
+    # Extract on raw images + make catalogs + run photo-z (a)
+    for kern in KERNELS:
         os.system(f'python {PATH_APERPY}/source_extract.py {DIR_CONFIG} {det_nickname} {kern}')
         os.system(f'python {PATH_APERPY}/combine_catalogs_kronlike.py {DIR_CONFIG} {det_nickname} {kern}')
         os.system(f'python {PATH_APERPY}/make_supercatalog.py {DIR_CONFIG} {det_nickname} {kern}')
@@ -37,5 +36,8 @@ for kern in KERNELS:
             if APER != 'SUPER':
                 APER = str(APER).replace('.', '_')
             for template in TEMPLATE_SETS:
-                os.system(f'python {PATH_APERPY}/eazy_photoz.py {DIR_CONFIG} {det_nickname} {kern} {APER} {template}')
+                ITERATE = [False,]
+                if ITERATE_ZP: ITERATE += [True]
+                for it in ITERATE:
+                    os.system(f'python {PATH_APERPY}/eazy_photoz.py {DIR_CONFIG} {det_nickname} {kern} {APER} {template} {it}')
 

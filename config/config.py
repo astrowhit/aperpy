@@ -1,8 +1,11 @@
 import os
+import glob
 from typing import OrderedDict
 import astropy.units as u
 from astropy.coordinates import SkyCoord
 import numpy as np
+from astropy.io import fits
+APERPY = '/path/to/aperpy/'
 
 ### GENERAL
 KERNELS = {}
@@ -40,7 +43,6 @@ PROJECT = 'PROJECT'
 VERSION = '0.0.1'
 WORKING_DIR = 'path/to/working/directory'
 DIR_IMAGES = os.path.join(WORKING_DIR, 'images/')
-
 DIR_OUTPUT = os.path.join(WORKING_DIR, 'output/')
 DIR_PSFS = os.path.join(WORKING_DIR, 'intermediate/PSF/')
 DIR_KERNELS = os.path.join(WORKING_DIR, 'intermediate/kernels/')
@@ -52,9 +54,9 @@ USE_EXPTIME = False # use exposure time maps to get median exposure time for eac
 
 BORROW_HEADER_FILE = 'path/to/image/file/'
 
-PATH_SW_ENERGY = '/path/to/config/Encircled_Energy_SW_ETCv2.txt'
-PATH_LW_ENERGY = '/path/to/config/Encircled_Energy_LW_ETCv2.txt'
-PATH_HST_ENERGY = '/path/to/config/Encircled_Energy_HST_ETCv2.txt'
+PATH_SW_ENERGY = os.path.join(APERPY,'config/Encircled_Energy_SW_ETCv2.txt')
+PATH_LW_ENERGY = os.path.join(APERPY,'config/Encircled_Energy_LW_ETCv2.txt')
+PATH_HST_ENERGY = os.path.join(APERPY,'config/Encircled_Energy_HST_ETCv2.txt')
 
 SKYEXT = '_skysubvar'
 BLOCK_WHT_REPLACE = ('sci', 'wht') # for resampling images
@@ -79,34 +81,43 @@ FILTER_SIZE = 8.3 # arcsec
 BACKPARAMS = dict(bw=32, bh=32, fw=8, fh=8, maskthresh=1, fthresh=0.)
 BACKTYPE = 'var' # var, global, med, or none
 
+FILTERS_ACS = ['F435W','F606W','F814W']
+FILTERS_WFC = ['F105W','F125W','F140W','F160W']
+HST_FILTERS = FILTERS_ACS + FILTERS_WFC
+
+SW_FILTERS = ['F090W','F115W','F150W','F200W']
+LW_FILTERS = ['F277W','F356W','F410M','F444W']
+WEBB_FILTERS = SW_FILTERS + LW_FILTERS
+
+FILTERS = HST_FILTERS + WEBB_FILTERS
+FILTERS = [filt.lower() for filt in FILTERS]
+
+
 ### DETECTION COADD # use '-' in nicknames, NOT '_'
-DETECTION_GROUPS = {}
-DETECTION_GROUPS['LW'] = ('f277w', 'f356w', 'f444w')
+DETECTION_GROUPS = {'LW':{}}
+DETECTION_GROUPS['LW']['filters'] = ('f277w', 'f356w', 'f444w')
+DETECTION_GROUPS['LW']['method'] = 'noise-equal'
 
 USE_COMBINED_KRON_IMAGE = True   # uses a REF_BAND PSF-matched NE image for kron radius/flux + flux radius
 KRON_COMBINED_BANDS = {}
 KRON_COMBINED_BANDS['LW'] = ('f277w', 'f356w', 'f444w')
 KRON_ZPT = 28.9 # I hope it's the same as all of your combined mosaics!
 
-DET_TYPE = 'noise-equal'
 DETECTION_NICKNAMES = []
 for nickname in DETECTION_GROUPS:
-    if len(nickname) > 1:
-        joined = '-'.join(DETECTION_GROUPS[nickname])
+    if len(DETECTION_GROUPS[nickname]['filters'])<=3:
+        joined = '-'.join(DETECTION_GROUPS[nickname]['filters'])
+        DETECTION_NICKNAMES.append(f'{nickname}_{joined}')
     else:
-        joined = nickname
-    DETECTION_NICKNAMES.append(f'{nickname}_{joined}')
+        DETECTION_NICKNAMES.append(nickname)
 
-import glob
 DETECTION_IMAGES = OrderedDict()
 for group in DETECTION_GROUPS:
     for filt in DETECTION_GROUPS[group]:
         for path in glob.glob(DIR_OUTPUT+'*'):
-            if ('sci.fits.gz' in path) & (filt in path):
+            if (f'sci{SKYEXT}.fits.gz' in path) & (filt in path):
                 DETECTION_IMAGES[filt] = path
 
-FILTERS = ['f435w', 'f606w', 'f814w','f090w','f105w','f115w','f125w','f140w',
-           'f150w','f160w','f200w','f277w','f356w','f410m','f444w']
 
 ### ZEROPOINTS
 PHOT_ZP = OrderedDict()
@@ -156,13 +167,23 @@ for filt in FILTERS:
 
 
 ### PHOTOZ
-TRANSLATE_FNAME = 'abell2744_uncover.translate'
+TRANSLATE_FNAME = '/path/to/eazy.translate'
 ITERATE_ZP = False
-TEMPLATE_SETS = ('fsps_full', 'sfhz') #, 'sfhz_blue')
+EAZY_FLOOR = True
+TEMPLATE_SETS = ('fsps_full', 'sfhz')
 
 ### AREA CALCULATIONS
-RA_RANGE = (3.487, 3.687)
-DEC_RANGE = (-30.5, -30.2)
+FNAME = glob.glob(f'{DIR_IMAGES}*{LW_FILTERS[-1].lower()}*sci.fits*')[0]
+hdr = fits.getheader(FNAME)
+L1,L2 = hdr['NAXIS1'],hdr['NAXIS2']
+crval1,crval2 = hdr['CRVAL1'],hdr['CRVAL2']
+crpix1,crpix2 = hdr['CRPIX1'],hdr['CRPIX2']
+ra_min = crval1-(crpix1*PIXEL_SCALE/3600)
+dec_min = crval2-(crpix2*PIXEL_SCALE/3600)
+ra_max = crval1+((L1-crpix1)*PIXEL_SCALE/3600)
+dec_max = crval2+((L2-crpix2)*PIXEL_SCALE/3600)
+RA_RANGE = (ra_min, ra_max)
+DEC_RANGE = (dec_min, dec_max)
 
 ### STARS AND BAD PIXELS -- currrently set for f444w-matched images only!
 # POINT-LIKE FLAG - WEBB
@@ -174,7 +195,7 @@ PS_WEBB_MAGLIMIT = 25.0
 PS_WEBB_APERSIZE = 0.7
 
 # POINT-LIKE FLAG - HST
-PS_HST_USE = False
+PS_HST_USE = True
 PS_HST_FLUXRATIO = (0.7, 0.32)
 PS_HST_FLUXRATIO_RANGE = (1.5, 1.65)
 PS_HST_FILT = 'f160w'
@@ -188,13 +209,13 @@ AUTOSTAR_XMATCH_RADIUS = 0.3*u.arcsec
 AUTOSTAR_NFILT = 1
 
 # GAIA
-GAIA_USE = False
+GAIA_USE = True
 GAIA_ROW_LIMIT = 10000
 GAIA_XMATCH_RADIUS = 0.6*u.arcsec
 
 # EXTERNAL STARS (useful for high proper motion stars)
 EXTERNALSTARS_USE = True
-FN_EXTERNALSTARS = 'path/to/external/files/UNCOVER_F160W_stars.fits' # includes ra and dec at minimum
+FN_EXTERNALSTARS = 'path/to/external/files/star_catalog.fits' # includes ra and dec at minimum
 EXTERNALSTARS_XMATCH_RADIUS = 0.7*u.arcsec
 
 # COVERAGE FLAGS (flag sources with no coverage in certain bands)
@@ -203,8 +224,14 @@ COV_FILTS = ['f435w','f606w']
 COV_APERSIZE = 0.7
 COV_NAME = 'acs'
 
+# NUMBER OF BANDS (can choose to use specific bands; e.g. medium bands, etc.)
+NBANDS_USE = True
+NBANDS_APERSIZE = 0.7
+NBANDS_FILTS = SW_FILTERS # Set to None to use all bands
+NBANDS_NAME = 'NIRCAM_SW'
+
 # BADWHT (useful for bad regions of the images)
-BADWHT_USE = False 
+BADWHT_USE = True 
 FN_BADWHT = os.path.join(os.path.join(WORKING_DIR, DIR_IMAGES), 'uncover_v7.0_abell2744clu_f200w_block40_wht.fits.gz')
 SATURATEDSTAR_MAGLIMIT = 21
 SATURATEDSTAR_FILT = 'f200w'
@@ -256,31 +283,3 @@ XCAT2_RAD = 0.08
 XCAT3_FILENAME = None
 XCAT3_NAME = 'id_msa', 'msa'
 XCAT3_RAD = 0.24
-
-# ---------------- generally don't touch this! ------
-
-HST_FILTERS = ['F105W', 'F125W', 'F140W', 'F160W', 'F435W', 'F475W', 'F606W', 'F775W', 'F814W']
-
-SW_FILTERS = ['F070W', 'F090W', 'F115W', 'F140M', 'F150W', 'F162M', 'F164N',
-                'F150W2', 'F182M', 'F187N', 'F200W', 'F210M', 'F212N']
-LW_FILTERS = ['F250M', 'F277W', 'F300M', 'F322W2', 'F323N', 'F335M',
-                'F360M', 'F356W', 'F405N', 'F410M', 'F430M', 'F444W', 'F460M',
-                'F466N', 'F470N', 'F480M']
-
-WEBB_FILTERS = SW_FILTERS + LW_FILTERS
-
-PIVOT = OrderedDict([('f435w', 4318.828102108889),
-             ('f606w', 5920.818879556311),
-             ('f814w', 8056.879509287926),
-             ('f090w', 8989.),
-             ('f105w', 10543.523234897353),
-             ('f125w', 12470.520322831206),
-             ('f140w', 13924.163916315556),
-             ('f160w', 15396.616154585481),
-             ('f115w', 11540.),
-             ('f150w', 15007.454908178013),
-             ('f200w', 19886.478139793544),
-             ('f277w', 27577.958764384803),
-             ('f356w', 35682.27763839694),
-             ('f410m', 40820.),
-             ('f444w', 44036.71097714713)])
