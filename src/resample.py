@@ -90,6 +90,7 @@ if USE_EXPTIME:
         header = fits.getheader(filename)
         wcs = WCS(header)
         pcs = np.round(utils.proj_plane_pixel_scales(wcs)[0] * 3600, 2)
+        print(pcs)
         if pcs == PIXEL_SCALE: continue
 
         # print(filename.split('/')[-1])

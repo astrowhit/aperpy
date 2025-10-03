@@ -13,7 +13,10 @@ sys.path.insert(0, PATH_CONFIG)
 from config import DIR_OUTPUT, DIR_IMAGES, DIR_KERNELS, DIR_OUTPUT, FILTERS, USE_FFT_CONV, WHT_REPLACE, SKYEXT, IS_COMPRESSED
 
 KERNEL = sys.argv[2]
-SCI_FILENAMES = list(glob.glob(DIR_OUTPUT+f'/*_sci{SKYEXT}.fits*'))
+if SKYEXT == '':
+    SCI_FILENAMES = list(glob.glob(DIR_IMAGES+f'/*_sci{SKYEXT}.fits*'))
+else:
+    SCI_FILENAMES = list(glob.glob(DIR_OUTPUT+f'/*_sci{SKYEXT}.fits*'))
 
 if USE_FFT_CONV:
     # convolve_func = convolve_fft
@@ -27,6 +30,9 @@ else:
 for filename in SCI_FILENAMES:
     outsciname = filename.replace(f'{SKYEXT}.fits', f'{SKYEXT}_{KERNEL}-matched.fits')
     outwhtname = filename.replace(f'_sci{SKYEXT}.fits', f'_wht_{KERNEL}-matched.fits')
+    if SKYEXT == '':
+        outsciname = outsciname.replace(DIR_IMAGES, DIR_OUTPUT)
+        outwhtname = outwhtname.replace(DIR_IMAGES, DIR_OUTPUT)
     
     if os.path.exists(outsciname) and os.path.exists(outwhtname):
         print(outsciname, outwhtname)

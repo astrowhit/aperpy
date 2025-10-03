@@ -14,8 +14,8 @@ from astropy.convolution import convolve_fft
 PATH_CONFIG = sys.argv[1]
 sys.path.insert(0, PATH_CONFIG)
 
-from config import DIR_PSFS, PIXEL_SCALE, DIR_OUTPUT, FILTERS, PHOT_ZP, \
-                MATCH_BAND, SKYEXT, DIR_KERNELS, MAGLIM, PSF_DICT
+from config import DIR_PSFS, PIXEL_SCALE, DIR_IMAGES, DIR_OUTPUT, FILTERS, PHOT_ZP, \
+                MATCH_BAND, SKYEXT, DIR_KERNELS, MAGLIM, PSF_DICT, OVERWRITE
 from psf_tools import *
 
 
@@ -31,13 +31,30 @@ if not os.path.exists(plotdir):
 target_filter = MATCH_BAND
 image_dir = DIR_OUTPUT
 print('target filter',target_filter)
-hdr = fits.getheader(glob.glob(os.path.join(DIR_OUTPUT, f'*{target_filter}*sci{SKYEXT}.fits*'))[0])
+# hdr = fits.getheader(glob.glob(os.path.join(DIR_OUTPUT, f'*{target_filter}*sci{SKYEXT}.fits*'))[0])
+if SKYEXT == '':
+    filename = glob.glob(os.path.join(DIR_IMAGES, f'*{target_filter}*sci{SKYEXT}.fits*'))[0]
+else:
+    filename = glob.glob(os.path.join(DIR_OUTPUT, f'*{target_filter}*sci{SKYEXT}.fits*'))[0]
+hdr = fits.getheader(filename)
 
+
+### Make ePSFs
 use_filters = [MATCH_BAND] + [f for f in FILTERS if f != MATCH_BAND]
 for pfilt in use_filters:
+
+    psfname = os.path.join(DIR_PSFS, f'{pfilt}_psf.fits')
+    if not OVERWRITE and os.path.exists(psfname):
+        print(f'{pfilt} kernel already exists, will not overwrite.\n'
+              'Check OVERWRITE param in config if this is not the desired effect.')
+        continue
+
     print()
     print(f'Finding stars for {pfilt}...')
-    filename = glob.glob(os.path.join(DIR_OUTPUT, f'*{pfilt}*sci{SKYEXT}.fits*'))[0]
+    if SKYEXT == '':
+        filename = glob.glob(os.path.join(DIR_IMAGES, f'*{pfilt}*sci{SKYEXT}.fits*'))[0]
+    else:
+        filename = glob.glob(os.path.join(DIR_OUTPUT, f'*{pfilt}*sci{SKYEXT}.fits*'))[0]
     suffix = '.fits' + filename.split('.fits')[-1]
     starname = filename.replace(suffix, '_star_cat.fits').replace(DIR_OUTPUT, DIR_PSFS)
     outname = os.path.join(DIR_PSFS, f'{pfilt}.fits')
@@ -50,6 +67,7 @@ for pfilt in use_filters:
     print(filename)
     print(starname)
 
+    cutout_size = PSF_DICT['cutout_size'][pfilt]
     range = PSF_DICT['range'][pfilt]
     threshold_max = PSF_DICT['threshold_max'][pfilt]
     mag_lim = PSF_DICT['mag_lim'][pfilt]
@@ -60,12 +78,6 @@ for pfilt in use_filters:
 
     radii=np.array([0.5,1.,2.,4.,7.5]) * aper_scale
     print(f"apertures={radii}")
-
-    method = PSF_DICT['method'][pfilt]
-    oversample = PSF_DICT['oversample'][pfilt]
-    pypher_r = PSF_DICT['pypher_r'][pfilt]
-    alpha = PSF_DICT['alpha'][pfilt]
-    beta = PSF_DICT['beta'][pfilt]
 
     showme = False
 
@@ -80,7 +92,7 @@ for pfilt in use_filters:
     ra, dec, ids = peaks['ra'][ok], peaks['dec'][ok], peaks['id'][ok]
 
     print(f'Processing PSF...')
-    pixsize=int(4/PIXEL_SCALE)
+    pixsize=int(cutout_size/PIXEL_SCALE)
     if pixsize % 2 == 0: pixsize+=1
     if pixsize < 101: pixsize=101
     psf = PSF(image=filename, x=ra, y=dec, ids=ids, pixsize=pixsize, pixelscale=PIXEL_SCALE)
@@ -102,16 +114,29 @@ for pfilt in use_filters:
     for plot in plots:
         os.rename(plot,plot.replace(outdir,plotdir))
     
-    filt_psf = np.array(psf.psf_average)
+    
+### Make matching kernels
+for pfilt in use_filters:
     if pfilt == MATCH_BAND:
+        continue
+
+    psfname = os.path.join(DIR_PSFS, f'{pfilt}_psf.fits')
+    outname = psfname.replace('psf','kernel').replace(DIR_PSFS, DIR_KERNELS)
+    if not OVERWRITE and os.path.exists(outname):
+        print(f'{pfilt} kernel already exists, will not overwrite.\n'
+              'Check OVERWRITE param in config if this is not the desired effect.')
         continue
 
     target_psf = fits.getdata(glob.glob(DIR_PSFS+'*'+target_filter.lower()+'*'+'psf.fits')[0])
 
-    psfname = glob.glob(DIR_PSFS+'*'+pfilt.lower()+'*'+'psf.fits')[0]
-    outname = DIR_KERNELS+os.path.basename(psfname).replace('psf','kernel')
-
     filt_psf = fits.getdata(psfname)
+
+    method = PSF_DICT['method'][pfilt]
+    oversample = PSF_DICT['oversample'][pfilt]
+    pypher_r = PSF_DICT['pypher_r'][pfilt]
+    alpha = PSF_DICT['alpha'][pfilt]
+    beta = PSF_DICT['beta'][pfilt]
+
     if oversample > 1:
         print(f'Oversampling PSF by {oversample}x...')
         filt_psf = zoom(filt_psf, oversample)

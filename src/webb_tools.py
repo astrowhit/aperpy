@@ -9,6 +9,8 @@ from astropy.io import fits
 import astropy.units as u
 from astropy.coordinates import SkyCoord
 import matplotlib.pyplot as plt
+from collections import Counter
+from tqdm import tqdm
 
 import sys
 
@@ -399,10 +401,15 @@ def psf_cog(psfmodel, filt, nearrad=None, fix_extrapolation=True, pixel_scale=No
         return output
 
 def compute_isofluxes(seg_flat, sci_flat):
-    isofluxes = np.zeros(np.max(seg_flat))
-    for idx, val in zip(seg_flat, sci_flat):
-        if idx == 0: continue
-        isofluxes[idx-1] += val
+    idlist = np.sort(np.unique(seg_flat))
+    idlist = idlist[idlist>0]
+    index = np.arange(len(idlist))
+    isofluxes = np.zeros(len(idlist), dtype=np.float32)
+    mapping = {ID:ind for ID,ind in zip(idlist, index)}
+    for idl, val in zip(tqdm(seg_flat), sci_flat):
+        if idl <= 0: continue
+        idx = mapping[idl]
+        isofluxes[idx] += val
     return isofluxes
 
 def find_friends(seg):
@@ -625,7 +632,7 @@ def make_cutout(ra, dec, size, nickname, filters, dir_images, precomp=None, row=
             elif np.isnan(scale):
                 scale = 1
             ax.imshow(img, cmap='RdGy', norm=SymLogNorm(3*rms, 1, -scale, scale))
-            print(flux, fluxerr, snr)
+            # print(flux, fluxerr, snr)
             ax.text(0.05, 1.05, f'{filt}\n{flux:2.2f}+/-{fluxerr:2.2f} 10*nJy (S/N:{snr:2.2f})', transform=ax.transAxes)
             ax.axes.xaxis.set_visible(False)
             ax.axes.yaxis.set_visible(False)
@@ -743,7 +750,7 @@ def get_gaia_radec_at_time(gaia_tbl, date=2015.5, format='decimalyear'):
     return(coord_at_time)
 
 
-def crossmatch(cat1, cat2, thresh=[1*u.arcsec,], verbose=1, plot=False, col1=None, col2=None, return_idx=False, checkmask=True):
+def crossmatch(cat1, cat2, thresh=[1*u.arcsec,], verbose=1, plot=False, col1=None, col2=None, return_idx=False, checkmask=True, unique=False):
     """Quick crossmatching of catalogs, including debug plots.
 
     Parameters
@@ -828,6 +835,18 @@ def crossmatch(cat1, cat2, thresh=[1*u.arcsec,], verbose=1, plot=False, col1=Non
         dsky = np.hypot(dra, ddec)
 
         coord_primary = SkyCoord(coord_primary.ra - dra, coord_primary.dec - ddec)
+
+        if unique:
+            element_counts = Counter(idx[sel_thresh])
+            non_unique_elements = {element for element, count in element_counts.items() if count > 1}
+
+            non_unique_indices = []
+            for i, item in enumerate(idx):
+                if item in non_unique_elements:
+                    non_unique_indices.append(i)
+
+            sel_thresh[non_unique_indices]=False
+
 
         if verbose > 0:
             Nthresh = np.sum(sel_thresh)

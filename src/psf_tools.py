@@ -304,7 +304,8 @@ def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,
                threshold_min = -0.5, threshold_max = 10, threshold_mode=[-0.2,0.2], shift_lim=2, zp=28.9, instars=None,
                showme=True, label='', outdir='./', plotdir='./'):
 
-    filt=re.search('f[0-9][0-9][0-9][a-z]*_',filename).group()[:-1]
+    filt=re.search('f[0-9][0-9][0-9][a-z]*[-_]',filename).group()[:-1]
+    print(filt)
 
     img, hdr = fits.getdata(filename, header=True)
     wcs = WCS(hdr)
@@ -486,9 +487,6 @@ def sigma_clip_3d(data, maxiters=2, axis=0, **kwargs):
         clipped_data, lo, hi = sigma_clip(clipped_data, maxiters=0, axis=0, masked=True, grow=False, return_bounds=True, **kwargs)
         # grow mask
         for i in range(len(clipped_data.mask)): clipped_data.mask[i,:,:] = grow(clipped_data.mask[i,:,:],iterations=1)
-    # print((np.mean(clipped_data,axis=axis)[67,67]))
-    # print(clipped_data.mask[:,67,67])
-    # raise
     return np.mean(clipped_data,axis=axis), lo, hi, clipped_data
 
 # interpolation=cv2.INTER_LANCZOS4
@@ -614,7 +612,7 @@ class PSF():
             # self.cat.pprint_all()
 
 
-    def stack(self,sigma=3,maxiters=2):
+    def stack(self,sigma=3,maxiters=1):
         iok = np.where(self.ok)[0]
 
         norm = self.cat['phot'][iok]
@@ -1061,17 +1059,27 @@ def renorm_psf(psfmodel, filt, fov=4.04, pixscl=0.04):
     encircled['F125W'] = 0.969
     encircled['F140W'] = 0.967
     encircled['F160W'] = 0.966
-    encircled['F090W'] = 0.9837
-    encircled['F115W'] = 0.9822
-    encircled['F150W'] = 0.9804
-    encircled['F200W'] = 0.9767
+    encircled['F070W'] = 0.992
+    encircled['F090W'] = 0.989
+    encircled['F115W'] = 0.987
+    encircled['F140M'] = 0.984
+    encircled['F150W2'] = 0.984
+    encircled['F150W'] = 0.983
+    encircled['F162M'] = 0.982
+    encircled['F182M'] = 0.980
+    encircled['F200W'] = 0.979
+    encircled['F210M'] = 0.978
     encircled['F250M'] = 0.973
-    encircled['F277W'] = 0.9691
+    encircled['F277W'] = 0.971
     encircled['F300M'] = 0.968
-    encircled['F356W'] = 0.9618
-    encircled['F410M'] = 0.9568
-    encircled['F444W'] = 0.9546
-    encircled['F480M'] = 0.952
+    encircled['F335M'] = 0.964
+    encircled['F356W'] = 0.963
+    encircled['F360M'] = 0.962
+    encircled['F410M'] = 0.958
+    encircled['F430M'] = 0.956
+    encircled['F444W'] = 0.956
+    encircled['F460M'] = 0.953
+    encircled['F480M'] = 0.952          
 
     # Normalize to correct for missing flux
     # Has to be done encircled! Ensquared were calibated to zero angle...

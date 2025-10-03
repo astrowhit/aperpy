@@ -360,12 +360,11 @@ if APPLY_MWDUST is not None:
     for filter in FILTERS:
         for tryfilt in tr.trans:
             if 'F' not in tr.trans[tryfilt]: 
-                print(f'{filter} not found, check translate file')
                 continue
             if tryfilt.endswith(filter):
                 num = int(tr.trans[tryfilt][1:])
                 filter_pwav[filter] = res[num].pivot
-                # print(filter, tryfilt, filter_pwav[filter])
+                print(filter, tryfilt, filter_pwav[filter])
                 break
 
     atten_mag = extinction.fm07(np.array(list(filter_pwav.values())), Av) # atten_mag in magnitudes from Fitzpatrick + Massa 2007
@@ -374,7 +373,6 @@ if APPLY_MWDUST is not None:
         if np.isnan(atten_factor[i]):
             print('No associated filter found in "Extinction": check eazy translate file (TRANSLATE_FNAME in config)')
         print(f'{filter} ::  {atten_factor[i]:2.5f}x or {atten_mag[i]:2.5f} AB')
-
     print('Applying Milky Way Attenuation correction (FM+07)')
     for coln in maincat.colnames:
         if 'RADIUS' in coln:
@@ -543,8 +541,8 @@ if NBANDS_USE:
     else:
         NBANDS_NAME = f'_{NBANDS_NAME}'
     for filt in NBANDS_FILTS:
-        NBANDS += np.isfinite(maincat[f'{filt}_FLUX_APER{str_aper}']).astype(int)
-    maincat.add_column(Column(NBANDS.astype(int), name=f'n_bands{NBANDS_NAME}'))
+        NBANDS += np.isfinite(maincat[f'{filt.lower()}_FLUX_APER{str_aper}']).astype(int)
+    maincat.add_column(Column(NBANDS.astype(int), name=f'n_bands{NBANDS_NAME.lower()}'))
 
 # bad pixel flag
 if BP_USE:
@@ -664,11 +662,11 @@ if REGMASK_USE:
     regs = Regions.read(FN_REGMASK)
     SEL_REGMASK = np.zeros(len(maincat), dtype=bool)
     catcoords = SkyCoord(maincat['RA'], maincat['DEC'])
-    DETERR_NAME = f'{DET_NICKNAME}_{DET_TYPE}/{DET_NICKNAME}_opterr.fits'
+    DETIMG_NAME = f'{DET_NICKNAME}_{DET_TYPE}/{DET_NICKNAME}_{DET_TYPE}.fits'
     if IS_COMPRESSED:
-        DETERR_NAME +='.gz'
+        DETIMG_NAME +='.gz'
     from astropy.wcs import WCS
-    wcs = WCS(fits.getheader(os.path.join(DIR_CATALOGS, DETERR_NAME)))
+    wcs = WCS(fits.getheader(os.path.join(DIR_CATALOGS, DETIMG_NAME)))
     for reg in regs:
         SEL_REGMASK |= reg.contains(catcoords, wcs=wcs)
     maincat['combined_artifact_flag'][SEL_REGMASK] = 1 # this one is more debatable since bright stars will get caught.
@@ -821,6 +819,9 @@ for apersize in PHOT_APER:
             cols['extrabad_flag'] = 'flag_nearbcg'
         if COVERAGE_USE:
             cols[f'{COV_NAME}_coverage_flag'] = f'flag_{COV_NAME}_coverage'
+        if NBANDS_USE:
+            cols[f'n_bands{NBANDS_NAME.lower()}'] = f'n_bands{NBANDS_NAME.lower()}'
+
         cols['z_spec'] = 'z_spec'
 
         subcat = maincat[list(cols.keys())].copy()
@@ -878,7 +879,7 @@ for apersize in PHOT_APER:
                 subcat[coln.replace('f_', 'w_')][badsel] = np.nan
 
         fluxes = np.array([subcat[coln] for coln in subcat.colnames if 'f_' in coln])
-        badsel = np.nansum(np.isfinite(fluxes), 0) == 0
+        badsel = np.nansum(np.isfinite(fluxes) | (fluxes > 0), 0) == 0
         print(f'Found {np.sum(badsel)} objects with NO viable photometry whatsoever. {np.sum(badsel & (subcat["use_phot"]==0))} already flagged. Flagging rest.')
         subcat['use_phot'][badsel] = 0
         subcat.add_column(Column(np.where(badsel, 1, 0), name='flag_nophot', dtype='i4'), 1+subcat.colnames.index('use_phot'))
@@ -890,6 +891,6 @@ for apersize in PHOT_APER:
         if len(str_aper) == 2:
             str_aper += '0' # 07 -> 070
         sub_outfilename = outfilename.replace('COMBINED', f'D{str_aper}')
-        sub_outfilename = sub_outfilename.replace(DET_NICKNAME+'_K', f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K")
+        sub_outfilename = sub_outfilename.replace(DET_NICKNAME+'_K', f"{PROJECT}_{VERSION}_{DET_NICKNAME.split('_')[0]}_K")
         subcat.write(sub_outfilename, overwrite=True)
         print('Wrote formatted combined catalog to ', sub_outfilename)

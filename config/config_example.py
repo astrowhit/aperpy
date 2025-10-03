@@ -5,6 +5,7 @@ from astropy.coordinates import SkyCoord
 from astropy.io import fits
 import numpy as np
 APERPY = '/Users/secutler/Documents/aperpy/'
+OVERWRITE = False
 
 ### GENERAL
 KERNELS = {}
@@ -20,7 +21,7 @@ DETECTION_PARAMS = dict(
     clean = False,
     )
 
-PHOT_APER = [0.32, 0.48, 0.7, 1.0, 1.4] # diameter in arcsec
+PHOT_APER = [0.2, 0.32, 0.48, 0.7, 1.0, 1.4] # diameter in arcsec
 PHOT_AUTOPARAMS = 2.5, 1.0 # Kron-scaling radius, minimum kron factor
 PHOT_FLUXRADIUS = 0.5, 0.6 # FLUX_RADIUS at 50% and 60% of flux (always keep 0.5!)
 PHOT_KRONPARAM = 6.0 # SE hardcodes this as 6.0
@@ -39,41 +40,38 @@ MAKE_SCIREADY_ALL = True # make aperture corrected catalogs for all apertures
 
 ### DIRECTORIES
 PROJECT = 'MINERVA-UDS'
+SURVEY = PROJECT.split('-')[0]
+FIELD = PROJECT.split('-')[1]
 REDUCTION = 'grizli'
-VERSION = '0.1'
-DRIVE = '/Volumes/SanDisk3/'
-WORKING_DIR = DRIVE + f'MINERVA/UDS/v{VERSION}'
+VERSION = 'n2.2_m2.0_v1.0'
+DRIVE = f'/Volumes/SanDisk3/{SURVEY}/'
+WORKING_DIR = f'{DRIVE}{FIELD}/{VERSION}'
 DIR_IMAGES = os.path.join(WORKING_DIR, 'external/')
 DIR_OUTPUT = os.path.join(WORKING_DIR, 'output/')
 DIR_PSFS = os.path.join(WORKING_DIR, 'intermediate/PSF/')
 DIR_KERNELS = os.path.join(WORKING_DIR, 'intermediate/kernels/')
 DIR_CATALOGS = os.path.join(WORKING_DIR, 'catalogs/')
-DIR_CONFIG = '/Users/secutler/Documents/MINERVA/'
+DIR_CONFIG = f'/Users/secutler/Documents/{SURVEY}/'
 IS_COMPRESSED = True # outputs files as .gz
 
 USE_EXPTIME = True # use exposure time maps to get median exposure time for each source
 
 BORROW_HEADER_FILE = glob.glob(DIR_IMAGES+'*f444w*sci.fits*')[0]
 
-PATH_SW_ENERGY = os.path.join(APERPY,'config/Encircled_Energy_SW_ETCv2.txt')
-PATH_LW_ENERGY = os.path.join(APERPY,'config/Encircled_Energy_LW_ETCv2.txt')
-PATH_HST_ENERGY = os.path.join(APERPY,'config/Encircled_Energy_HST_ETCv2.txt')
+PATH_SW_ENERGY = APERPY+'config/Encircled_Energy_SW_ETCv2.txt'
+PATH_LW_ENERGY = APERPY+'config/Encircled_Energy_LW_ETCv2.txt'
+PATH_HST_ENERGY = APERPY+'config/Encircled_Energy_HST_ETCv2.txt'
 
-SKYEXT = '_skysubvar'
+SKYEXT = ''
 BLOCK_WHT_REPLACE = ('sci', 'wht')
-WHT_REPLACE = ('sci_skysubvar', 'wht')
+WHT_REPLACE = ('sci', 'wht')
 DIRWHT_REPLACE = (DIR_OUTPUT, DIR_IMAGES)
 DIR_SFD = '~/sfddata-master'
-ZSPEC = '/Users/secutler/Documents/MINERVA/uds/uds_dja_nirspec_graded_v4.2.csv'
+ZSPEC = f'/Users/secutler/Documents/{SURVEY}/{FIELD.lower()}/{FIELD.lower()}_zspec.fits'
 ZCOL= 'z'
 ZRA = 'ra'
 ZDEC = 'dec'
-ZCONF = 'grade', 3
-# ZSPEC = '/Users/secutler/Documents/MINERVA/uds/uds_3dhst_zspec.fits'
-# ZCOL= 'z'
-# ZRA = 'RA'
-# ZDEC = 'DEC'
-# ZCONF = 'use', 1
+ZCONF = 'use', 1
 MAX_SEP = 0.3 * u.arcsec
 
 ### MEDIAN FILTERING
@@ -84,17 +82,16 @@ MED_SIZE = 1.3*u.arcmin
 BLOCK_SIZE = 4 # pixels
 
 ### BACKGROUNDS
-# BACKPARAMS = dict(bw=32, bh=32, fw=8, fh=8, maskthresh=1, fthresh=0.)
-# BACKTYPE = 'var'
-BACKPARAMS = dict(bw=128, bh=128, fw=8, fh=8, maskthresh=1, fthresh=0.)
+BACKPARAMS = dict(bw=128, bh=128, fw=3, fh=3, maskthresh=1, fthresh=0.)
 BACKTYPE = 'var'
 
 FILTERS_ACS = ['F435W','F606W','F775W','F814W','F850LP']
 FILTERS_WFC = ['F098M','F105W','F125W','F140W','F160W']
 HST_FILTERS = FILTERS_ACS + FILTERS_WFC
 
-SW_FILTERS = ['F090W','F115W','F150W','F200W']
-LW_FILTERS = ['F277W','F356W','F410M','F444W']
+SW_FILTERS = ['F090W','F115W','F140M','F150W','F162M','F182M','F200W','F210M']
+LW_FILTERS = ['F250M','F277W','F300M','F335M','F356W','F360M','F410M','F430M',
+              'F444W','F460M','F480M']
 
 USE_FILTERS = []#LW_FILTERS*1 # Filters to use with WebbPSF
 
@@ -107,6 +104,7 @@ FILTERS = [filt.lower() for filt in FILTERS]
 DETECTION_GROUPS = {'ACS+WEBB':{},'LW':{}}
 
 CHI_MEAN_FILTS = [filt for filt in FILTERS if filt.upper() not in FILTERS_WFC]
+
 DETECTION_GROUPS['ACS+WEBB']['filters'] = tuple(CHI_MEAN_FILTS)
 DETECTION_GROUPS['ACS+WEBB']['method'] = 'chi-mean'
 DETECTION_GROUPS['ACS+WEBB']['n_regions'] = 3
@@ -132,10 +130,16 @@ for nickname in DETECTION_GROUPS:
 DETECTION_IMAGES = OrderedDict()
 for group in DETECTION_GROUPS:
     for filt in DETECTION_GROUPS[group]['filters']:
-        for path in glob.glob(DIR_OUTPUT+'*'):
-            if ('sci_skysubvar.fits' in path) & (filt in path):
-                DETECTION_IMAGES[filt] = path
+        path = glob.glob(f'{DIR_IMAGES}*{filt}*sci.fits*')[0]
+        DETECTION_IMAGES[filt] = path
 
+ID_FLOOR = 1000000 # value to add to all IDs
+# zero if you want to leave them untouched, will not work with XCAT below
+### CROSSMATCH to old ID versions
+XCAT_FILENAMES_MAIN = {'ACS+WEBB': f'{DRIVE}/{FIELD}/n2.1_m2.0_v1.0/catalogs/ACS+WEBB_chi-mean/f444w/MINERVA-UDS_n2.1_m2.0_v1.0_ACS+WEBB_Kf444w_SUPER_CATALOG.fits',
+                       'LW': f'{DRIVE}/{FIELD}/n2.1_m2.0_v1.0/catalogs/LW_f277w-f356w-f444w_noise-equal/f444w/MINERVA-UDS_n2.1_m2.0_v1.0_LW_Kf444w_SUPER_CATALOG.fits'}
+XCAT_NAME_MAIN = 'id' # column to include, name to use
+XCAT_RAD_MAIN = 0.08
 
 ### ZEROPOINTS
 PHOT_ZP = OrderedDict()
@@ -149,6 +153,7 @@ ANGLE = None
 MAGLIM = (14,26)
 PSF_DICT = {
     # oPSF generation
+    'cutout_size':{}, # diameter of PSF cutout in arcsec
     'range':{}, # range of flux ratios for determining point-source locus
     'threshold_max':{}, # point source detection threshold
     'mag_lim':{}, # magnitude limit for point source detection
@@ -168,6 +173,7 @@ PSF_DICT = {
 for filt in FILTERS:
     PHOT_ZP[filt] = 28.9
 
+    PSF_DICT['cutout_size'][filt] = 4
     PSF_DICT['range'][filt] = [1.2,3]
     PSF_DICT['threshold_max'][filt] = 10
     PSF_DICT['mag_lim'][filt] = 24.0
@@ -175,9 +181,12 @@ for filt in FILTERS:
     PSF_DICT['sigma'][filt] = 2.8
     PSF_DICT['npeaks'][filt] = 1000
     PSF_DICT['aper_scale'][filt] = 0.04/PIXEL_SCALE
-    
+
     if filt == 'f160w':
         PSF_DICT['range'][filt] = [1.2,3.5]
+    
+    if filt == 'f140w':
+        PSF_DICT['range'][filt] = [2.5,4]
     
     if filt == 'f606w':
         PSF_DICT['npeaks'][filt] = 2000
@@ -189,13 +198,15 @@ for filt in FILTERS:
     PSF_DICT['beta'][filt] = 0.15
 
 ### PHOTOZ
-TRANSLATE_FNAME = '/Users/secutler/Documents/MINERVA/uds/minerva_uds.translate'
+TRANSLATE_FNAME = f'/Users/secutler/Documents/{SURVEY}/{FIELD.lower()}/{VERSION}/{SURVEY.lower()}_{FIELD.lower()}_{VERSION[:4]}.translate'
 ITERATE_ZP = True
-EAZY_FLOOR = True
-TEMPLATE_SETS = ['larson', 'sfhz_agn_blue']
+EAZY_FLOOR = False
+TEMPLATE_SETS = ['larson','sfhz_blue_agn','sfhz']
+EAZY_APERS = ['SUPER',0.32,0.20]
+
 
 ### AREA CALCULATIONS
-FNAME = glob.glob(f'{DIR_IMAGES}*{LW_FILTERS[-1].lower()}*sci.fits*')[0]
+FNAME = glob.glob(f'{DIR_IMAGES}*{MATCH_BAND.lower()}*sci.fits*')[0]
 hdr = fits.getheader(FNAME)
 L1,L2 = hdr['NAXIS1'],hdr['NAXIS2']
 crval1,crval2 = hdr['CRVAL1'],hdr['CRVAL2']
@@ -237,7 +248,7 @@ GAIA_XMATCH_RADIUS = 0.6*u.arcsec
 
 # EXTERNAL STARS (useful for high proper motion stars)
 EXTERNALSTARS_USE = False
-FN_EXTERNALSTARS = '/Users/secutler/Documents/MINERVA/uds/uds_3dhst_stars.fits'
+FN_EXTERNALSTARS = f'/Users/secutler/Documents/{SURVEY}/{FIELD.lower()}/{FIELD.lower()}_3dhst_stars.fits'
 EXTERNALSTARS_XMATCH_RADIUS = 1*u.arcsec
 
 # COVERAGE FLAGS (flag sources with no coverage in certain bands)
@@ -250,8 +261,10 @@ COV_SEL_EAZY = True
 # NUMBER OF BANDS (can choose to use specific bands; e.g. medium bands, etc.)
 NBANDS_USE = True
 NBANDS_APERSIZE = 0.7
-NBANDS_FILTS = SW_FILTERS # Set to None to use all bands
-NBANDS_NAME = 'NIRCAM_SW'
+# Set to None to use all bands
+NBANDS_FILTS = ['F140M','F162M','F182M','F210M',
+                'F250M','F300M','F335M','F360M','F430M','F460M','F480M'] 
+NBANDS_NAME = 'MB'
 
 # BADWHT
 BADWHT_USE = True
@@ -267,8 +280,8 @@ EXTRABAD_XMATCH_RADIUS = 0.5*u.arcsec
 EXTRABAD_LABEL = ''
 
 # REGMASK (mask region file of your choice)
-REGMASK_USE = False
-FN_REGMASK = ''
+REGMASK_USE = True
+FN_REGMASK = f'/Users/secutler/Documents/{SURVEY}/{FIELD.lower()}/{VERSION}/{PROJECT}_{VERSION}_starspike_mask.reg'
 
 ### BAD PIXELS
 BP_USE = True

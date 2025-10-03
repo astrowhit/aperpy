@@ -1,4 +1,4 @@
-import os, sys
+import os, sys, glob
 import numpy as np
 import matplotlib.pyplot as plt
 from astropy.table import Table
@@ -37,10 +37,10 @@ if 'SUPER' not in sys.argv[4]:
 else:
     APERSIZE = 'SUPER'
 TEMPLATES = sys.argv[5]
-ITERATE_ZP = sys.argv[6] 
+ITERATE_ZP = eval(sys.argv[6])
 
 from config import DIR_CATALOGS, DETECTION_GROUPS, TRANSLATE_FNAME, TARGET_ZP, \
-                   FILTERS, MATCH_BAND, PROJECT, VERSION, \
+                   FILTERS, MATCH_BAND, PROJECT, VERSION, OVERWRITE,\
                    COVERAGE_USE, COV_NAME, COV_SEL_EAZY, EAZY_FLOOR
 
 DET_TYPE = DETECTION_GROUPS[DET_NICKNAME.split('_')[0]]['method']
@@ -62,7 +62,7 @@ is_zpiter = ''
 if ITERATE_ZP:
     is_zpiter = 'zpiter_'
 
-catalog_path = os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_{nickname}_CATALOG.ezinput.fits")
+catalog_path = os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_{nickname}_CATALOG.fits")
 if EAZY_FLOOR: 
     catalog = Table.read(catalog_path)
 
@@ -71,16 +71,16 @@ if EAZY_FLOOR:
         if 'f_' in col:
             SN_mask = (catalog[col]/catalog[col.replace('f_','e_')]) > 20
             catalog[col.replace('f_','e_')][SN_mask] = catalog[col][SN_mask]/20
-
-    catalog.write(catalog_path.replace('.fits','.ezinput.fits'))
+    catalog_path=catalog_path.replace('.fits','.ezinput.fits')
+    catalog.write(catalog_path,overwrite=True)
     params['SYS_ERR'] = 0
 
 else: params['SYS_ERR'] = 0.05
 
 
 params['CATALOG_FILE'] = catalog_path
-params['MAIN_OUTPUT_FILE'] = os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_{nickname}_{is_zpiter}CATALOG.{TEMPLATES}.eazypy")
-
+params['MAIN_OUTPUT_FILE'] = os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_{nickname}_{is_zpiter}CATALOG.{TEMPLATES}.eazypy")
+zout_name = os.path.join(FULLDIR_CATALOGS, f'{PROJECT}_{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_{nickname}_{is_zpiter}CATALOG_{TEMPLATES}.zout.fits')
 
 params['APPLY_PRIOR'] = 'n'
 params['PRIOR_ABZP'] = TARGET_ZP
@@ -89,6 +89,14 @@ params['CAT_HAS_EXTCORR'] = 'y'
 params['N_MIN_COLORS'] = 2
 params['Z_COLUMN'] = 'z_phot'
 params['USE_ZSPEC_FOR_REST'] = 'n'
+
+UBVJ_FILTERS = [153,154,155,161] # Maiz-Appellaniz & 2MASS
+
+RF_FILTERS = [270, 274] # UV tophat
+RF_FILTERS += [120, 121] # GALEX
+RF_FILTERS += [156, 157, 158, 159, 160] #SDSS
+RF_FILTERS += [161, 162, 163] # 2MASS
+RF_FILTERS += [414, 415, 416] # synthetic ugi (Antwi-Danso+22)
 
 
 params['Z_MAX'] = 20. #30.
@@ -104,57 +112,88 @@ elif TEMPLATES == 'sfhz_blue_agn':
     params['TEMPLATES_FILE'] = 'templates/sfhz/agn_blue_sfhz_13.param'
 elif TEMPLATES == 'larson':
     params['TEMPLATES_FILE'] = 'templates/LarsonTemp/newtemp_fsps_L22tweaked_v2.param'
+else:
+   print(f'{TEMPLATES} does not exist! Check Config.')
+   raise
 
 params['VERBOSITY'] = 1
 
 # from astropy.cosmology import WMAP9
+print(zout_name)
+if OVERWRITE or not os.path.exists(zout_name):
+    ez = eazy.photoz.PhotoZ(param_file=None,  #cosmology=WMAP9,
+                                translate_file=translate_file,
+                                zeropoint_file=None, params=params,
+                                load_prior=False, load_products=False)
 
-ez = eazy.photoz.PhotoZ(param_file=None,  #cosmology=WMAP9,
-                              translate_file=translate_file,
-                              zeropoint_file=None, params=params,
-                              load_prior=False, load_products=False)
+    print(ez.cosmology)
 
-print(ez.cosmology)
+    NITER = 5
+    NBIN = np.minimum(ez.NOBJ//100, 180)
 
-NITER = 5
-NBIN = np.minimum(ez.NOBJ//100, 180)
+    ez.cat = ez.cat.filled(-99)
 
-ez.cat = ez.cat.filled(-99)
+    ez.param.params['VERBOSITY'] = 1.
 
-ez.param.params['VERBOSITY'] = 1.
+    if ITERATE_ZP:
+        for iter in range(NITER):
+            print('Iteration: ', iter)
 
-if ITERATE_ZP:
-    for iter in range(NITER):
-        print('Iteration: ', iter)
+            sn = ez.fnu/ez.efnu
+            clip = (sn > 10).sum(axis=1) > 6
+            clip &= ez.cat['use_phot'] == 1
+            ez.iterate_zp_templates(idx=ez.idx[clip], update_templates=False,
+                                    update_zeropoints=True, iter=iter, n_proc=8,
+                                    save_templates=False, error_residuals=(iter > 0),
+                                    NBIN=NBIN, get_spatial_offset=False)
 
-        sn = ez.fnu/ez.efnu
-        clip = (sn > 10).sum(axis=1) > 6
-        clip &= ez.cat['use_phot'] == 1
-        ez.iterate_zp_templates(idx=ez.idx[clip], update_templates=False,
-                                update_zeropoints=True, iter=iter, n_proc=8,
-                                save_templates=False, error_residuals=(iter > 0),
-                                NBIN=NBIN, get_spatial_offset=False)
+    # Turn off error corrections derived above
+    # ez.efnu = ez.efnu_orig
+    ez.set_sys_err(positive=True)
+
+    # Full catalog
+    sample = ez.idx # all
+
+    ez.fit_parallel(sample, n_proc=8, prior=False, beta_prior=False)
+
+    comp_sel = ez.cat['use_phot']==1
+    if COVERAGE_USE and COV_SEL_EAZY:
+        comp_sel &= ez.cat[f'flag_{COV_NAME}_coverage'] == 1
+        comp_sel &= (ez.cat['f_f444w']/ez.cat['e_f444w']) > 5
+
+    ez.zphot_zspec(include_errors=False, zmax=6.5, selection=comp_sel)
+    fig = plt.gcf()
+    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{PROJECT}_{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_{nickname}_{is_zpiter}CATALOG_{TEMPLATES}.photoz-specz.pdf'))
 
 
-# Turn off error corrections derived above
-# ez.efnu = ez.efnu_orig
-ez.set_sys_err(positive=True)
+else:
+    print('EAzY will not be rerun. Check OVERWRITE param in config '
+          'if this is not the desired effect.')
 
-# Full catalog
-sample = ez.idx # all
+    pcat = Table.read(catalog_path).filled(-99)
+    ezcat = Table.read(zout_name).filled(-99)
+    zbest = ezcat['z_phot']
+    ZSPEC = ezcat['z_spec']
 
-ez.fit_parallel(sample, n_proc=8, prior=False, beta_prior=False)
+    selection = pcat['use_phot']==1
 
-comp_sel = ez.cat['use_phot']==1
-if COVERAGE_USE and COV_SEL_EAZY:
-    comp_sel &= ez.cat[f'flag_{COV_NAME}_coverage']==1
-
-ez.zphot_zspec(include_errors=False, zmax=6.5, selection=comp_sel)
-fig = plt.gcf()
-fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{PROJECT}_v{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_{nickname}_{is_zpiter}CATALOG_{TEMPLATES}.photoz-specz.pdf'))
+    if COVERAGE_USE and COV_SEL_EAZY:
+        selection &= (pcat[f'flag_{COV_NAME}_coverage'] == 1)
+        selection &= ((pcat['f_f444w']/pcat['e_f444w']) > 5)
+        # selection &= (pcat['n_bands_mb'] >= 8)
+    
+    fig = eazy.utils.zphot_zspec(zbest, ZSPEC, 
+                        zlimits=None, 
+                        selection=selection, min_zphot=0.02, 
+                        zmin=0, zmax=10.5)
+    fig = plt.gcf()
+    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{PROJECT}_{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_{nickname}_{is_zpiter}CATALOG_{TEMPLATES}.photoz-specz.pdf'))
+    sys.exit()
 
 zout, hdu = ez.standard_output(rf_pad_width=0.5, rf_max_err=2, n_proc=2,
-                                 prior=False, beta_prior=False)
+                               prior=False, beta_prior=False,
+                               UBVJ=UBVJ_FILTERS, 
+                               extra_rf_filters = RF_FILTERS)
 
 ez.fit_phoenix_stars()
 star_coln = ['star_chi2', 'star_min_ix', 'star_min_chi2', 'star_min_chinu']
@@ -185,7 +224,7 @@ zout['uvj_class'] = clas
 
 zout['flag_eazy'] = np.where( (zout['z_phot']>0) & np.isfinite(zout['mass']) & (zout['z_phot_chi2'] < 300), 1, 0)
 
-zout.write(os.path.join(FULLDIR_CATALOGS, f'{PROJECT}_v{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_{nickname}_{is_zpiter}CATALOG_{TEMPLATES}.zout.fits'), overwrite=True)
+zout.write(os.path.join(FULLDIR_CATALOGS, zout_name), overwrite=True)
 
 eazy.hdf5.write_hdf5(ez, h5file=ez.param['MAIN_OUTPUT_FILE'] + '.h5')
 
@@ -235,7 +274,7 @@ for test, ylabel, fname in zip((rel_diff, ztest, dmag),
     ax.set(xlim=(0.1, 5), xlabel='Observed Wavelength ($\\mu$m)', ylabel=ylabel)
 
     fig.tight_layout()
-    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{PROJECT}_v{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_{nickname}_{is_zpiter}CATALOG_{TEMPLATES}_{fname}.pdf'))
+    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{PROJECT}_{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_{nickname}_{is_zpiter}CATALOG_{TEMPLATES}_{fname}.pdf'))
 
 
 # 2. mod - obs vs. z, per band
@@ -288,7 +327,7 @@ for test, ylabel, fname in zip((rel_diff, ztest, dmag),
         ax.text(0.65, 0.8, f'$\\Delta={delta:2.3f}$', transform=ax.transAxes, fontsize=15)
 
     fig.tight_layout()
-    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{PROJECT}_v{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_{nickname}_{is_zpiter}CATALOG_{TEMPLATES}_{fname}.pdf'))
+    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{PROJECT}_{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_{nickname}_{is_zpiter}CATALOG_{TEMPLATES}_{fname}.pdf'))
 
 
 
@@ -348,7 +387,7 @@ for test, ylabel, fname in zip((rel_diff, ztest, dmag),
         ax.text(0.65, 0.8, f'$\\Delta={delta:2.3f}$', transform=ax.transAxes, fontsize=15)
 
     fig.tight_layout()
-    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{PROJECT}_v{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_{nickname}_{is_zpiter}CATALOG_{TEMPLATES}_{fname}.pdf'))
+    fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{PROJECT}_{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_{nickname}_{is_zpiter}CATALOG_{TEMPLATES}_{fname}.pdf'))
 
 # Basic properties
 
@@ -382,4 +421,4 @@ axes[3].set(xlabel=MATCH_BAND.upper())
 axes[3].semilogy()
 
 fig.tight_layout()
-fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{PROJECT}_v{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_{nickname}_{is_zpiter}CATALOG_{TEMPLATES}_properties_scatter.pdf'))
+fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{PROJECT}_{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_{nickname}_{is_zpiter}CATALOG_{TEMPLATES}_properties_scatter.pdf'))

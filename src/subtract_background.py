@@ -11,6 +11,7 @@ from astropy.nddata import Cutout2D
 from astropy.wcs import WCS
 from scipy import signal
 from astropy.nddata import block_reduce, block_replicate
+from astropy.stats import sigma_clip
 import numpy as np
 from scipy.ndimage import zoom
 
@@ -18,7 +19,7 @@ import sys
 PATH_CONFIG = sys.argv[1]
 sys.path.insert(0, PATH_CONFIG)
 
-from config import DIR_IMAGES, DIR_OUTPUT, BACKTYPE, BACKPARAMS,\
+from config import DIR_IMAGES, DIR_OUTPUT, BACKTYPE, BACKPARAMS, OVERWRITE, SKYEXT,\
             FILTERS, MED_CENTERS, MED_SIZE, FILTER_SIZE, PIXEL_SCALE, IS_CLUSTER, BLOCK_SIZE
 
 SCI_FILENAMES = list(glob.glob(DIR_IMAGES+'/*_sci.fits*'))
@@ -27,7 +28,16 @@ WHT_FILENAMES = list(glob.glob(DIR_IMAGES+'/*_wht.fits*'))
 def round_up_to_odd(f):
     return int(np.ceil(f) // 2 * 2 + 1)
 
+if SKYEXT == '': sys.exit()
+
 for filename in SCI_FILENAMES:
+    outfname = filename.replace('.fits', f'_skysub{BACKTYPE}.fits').replace(DIR_IMAGES, DIR_OUTPUT)
+    if not OVERWRITE and os.path.exists(outfname):
+        print(f'{os.path.basename(outfname)} already exists, '
+              'will not overwrite.\nCheck OVERWRITE param in config '
+              'if this is not the desired effect.')
+        continue
+
     if np.sum([(filt in filename) for filt in FILTERS]) == 0: continue
     fn_sci = filename
     fn_wht = filename.replace('sci', 'wht')
@@ -72,6 +82,5 @@ for filename in SCI_FILENAMES:
         outbfname = filename.replace('.fits', f'_sky{BACKTYPE}.fits').replace(DIR_IMAGES, DIR_OUTPUT)
         fits.PrimaryHDU(data=back.astype(np.float32), header=head).writeto(outbfname, overwrite=True)
 
-    outfname = filename.replace('.fits', f'_skysub{BACKTYPE}.fits').replace(DIR_IMAGES, DIR_OUTPUT)
     fits.PrimaryHDU(data=(img-back).astype(np.float32), header=head).writeto(outfname, overwrite=True)
     print(f'Written to {outfname}')

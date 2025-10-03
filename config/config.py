@@ -1,11 +1,11 @@
-import os
-import glob
+import os, glob
 from typing import OrderedDict
 import astropy.units as u
 from astropy.coordinates import SkyCoord
-import numpy as np
 from astropy.io import fits
+import numpy as np
 APERPY = '/path/to/aperpy/'
+OVERWRITE = False
 
 ### GENERAL
 KERNELS = {}
@@ -21,7 +21,7 @@ DETECTION_PARAMS = dict(
     clean = False,
     )
 
-PHOT_APER = [0.32, 0.48, 0.7, 1.0, 1.4] # diameter in arcsec
+PHOT_APER = [0.2, 0.32, 0.48, 0.7, 1.0, 1.4] # diameter in arcsec
 PHOT_AUTOPARAMS = 2.5, 1.0 # Kron-scaling radius, mimumum kron factor
 PHOT_FLUXRADIUS = 0.5, 0.6 # FLUX_RADIUS at 50% and 60% of flux (always keep 0.5!)
 PHOT_KRONPARAM = 6.0 # SE hardcodes this as 6.0
@@ -70,7 +70,7 @@ ZDEC = 'DEC'
 ZCONF = 'zconf', (3, 4) # confidence flag
 MAX_SEP = 0.3 * u.arcsec
 
-### MEDIAN FILTERING
+### MEDIAN FILTERING FOR CLUSTER GALAXY REMOVAL
 IS_CLUSTER = False  # if True, use median filtering
 MED_CENTERS = [SkyCoord(3.587*u.deg, -30.40*u.deg)] # where to center the median filter regions
 MED_SIZE = 1.3*u.arcmin
@@ -118,6 +118,15 @@ for group in DETECTION_GROUPS:
             if (f'sci{SKYEXT}.fits.gz' in path) & (filt in path):
                 DETECTION_IMAGES[filt] = path
 
+ID_FLOOR = 1000000 # value to add to all IDs
+# zero if you want to leave them untouched, will not work with XCAT below
+
+### CROSSMATCH to old ID versions
+# set path to None to ignore
+XCAT_FILENAMES_MAIN = {'LW': 'path/to/previous/LW/catalog/version.fits'}
+XCAT_NAME_MAIN = 'id' # column to include, name to use
+XCAT_RAD_MAIN = 0.08
+
 
 ### ZEROPOINTS
 PHOT_ZP = OrderedDict()
@@ -131,6 +140,7 @@ MAGLIM = (14,26)
 PSF_FOV = 4 # arcsec
 PSF_DICT = {
     # oPSF generation
+    'cutout_size':{}, # diameter of PSF cutout in arcsec
     'range':{}, # range of flux ratios for determining point-source locus
     'threshold_max':{}, # point source detection threshold
     'mag_lim':{}, # magnitude limit for point source detection
@@ -151,6 +161,7 @@ PSF_DICT = {
 for filt in FILTERS:
     PHOT_ZP[filt] = 28.9
 
+    PSF_DICT['cutout_size'][filt] = 4
     PSF_DICT['range'][filt] = [1.2,3]
     PSF_DICT['threshold_max'][filt] = 10
     PSF_DICT['mag_lim'][filt] = 24.0
@@ -169,8 +180,9 @@ for filt in FILTERS:
 ### PHOTOZ
 TRANSLATE_FNAME = '/path/to/eazy.translate'
 ITERATE_ZP = False
-EAZY_FLOOR = True
+EAZY_FLOOR = False
 TEMPLATE_SETS = ('fsps_full', 'sfhz')
+EAZY_APERS = ['SUPER', 0.32] #Catalogs to run eazy on
 
 ### AREA CALCULATIONS
 FNAME = glob.glob(f'{DIR_IMAGES}*{LW_FILTERS[-1].lower()}*sci.fits*')[0]
@@ -223,6 +235,7 @@ COVERAGE_USE = False
 COV_FILTS = ['f435w','f606w']
 COV_APERSIZE = 0.7
 COV_NAME = 'acs'
+COV_SEL_EAZY = False # apply coverage selection to eazy plots
 
 # NUMBER OF BANDS (can choose to use specific bands; e.g. medium bands, etc.)
 NBANDS_USE = True

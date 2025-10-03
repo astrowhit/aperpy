@@ -8,7 +8,7 @@ import sep
 import os, sys, glob
 from astropy.convolution import Gaussian2DKernel, Tophat2DKernel
 from regions import EllipseSkyRegion, Regions, CircleSkyRegion
-from webb_tools import empty_apertures, compute_isofluxes, find_friends
+from webb_tools import empty_apertures, compute_isofluxes, find_friends, crossmatch
 import gc
 
 import sys
@@ -16,8 +16,9 @@ PATH_CONFIG = sys.argv[1]
 sys.path.insert(0, PATH_CONFIG)
 
 from config import TARGET_ZP, PHOT_APER, PHOT_AUTOPARAMS, PHOT_FLUXRADIUS, DETECTION_PARAMS, SKYEXT,\
-         DIR_IMAGES, PHOT_ZP, FILTERS, DIR_OUTPUT, DIR_CATALOGS, IS_COMPRESSED, PIXEL_SCALE, PHOT_KRONPARAM,\
-             USE_COMBINED_KRON_IMAGE, KRON_COMBINED_BANDS, KRON_ZPT, PHOT_EMPTYAPER_DIAMS, USE_EXPTIME, DETECTION_GROUPS
+        DIR_IMAGES, PHOT_ZP, FILTERS, DIR_OUTPUT, DIR_CATALOGS, IS_COMPRESSED, PIXEL_SCALE, PHOT_KRONPARAM,\
+        USE_COMBINED_KRON_IMAGE, KRON_COMBINED_BANDS, KRON_ZPT, PHOT_EMPTYAPER_DIAMS, USE_EXPTIME, DETECTION_GROUPS,\
+        OVERWRITE, ID_FLOOR, XCAT_FILENAMES_MAIN, XCAT_NAME_MAIN, XCAT_RAD_MAIN
 
 # MAIN PARAMETERS
 DET_NICKNAME = sys.argv[2]
@@ -117,19 +118,69 @@ objects, segmap = sep.extract(
 
 print(f'Detected {len(objects)} objects.')
 
+
 hdul = fits.HDUList()
 hdul.append(fits.ImageHDU(name='SEGMAP', data=segmap, header=dethead))
+SEGMAP_NAME_ORIG = f'{DET_NICKNAME}_SEGMAP_orig.fits'
 SEGMAP_NAME = f'{DET_NICKNAME}_SEGMAP.fits'
 if IS_COMPRESSED:
+     SEGMAP_NAME_ORIG +='.gz'
      SEGMAP_NAME +='.gz'
-hdul.writeto(os.path.join(FULLDIR_CATALOGS, SEGMAP_NAME), overwrite=True)
+hdul.writeto(os.path.join(FULLDIR_CATALOGS, SEGMAP_NAME_ORIG), overwrite=True)
 
 # CLEAN UP
 catalog = Table(objects)
-catalog.add_column(Column(1+np.arange(len(catalog)), name='ID'), 0)
+idlist_init = 1+np.arange(len(catalog))
+catalog.add_column(Column(idlist_init, name='ID'), 0)
 detcoords = detwcs.pixel_to_world(catalog['x'], catalog['y'])
 catalog['RA'] = [c.ra for c in detcoords]
 catalog['DEC'] = [c.dec for c in detcoords]
+
+XCAT_FILENAMES_MAIN = XCAT_FILENAMES_MAIN[DET_NICKNAME.split('_')[0]]
+
+if XCAT_FILENAMES_MAIN is None and ID_FLOOR <= 0:
+    os.rename(os.path.join(FULLDIR_CATALOGS, SEGMAP_NAME_ORIG), 
+              os.path.join(FULLDIR_CATALOGS, SEGMAP_NAME))
+
+else:
+    if XCAT_FILENAMES_MAIN is not None:
+        cat_match = Table.read(XCAT_FILENAMES_MAIN)
+        _,_,idx1,idx2 = crossmatch(catalog, cat_match, 
+                                thresh=[XCAT_RAD_MAIN*u.arcsec],
+                                unique=True, return_idx=True)
+        
+        new_labels=np.full(len(catalog),-99,dtype=int)
+        new_labels[idx1]=cat_match[XCAT_NAME_MAIN][idx2]
+
+        nsources_matched = np.sum(new_labels>0)
+        nsources_unmatched = len(new_labels) - nsources_matched
+
+        new_ids = np.arange(np.max(new_labels)+1,np.max(new_labels)+1+nsources_unmatched,1)
+        new_labels[new_labels<0] = new_ids
+
+    else:
+        new_labels = idlist_init + ID_FLOOR
+
+
+    catalog['ID'] = new_labels.astype(np.int32)
+    catalog.sort('ID')
+
+    mapping = Table({'old_ids':idlist_init, 'new_ids':new_labels})
+    mapping.write(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_NEW_ID_MAPPING.txt'),
+                  overwrite=True, format='ascii')
+
+
+    label_mapping = {id_o:id_n for id_o,id_n in zip(idlist_init, new_labels)}
+    label_mapping[0] = 0
+
+    segmap_new = np.vectorize(label_mapping.get)(segmap)
+    segmap = np.copy(segmap_new).astype(np.int32)
+    del segmap_new
+    gc.collect()
+
+    hdul['SEGMAP'].data = segmap
+    hdul.writeto(os.path.join(FULLDIR_CATALOGS, SEGMAP_NAME), overwrite=True)
+
 
 print('CONSTRUCTING ASSOCIATION TABLE OF NEIGHBORS...')
 friends = find_friends(segmap)
@@ -189,7 +240,6 @@ if (KERNEL != 'None') & (USE_COMBINED_KRON_IMAGE):
         for PHOT_NICKNAME in KRON_COMBINED_BANDS[DET_NICKNAME.split('_')[0]]:
             ext=f'_{KERNEL}-matched'
             dir_weight = DIR_OUTPUT
-            print(DIR_OUTPUT)
             PHOTSCI_NAME = f'*{PHOT_NICKNAME}*_sci{SKYEXT}{ext}.fits'
             PHOTWHT_NAME = f'*{PHOT_NICKNAME}*_wht{ext}.fits'
             if IS_COMPRESSED:
@@ -230,6 +280,13 @@ if (KERNEL != 'None') & (USE_COMBINED_KRON_IMAGE):
 for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
     for use_kernel in ('None', KERNEL):
 
+        photcatalog_name = os.path.join(FULLDIR_CATALOGS, f'{PHOT_NICKNAME}_{DET_NICKNAME}_K{use_kernel}_PHOT_CATALOG.fits')
+        if not OVERWRITE and os.path.exists(photcatalog_name): 
+            print(f'{PHOT_NICKNAME}_{DET_NICKNAME}_K{use_kernel}_PHOT_CATALOG exists, ' 
+                  'I will not overwrite.\nCheck OVERWRITE param in config '
+                  'if this is not the desired effect.')
+            continue
+
         # areas = {}
         # stats = {}
 
@@ -237,16 +294,25 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
         if PHOT_NICKNAME != KRON_MATCH_BAND:
             skyext = SKYEXT #'_skysubvar'
             ext = ''
-            dir_weight = DIR_IMAGES
             if use_kernel != 'None':
                 ext=f'_{use_kernel}-matched'
                 dir_weight = DIR_OUTPUT
-            print(DIR_OUTPUT)
+                dir_images = DIR_OUTPUT
+            else:
+                dir_weight = DIR_IMAGES
+                
+                if SKYEXT == '':
+                    dir_images = DIR_IMAGES
+                else:
+                    dir_images = DIR_OUTPUT
+           
+
+            print(dir_images)
             PHOTSCI_NAME = f'*{PHOT_NICKNAME}*_sci{skyext}{ext}.fits*'
             PHOTWHT_NAME = f'*{PHOT_NICKNAME}*_wht{ext}.fits*'
 
             print(PHOTSCI_NAME)
-            PATH_PHOTSCI = glob.glob(os.path.join(DIR_OUTPUT, PHOTSCI_NAME))[0]
+            PATH_PHOTSCI = glob.glob(os.path.join(dir_images, PHOTSCI_NAME))[0]
             PATH_PHOTHEAD = PATH_PHOTSCI
             PATH_PHOTWHT = glob.glob(os.path.join(dir_weight, PHOTWHT_NAME))[0]
             PATH_PHOTMASK = 'None'
@@ -313,10 +379,12 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
         # Compute isophotal fluxes based on segmentation
         # if use_kernel == KERNEL:
         print(f"{PHOT_NICKNAME} :: MEASURING PHOTOMETRY in isophotal segments...")
-        isofluxes = compute_isofluxes(segmap.ravel().astype(np.int32), photsci.ravel().astype(np.float32))
-        isoerrors = compute_isofluxes(segmap.ravel().astype(np.int32), (photerr**2).ravel().astype(np.float32))
+        isofluxes = compute_isofluxes(segmap.ravel().astype(np.int32),
+                                      photsci.ravel().astype(np.float32))
+        isoerrors = compute_isofluxes(segmap.ravel().astype(np.int32), 
+                                      (photerr**2).ravel().astype(np.float32))
         catalog[f'FLUX_ISO'] = isofluxes * conv_flux(PHOT_ZPT)
-        catalog[f'FLUXERR_ISO'] = (isoerrors) * conv_flux(PHOT_ZPT)
+        catalog[f'FLUXERR_ISO'] = np.sqrt(isoerrors) * conv_flux(PHOT_ZPT)
 
         # Hack the x,y coords
         xphot,yphot = photwcs.wcs_world2pix(catalog['RA'], catalog['DEC'],1)
@@ -467,7 +535,7 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
 
         # WRITE OUT
         print(f'DONE. Writing out {PHOT_NICKNAME}-K{use_kernel} catalog.')
-        catalog.write(os.path.join(FULLDIR_CATALOGS, f'{PHOT_NICKNAME}_{DET_NICKNAME}_K{use_kernel}_PHOT_CATALOG.fits'), overwrite=True)
+        catalog.write(photcatalog_name, overwrite=True)
         del catalog
 
         if use_kernel==KERNEL:

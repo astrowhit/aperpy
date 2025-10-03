@@ -14,7 +14,8 @@ import sys
 PATH_CONFIG = sys.argv[1]
 sys.path.insert(0, PATH_CONFIG)
 
-from config import DIR_CATALOGS, DETECTION_GROUPS, DETECTION_IMAGES, DIRWHT_REPLACE, IS_COMPRESSED, WHT_REPLACE
+from config import DIR_CATALOGS, DETECTION_GROUPS, DETECTION_IMAGES,\
+    DIRWHT_REPLACE, IS_COMPRESSED, WHT_REPLACE, OVERWRITE
 
 # chi-mean, noise-equalized, stack
 def simple_chi_mean(bands, outname, science_fnames, weight_fnames, is_compressed=True):
@@ -50,6 +51,21 @@ def simple_chi_mean(bands, outname, science_fnames, weight_fnames, is_compressed
 
 # optimum average, so "noise equalized"
 def noise_equalized(bands, outname, science_fnames, weight_fnames, is_compressed=True):
+
+    avgout = f'{outname}_optavg.fits'
+    errout = f'{outname}_opterr.fits'
+    neqout = f'{outname}_noise-equal.fits'
+    if is_compressed:
+        avgout += '.gz'
+        errout += '.gz'
+        neqout += '.gz'
+
+    out_files = [avgout, errout, neqout]
+    if not OVERWRITE and all(os.path.exists(path) for path in out_files):
+        print('Noise-equalized detection image already exists, I will not remake.\n'
+              'Check OVERWRITE param in config if this is not the desired effect.')
+        return
+
     # SUM( X * WHT) / SUM(WHT)
     print(f'Building noise equalized image from {bands}')
     if np.isscalar(bands):
@@ -83,14 +99,6 @@ def noise_equalized(bands, outname, science_fnames, weight_fnames, is_compressed
     comb = optavg / opterr # signal / noise
     del top
     del bot
-
-    avgout = f'{outname}_optavg.fits'
-    errout = f'{outname}_opterr.fits'
-    neqout = f'{outname}_noise-equal.fits'
-    if is_compressed:
-        avgout += '.gz'
-        errout += '.gz'
-        neqout += '.gz'
 
     fits.PrimaryHDU(data=optavg.astype(np.float32), header=head).writeto(avgout, overwrite=True)
     del optavg
@@ -149,8 +157,10 @@ def scaled_chi_mean(bands, outname, science_fnames, weight_fnames, nreg=3, is_co
         chiout += '.gz'
         nout +='.gz'
 
-    if os.path.exists(chiout):
-        print('Chi-mean detection image already exists, I will not remake.')
+    out_files = [chiout, nout]
+    if not OVERWRITE and all(os.path.exists(path) for path in out_files):
+        print('Chi-mean detection image already exists, I will not remake.\n'
+              'Check OVERWRITE param in config if this is not the desired effect.')
         img=fits.getdata(chiout)
         n=fits.getdata(nout)
 
@@ -262,37 +272,37 @@ def scaled_chi_mean(bands, outname, science_fnames, weight_fnames, nreg=3, is_co
         fits.PrimaryHDU(data=img.astype(np.float32), header=head).writeto(chiout, overwrite=True)
         fits.PrimaryHDU(data=n, header=head).writeto(nout, overwrite=True)
 
-        # check results
-        m_stat = ~np.isnan(img)  
-        m_stat &= (n == np.max(n))
+    # check results
+    m_stat = ~np.isnan(img)  
+    m_stat &= (n == np.max(n))
 
-        fig1, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 4))
-        for ax in [ax1, ax2]:
-            hist1, bin_edges, _ = ax.hist(img[m_stat], bins=200,
-                        range=[-3,5], alpha=0.5,
-                        color='blue', histtype='bar', label='data')
-            bin_centers = (bin_edges[1:] + bin_edges[:-1])/2.
+    fig1, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 4))
+    for ax in [ax1, ax2]:
+        hist1, bin_edges, _ = ax.hist(img[m_stat], bins=200,
+                    range=[-3,5], alpha=0.5,
+                    color='blue', histtype='bar', label='data')
+        bin_centers = (bin_edges[1:] + bin_edges[:-1])/2.
 
-            # Fit the chi-mean distribution
-            model_dist = p_dist_chi_mean(amplitude=10E5, N=np.max(n))
-            model_dist.N.fixed = True
+        # Fit the chi-mean distribution
+        model_dist = p_dist_chi_mean(amplitude=10E5, N=np.max(n))
+        model_dist.N.fixed = True
 
-            ins_fit = LevMarLSQFitter()
-            m_fit = (bin_centers < 0.) & (bin_centers > -2.)
+        ins_fit = LevMarLSQFitter()
+        m_fit = (bin_centers < 0.) & (bin_centers > -2.)
 
-            fit_dist = ins_fit(model_dist, bin_centers[m_fit], hist1[m_fit])
+        fit_dist = ins_fit(model_dist, bin_centers[m_fit], hist1[m_fit])
 
-            ax.plot(bin_centers, fit_dist(bin_centers), label='model')
-            ax.plot(bin_centers, hist1 - fit_dist(bin_centers), label='data-model')
+        ax.plot(bin_centers, fit_dist(bin_centers), label='model')
+        ax.plot(bin_centers, hist1 - fit_dist(bin_centers), label='data-model')
 
-        ax1.legend()
-        ax1.set_xlim(-3, 3)
+    ax1.legend()
+    ax1.set_xlim(-3, 3)
 
-        ax2.set_ylim(1, 8E5)
-        ax2.set_xlim(-3, 9)
-        ax2.set_yscale('log')
-        fn_save = os.path.join(plotpath,'final_noise_regions.png')
-        fig1.savefig(fn_save)
+    ax2.set_ylim(1, 8E5)
+    ax2.set_xlim(-3, 9)
+    ax2.set_yscale('log')
+    fn_save = os.path.join(plotpath,'final_noise_regions.png')
+    fig1.savefig(fn_save)
 
 
 

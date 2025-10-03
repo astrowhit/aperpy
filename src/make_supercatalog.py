@@ -21,7 +21,7 @@ FULLDIR_CATALOGS = os.path.join(DIR_CATALOGS, f'{DET_NICKNAME}_{DET_TYPE}/{KERNE
 # First determine which set of photometry that object is going to get.
 # Begin by assuming smallest aperture
 straper = f'{np.min(PHOT_APER):2.2f}'.replace('.', '')
-RELEASE = Table.read(os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_D{straper}_CATALOG.fits"))
+RELEASE = Table.read(os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_D{straper}_CATALOG.fits"))
 use_aper = PHOT_APER[0] * np.ones(len(RELEASE))
 shrink_factor = BLEND_SHRINK_FACTOR
 
@@ -30,7 +30,7 @@ shrink_factor = BLEND_SHRINK_FACTOR
 # already, blended things have f_XXX set to color apertures and tot_corr = 1!
 for aper in np.sort(PHOT_APER):
     straper = f'{aper:2.2f}'.replace('.', '')
-    RELEASE = Table.read(os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_D{straper}_CATALOG.fits"))
+    RELEASE = Table.read(os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_D{straper}_CATALOG.fits"))
     is_blended = RELEASE['flag_kron'] != 0 # blended, or some other detection issue. Don't trust it.
     iso_aper = np.sqrt(RELEASE['iso_area'] / np.pi) * 2. #2.
     use_phot = RELEASE['use_phot'] == 1
@@ -40,7 +40,7 @@ for aper in np.sort(PHOT_APER):
 # Then loop over 
 for aper in PHOT_APER:
     straper = f'{aper:2.2f}'.replace('.', '')
-    CATALOG = Table.read(os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_D{straper}_CATALOG.fits"))
+    CATALOG = Table.read(os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_D{straper}_CATALOG.fits"))
     RELEASE[use_aper == aper] = CATALOG[use_aper == aper]
 
 # add column
@@ -58,7 +58,7 @@ for col in RELEASE.colnames:
 RELEASE.meta['APER_DIAM'] = 'ADAPTIVE'
 RELEASE.meta['SHRINK_FACTOR'] = str(BLEND_SHRINK_FACTOR)
 
-RELEASE.write(os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_SUPER_CATALOG.fits"), overwrite=True)
+RELEASE.write(os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_SUPER_CATALOG.fits"), overwrite=True)
     
 
 from regions import EllipseSkyRegion, Regions, CircleSkyRegion
@@ -96,7 +96,7 @@ for coord, obj in zip(detcoords, RELEASE):
         
 # regs = np.array(regs)
 bigreg = Regions(regs)
-bigreg.write(os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_SUPER_OBJECTS.reg"), overwrite=True, format='ds9')
+bigreg.write(os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_SUPER_OBJECTS.reg"), overwrite=True, format='ds9')
 
 print('BUILDING REGION FILE...')
 regs = []
@@ -124,7 +124,7 @@ for coord, obj in zip(detcoords, RELEASE):
         
 # regs = np.array(regs)
 bigreg = Regions(regs)
-bigreg.write(os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_SUPER_OBJECTS_AUTO.reg"), overwrite=True, format='ds9')
+bigreg.write(os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_SUPER_OBJECTS_AUTO.reg"), overwrite=True, format='ds9')
 
 
 print('BUILDING REGION FILE...')
@@ -142,7 +142,7 @@ for coord, obj in zip(detcoords, RELEASE):
         
 # regs = np.array(regs)
 bigreg = Regions(regs)
-bigreg.write(os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_ALL_OBJECTS.reg"), overwrite=True, format='ds9')
+bigreg.write(os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_ALL_OBJECTS.reg"), overwrite=True, format='ds9')
 
 print('BUILDING REGION FILE...')
 regs = []
@@ -156,4 +156,4 @@ for coord, obj in zip(detcoords, RELEASE):
         
 # regs = np.array(regs)
 bigreg = Regions(regs)
-bigreg.write(os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_v{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_STARS_OBJECTS.reg"), overwrite=True, format='ds9')
+bigreg.write(os.path.join(FULLDIR_CATALOGS, f"{PROJECT}_{VERSION}_{DET_NICKNAME.split('_')[0]}_K{KERNEL}_STARS_OBJECTS.reg"), overwrite=True, format='ds9')
