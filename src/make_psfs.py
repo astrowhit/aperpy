@@ -224,10 +224,16 @@ for i, pfilt in enumerate(use_filters[1:]):
     fr,fpf,fpt = plot_profile(filt_psf,target_psf)
     plt.plot(fr*PIXEL_SCALE, fpf/fpt)
     plt.ylim(0.95,1.05)
+
+    method = PSF_DICT['method'][pfilt]
+    pypher_r = PSF_DICT['pypher_r'][pfilt]
+    alpha = PSF_DICT['alpha'][pfilt]
+    beta = PSF_DICT['beta'][pfilt]
     if method == 'pypher':
         plt.title('pypher r={}'.format(pypher_r))
     elif method == 'photutils':
         plt.title('alpha={}, beta={}'.format(alpha,beta))
+
     plt.axvline(x=0.16,ls=':')
     plt.xlabel('radius arcsec')
     plt.ylabel('ee_psf_conv / ee_psf_target')

@@ -77,7 +77,7 @@ def fit_apercurve(stats, plotname=None, pixelscale=PIXEL_SCALE, stat_type=['ksnm
     p, pcov, s = {}, {}, {}
     for i, st in enumerate(stat_type):
         def func(N, a, b):
-            s = py[0, i]
+            s = py1[0, i]
             return s * a * N**b
         s[st] = py1[0, i]
         p[st], pcov[st] = curve_fit(func, N, py[:,i], p0=init)
@@ -89,7 +89,7 @@ def fit_apercurve(stats, plotname=None, pixelscale=PIXEL_SCALE, stat_type=['ksnm
         fig, ax = plt.subplots(figsize=(5, 5))
         for i, st in enumerate(stat_type):
             def func(N, a, b):
-                s = py[0, i]
+                s = py1[0, i]
                 return s * a * N**b
             ax.scatter(psizes, py[:,i])
 

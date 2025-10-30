@@ -690,32 +690,33 @@ maincat.add_column(Column(SEL_STAR.astype(int), name='star_flag'))
 
 
 # z-spec
-ztable = Table.read(ZSPEC)
-conf_constraint = np.ones(len(ztable), dtype=bool)
-if ZCONF is not None:
-    conf_constraint = np.isin(ztable[ZCONF[0]], np.array(ZCONF[1]))
-ztable = ztable[conf_constraint & (ztable[ZDEC] >= -90.) & (ztable[ZDEC] <= 90.)]
-zcoords = SkyCoord(ztable[ZRA]*u.deg, ztable[ZDEC]*u.deg)
-catcoords = SkyCoord(maincat['RA'], maincat['DEC'])
-idx, d2d, d3d = catcoords.match_to_catalog_sky(zcoords)
-max_sep = MAX_SEP
-sep_constraint = d2d < max_sep
-print(f'Matched to {np.sum(sep_constraint)} objects with spec-z')
+if ZSPEC is not None:
+    ztable = Table.read(ZSPEC)
+    conf_constraint = np.ones(len(ztable), dtype=bool)
+    if ZCONF is not None:
+        conf_constraint = np.isin(ztable[ZCONF[0]], np.array(ZCONF[1]))
+    ztable = ztable[conf_constraint & (ztable[ZDEC] >= -90.) & (ztable[ZDEC] <= 90.)]
+    zcoords = SkyCoord(ztable[ZRA]*u.deg, ztable[ZDEC]*u.deg)
+    catcoords = SkyCoord(maincat['RA'], maincat['DEC'])
+    idx, d2d, d3d = catcoords.match_to_catalog_sky(zcoords)
+    max_sep = MAX_SEP
+    sep_constraint = d2d < max_sep
+    print(f'Matched to {np.sum(sep_constraint)} objects with spec-z')
 
-maincat.add_column(Column(d2d.to(u.arcsec), name='z_spec_radius'))
-for colname in ztable.colnames:
-    filler = np.zeros(len(maincat), dtype=ztable[colname].dtype)
-    try:
-        np.nan * filler
-    except:
-        pass
-    filler[sep_constraint] = ztable[idx[sep_constraint]][colname]
-    if colname == ZCOL:
-        colname = 'z_spec'
-        filler[filler<=0] = np.nan
-    else:
-        colname = f'z_spec_{colname}'
-    maincat.add_column(Column(filler, name=colname))
+    maincat.add_column(Column(d2d.to(u.arcsec), name='z_spec_radius'))
+    for colname in ztable.colnames:
+        filler = np.zeros(len(maincat), dtype=ztable[colname].dtype)
+        try:
+            np.nan * filler
+        except:
+            pass
+        filler[sep_constraint] = ztable[idx[sep_constraint]][colname]
+        if colname == ZCOL:
+            colname = 'z_spec'
+            filler[filler<=0] = np.nan
+        else:
+            colname = f'z_spec_{colname}'
+        maincat.add_column(Column(filler, name=colname))
 
 # use flag (minimum SNR cut + not a star)
 use_phot = np.zeros(len(maincat)).astype(int)
