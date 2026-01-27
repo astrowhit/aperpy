@@ -40,8 +40,10 @@ TEMPLATES = sys.argv[5]
 ITERATE_ZP = eval(sys.argv[6])
 
 from config import DIR_CATALOGS, DETECTION_GROUPS, TRANSLATE_FNAME, TARGET_ZP, \
-                   FILTERS, MATCH_BAND, PROJECT, VERSION, OVERWRITE,\
-                   COVERAGE_USE, COV_NAME, COV_SEL_EAZY, EAZY_FLOOR
+                   FILTERS, MATCH_BAND, PROJECT, VERSION, OVERWRITE, \
+                   EAZY_FLOOR, COVERAGE_USE, COV_NAME, COV_SEL_EAZY, \
+                   SN_LIM_EAZY, SN_FILT_EAZY, COVERAGE2_USE, COV2_NAME, COV2_SEL_EAZY, \
+                   NBANDS_USE, NBANDS_NAME, NBANDS_SEL_EAZY, NBANDS_NLIM_EAZY
 
 DET_TYPE = DETECTION_GROUPS[DET_NICKNAME.split('_')[0]]['method']
 FULLDIR_CATALOGS = os.path.join(DIR_CATALOGS, f'{DET_NICKNAME}_{DET_TYPE}/{KERNEL}/')
@@ -159,7 +161,12 @@ if OVERWRITE or not os.path.exists(zout_name):
     comp_sel = ez.cat['use_phot']==1
     if COVERAGE_USE and COV_SEL_EAZY:
         comp_sel &= ez.cat[f'flag_{COV_NAME}_coverage'] == 1
-        comp_sel &= (ez.cat['f_f444w']/ez.cat['e_f444w']) > 5
+    if COVERAGE2_USE and COV2_SEL_EAZY:
+        comp_sel &= ez.cat[f'flag_{COV2_NAME}_coverage'] == 1
+    if NBANDS_USE and NBANDS_SEL_EAZY:
+        comp_sel &= (ez.cat[f'n_bands_{NBANDS_NAME}'] >= NBANDS_NLIM_EAZY)
+    comp_sel &= (ez.cat[f'f_{SN_FILT_EAZY}']/ez.cat[f'e_{SN_FILT_EAZY}']) > SN_LIM_EAZY
+
 
     ez.zphot_zspec(include_errors=False, zmax=6.5, selection=comp_sel)
     fig = plt.gcf()
@@ -176,11 +183,13 @@ else:
     ZSPEC = ezcat['z_spec']
 
     selection = pcat['use_phot']==1
-
     if COVERAGE_USE and COV_SEL_EAZY:
-        selection &= (pcat[f'flag_{COV_NAME}_coverage'] == 1)
-        selection &= ((pcat['f_f444w']/pcat['e_f444w']) > 5)
-        # selection &= (pcat['n_bands_mb'] >= 8)
+        selection &= pcat[f'flag_{COV_NAME}_coverage'] == 1
+    if COVERAGE2_USE and COV2_SEL_EAZY:
+        selection &= pcat[f'flag_{COV2_NAME}_coverage'] == 1
+    if NBANDS_USE and NBANDS_SEL_EAZY:
+        selection &= (pcat[f'n_bands_{NBANDS_NAME}'] >= NBANDS_NLIM_EAZY)
+    selection &= (pcat[f'f_{SN_FILT_EAZY}']/pcat[f'e_{SN_FILT_EAZY}']) > SN_LIM_EAZY
     
     fig = eazy.utils.zphot_zspec(zbest, ZSPEC, 
                         zlimits=None, 

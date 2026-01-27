@@ -304,7 +304,7 @@ def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,
                threshold_min = -0.5, threshold_max = 10, threshold_mode=[-0.2,0.2], shift_lim=2, zp=28.9, instars=None,
                showme=True, label='', outdir='./', plotdir='./'):
 
-    filt=re.search('f[0-9][0-9][0-9][a-z]*[-_]',filename).group()[:-1]
+    filt=re.search('[Ff][0-9][0-9][0-9][a-z]*[-_]',filename).group()[:-1]
     print(filt)
 
     img, hdr = fits.getdata(filename, header=True)
@@ -620,6 +620,7 @@ class PSF():
         for i in np.arange(len(data)): data[i] = data[i]/norm[i]
 
         stack, lo, hi, clipped = sigma_clip_3d(data,sigma=sigma,axis=0,maxiters=maxiters)
+
         self.clipped = clipped
        # self.clipped[~np.isfinite(self.clipped)] = 0
 
@@ -1042,10 +1043,10 @@ def renorm_psf(psfmodel, filt, fov=4.04, pixscl=0.04):
 
     # Encircled energy for WFC3 IR within 2" radius, ACS Optical, and UVIS from HST docs
     encircled = {}
-    encircled['F200LP'] = 0.985
-    encircled['F225W'] = 0.993
-    encircled['F275W'] = 0.984
-    encircled['F336W'] = 0.9905
+    encircled['F200LPU'] = 0.985
+    encircled['F225WU'] = 0.993
+    encircled['F275WU'] = 0.984
+    encircled['F336WU'] = 0.9905
     encircled['F350LPU'] = 0.98036
     encircled['F390WU'] = 0.98865
     encircled['F435W'] = 0.979

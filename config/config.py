@@ -148,6 +148,7 @@ PSF_DICT = {
     'sigma':{}, # standard deviation for sigma-clipping
     'npeaks':{}, # number of peaks to retain in star finding step
     'aper_scale':{}, # multiplicative factor for scaling default aperture size
+    'radii':{}, # manually set aperture sizes, will ignore aper_scale if set
 
     # PSF homogenization
     'method':{}, # method used to homogenize PSF ('pypher' or 'phoutils')
@@ -171,8 +172,8 @@ for filt in FILTERS:
     PSF_DICT['aper_scale'][filt] = 0.04/PIXEL_SCALE
 
     PSF_DICT['method'][filt] = 'pypher'
-    PSF_DICT['pypher_r'][filt] = 3e-3
-    PSF_DICT['oversample'][filt] = 3
+    PSF_DICT['pypher_r'][filt] = 1e-4
+    PSF_DICT['oversample'][filt] = 1
     PSF_DICT['alpha'][filt] = 0.1
     PSF_DICT['beta'][filt] = 0.15
 
@@ -183,6 +184,8 @@ ITERATE_ZP = False
 EAZY_FLOOR = False
 TEMPLATE_SETS = ('fsps_full', 'sfhz')
 EAZY_APERS = ['SUPER', 0.32] #Catalogs to run eazy on
+SN_LIM_EAZY = 5
+SN_FILT_EAZY = 'f444w'
 
 ### AREA CALCULATIONS
 FNAME = glob.glob(f'{DIR_IMAGES}*{LW_FILTERS[-1].lower()}*sci.fits*')[0]
@@ -231,17 +234,32 @@ FN_EXTERNALSTARS = 'path/to/external/files/star_catalog.fits' # includes ra and 
 EXTERNALSTARS_XMATCH_RADIUS = 0.7*u.arcsec
 
 # COVERAGE FLAGS (flag sources with no coverage in certain bands)
-COVERAGE_USE = False
-COV_FILTS = ['f435w','f606w']
+COVERAGE_USE = True
+COV_FILTS = [f.lower() for f in WEBB_FILTERS]
 COV_APERSIZE = 0.7
-COV_NAME = 'acs'
-COV_SEL_EAZY = False # apply coverage selection to eazy plots
+COV_NBAND = 1 # required number of bands with coverage to have flag=0
+COV_NAME = 'jwst'
+COV_SEL_EAZY = True
+COV_USE_PHOT = True # include coverage flag in use_phot conditions
+
+# COVERAGE FLAGS (flag sources with no coverage in certain bands)
+COVERAGE2_USE = True
+COV2_FILTS = ['f435w','f606w']
+COV2_APERSIZE = 0.7
+COV2_NBAND = 2 # required number of bands with coverage to have flag=0
+COV2_NAME = 'acs'
+COV2_SEL_EAZY = True
+COV2_USE_PHOT = True # include coverage flag in use_phot conditions
 
 # NUMBER OF BANDS (can choose to use specific bands; e.g. medium bands, etc.)
 NBANDS_USE = True
 NBANDS_APERSIZE = 0.7
-NBANDS_FILTS = SW_FILTERS # Set to None to use all bands
+# Set to None to use all bands
+NBANDS_FILTS = [filt.lower() for filt in SW_FILTERS]
 NBANDS_NAME = 'NIRCAM_SW'
+NBANDS_SEL_EAZY = True
+NBANDS_NLIM_EAZY = 4
+
 
 # BADWHT (useful for bad regions of the images)
 BADWHT_USE = True 
@@ -267,6 +285,11 @@ BP_FLUXRATIO_RANGE = (0, 1.1)
 BP_FILT = {'LW':'f444w'}
 BP_MAGLIMIT = 26.
 BP_APERSIZE = 0.7
+
+### SNR-selected BAD PIXELS
+BP2_USE = True
+BP2_SN_LIMIT = 3
+BP2_APERSIZE = 0.2
 
 ### ARTIFACTS NEAR BAD PIXELS, EDGES
 ANBP_USE = True

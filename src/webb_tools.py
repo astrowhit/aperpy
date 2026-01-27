@@ -878,6 +878,7 @@ def crossmatch(cat1, cat2, thresh=[1*u.arcsec,], verbose=1, plot=False, col1=Non
         ax[1].axvline(0, ls='dotted', c='k')
         ax[1].axhline(0, ls='dotted', c='k')
         ax[1].set(xlim=(-pthresh, pthresh), ylim=(-pthresh, pthresh), xlabel='arcsec')
+        plt.close()
 
 
     idx1 = np.arange(len(cat1))

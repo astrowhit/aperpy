@@ -43,7 +43,7 @@ PROJECT = 'MINERVA-UDS'
 SURVEY = PROJECT.split('-')[0]
 FIELD = PROJECT.split('-')[1]
 REDUCTION = 'grizli'
-VERSION = 'n2.2_m2.0_v1.0'
+VERSION = 'n3.0_v1.2'
 DRIVE = f'/Volumes/SanDisk3/{SURVEY}/'
 WORKING_DIR = f'{DRIVE}{FIELD}/{VERSION}'
 DIR_IMAGES = os.path.join(WORKING_DIR, 'external/')
@@ -67,6 +67,11 @@ BLOCK_WHT_REPLACE = ('sci', 'wht')
 WHT_REPLACE = ('sci', 'wht')
 DIRWHT_REPLACE = (DIR_OUTPUT, DIR_IMAGES)
 DIR_SFD = '~/sfddata-master'
+# ZSPEC = '/Users/secutler/Documents/MINERVA/uds/uds_dja_nirspec_graded_v4.2.csv'
+# ZCOL= 'z'
+# ZRA = 'ra'
+# ZDEC = 'dec'
+# ZCONF = 'grade', 3
 ZSPEC = f'/Users/secutler/Documents/{SURVEY}/{FIELD.lower()}/{FIELD.lower()}_zspec.fits'
 ZCOL= 'z'
 ZRA = 'ra'
@@ -136,8 +141,8 @@ for group in DETECTION_GROUPS:
 ID_FLOOR = 1000000 # value to add to all IDs
 # zero if you want to leave them untouched, will not work with XCAT below
 ### CROSSMATCH to old ID versions
-XCAT_FILENAMES_MAIN = {'ACS+WEBB': f'{DRIVE}/{FIELD}/n2.1_m2.0_v1.0/catalogs/ACS+WEBB_chi-mean/f444w/MINERVA-UDS_n2.1_m2.0_v1.0_ACS+WEBB_Kf444w_SUPER_CATALOG.fits',
-                       'LW': f'{DRIVE}/{FIELD}/n2.1_m2.0_v1.0/catalogs/LW_f277w-f356w-f444w_noise-equal/f444w/MINERVA-UDS_n2.1_m2.0_v1.0_LW_Kf444w_SUPER_CATALOG.fits'}
+XCAT_FILENAMES_MAIN = {'ACS+WEBB': f'{DRIVE}/{FIELD}/n2.2_m2.0_v1.0/catalogs/ACS+WEBB_chi-mean/f444w/MINERVA-UDS_n2.2_m2.0_v1.0_ACS+WEBB_Kf444w_SUPER_CATALOG.fits',
+                       'LW': f'{DRIVE}/{FIELD}/n2.2_m2.0_v1.0/catalogs/LW_f277w-f356w-f444w_noise-equal/f444w/MINERVA-UDS_n2.2_m2.0_v1.0_LW_Kf444w_SUPER_CATALOG.fits'}
 XCAT_NAME_MAIN = 'id' # column to include, name to use
 XCAT_RAD_MAIN = 0.08
 
@@ -161,6 +166,7 @@ PSF_DICT = {
     'sigma':{}, # standard deviation for sigma-clipping
     'npeaks':{}, # number of peaks to retain in star finding step
     'aper_scale':{}, # multiplicative factor for scaling default aperture size
+    'radii':{}, # manually set aperture sizes, will ignore aper_scale if set
 
     # PSF homogenization
     'method':{}, # method used to homogenize PSF ('pypher' or 'phoutils')
@@ -191,18 +197,35 @@ for filt in FILTERS:
     if filt == 'f606w':
         PSF_DICT['npeaks'][filt] = 2000
 
+    if filt == 'f336wu':
+        PSF_DICT['mag_lim'][filt] = 26
+        PSF_DICT['range'][filt] = [0,2]
+        PSF_DICT['radii'][filt] = [0.5,1,4,8,10]
+        PSF_DICT['sigma'][filt] = 2.5
+
+    if filt == 'f275wu':
+        PSF_DICT['mag_lim'][filt] = 26
+        PSF_DICT['range'][filt] = [1.5,3]
+        PSF_DICT['radii'][filt] = [0.5,1.,1.5,2.,4.]
+        PSF_DICT['sigma'][filt] = 2.5
+
     PSF_DICT['method'][filt] = 'pypher'
-    PSF_DICT['pypher_r'][filt] = 3e-3
-    PSF_DICT['oversample'][filt] = 3
-    PSF_DICT['alpha'][filt] = 0.1
-    PSF_DICT['beta'][filt] = 0.15
+    if filt.upper() in FILTERS_WFC or filt in ['f430m', 'f460m', 'f480m']:
+        PSF_DICT['pypher_r'][filt] = 3e-5
+    else:
+        PSF_DICT['pypher_r'][filt] = 1e-4
+    PSF_DICT['oversample'][filt] = 1
+    PSF_DICT['alpha'][filt] = 0.2
+    PSF_DICT['beta'][filt] = 0.59
 
 ### PHOTOZ
 TRANSLATE_FNAME = f'/Users/secutler/Documents/{SURVEY}/{FIELD.lower()}/{VERSION}/{SURVEY.lower()}_{FIELD.lower()}_{VERSION[:4]}.translate'
 ITERATE_ZP = True
 EAZY_FLOOR = False
-TEMPLATE_SETS = ['larson','sfhz_blue_agn','sfhz']
-EAZY_APERS = ['SUPER',0.32,0.20]
+TEMPLATE_SETS = ['larson', 'sfhz_blue_agn']#['larson','sfhz_blue_agn','sfhz']
+EAZY_APERS = ['SUPER']#['SUPER',0.32,0.20]
+SN_LIM_EAZY = 5 # S/N cutoff for comparing EAzY photo-z to spec-z
+SN_FILT_EAZY = 'f444w' # filter to check for S/N cutoff
 
 
 ### AREA CALCULATIONS
@@ -253,10 +276,21 @@ EXTERNALSTARS_XMATCH_RADIUS = 1*u.arcsec
 
 # COVERAGE FLAGS (flag sources with no coverage in certain bands)
 COVERAGE_USE = True
-COV_FILTS = ['f435w','f606w']
+COV_FILTS = [f.lower() for f in WEBB_FILTERS]
 COV_APERSIZE = 0.7
-COV_NAME = 'acs'
+COV_NBAND = 1 # required number of bands with coverage to have flag=0
+COV_NAME = 'jwst'
 COV_SEL_EAZY = True
+COV_USE_PHOT = True # include coverage flag in use_phot conditions
+
+# COVERAGE FLAGS (flag sources with no coverage in certain bands)
+COVERAGE2_USE = True
+COV2_FILTS = ['f435w','f606w']
+COV2_APERSIZE = 0.7
+COV2_NBAND = 2 # required number of bands with coverage to have flag=0
+COV2_NAME = 'acs'
+COV2_SEL_EAZY = True
+COV2_USE_PHOT = True # include coverage flag in use_phot conditions
 
 # NUMBER OF BANDS (can choose to use specific bands; e.g. medium bands, etc.)
 NBANDS_USE = True
@@ -265,6 +299,8 @@ NBANDS_APERSIZE = 0.7
 NBANDS_FILTS = ['F140M','F162M','F182M','F210M',
                 'F250M','F300M','F335M','F360M','F430M','F460M','F480M'] 
 NBANDS_NAME = 'MB'
+NBANDS_SEL_EAZY = True
+NBANDS_NLIM_EAZY = 8
 
 # BADWHT
 BADWHT_USE = True
@@ -290,6 +326,11 @@ BP_FLUXRATIO_RANGE = (0, 1.1)
 BP_FILT = {'LW':'f444w','ACS+WEBB':'f444w'}
 BP_MAGLIMIT = 26.
 BP_APERSIZE = 0.7
+
+### SNR-selected BAD PIXELS
+BP2_USE = True
+BP2_SN_LIMIT = 3
+BP2_APERSIZE = 0.2
 
 ### ARTIFACTS NEAR BAD PIXELS, EDGES (e.g. saturated star segments)
 ANBP_USE = True

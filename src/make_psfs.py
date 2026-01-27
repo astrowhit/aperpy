@@ -41,6 +41,7 @@ hdr = fits.getheader(filename)
 
 ### Make ePSFs
 use_filters = [MATCH_BAND] + [f for f in FILTERS if f != MATCH_BAND]
+
 for pfilt in use_filters:
 
     psfname = os.path.join(DIR_PSFS, f'{pfilt}_psf.fits')
@@ -75,8 +76,10 @@ for pfilt in use_filters:
     sigma = PSF_DICT['sigma'][pfilt]
     npeaks = PSF_DICT['npeaks'][pfilt]
     aper_scale = PSF_DICT['aper_scale'][pfilt]
-
-    radii=np.array([0.5,1.,2.,4.,7.5]) * aper_scale
+    try:
+        radii = PSF_DICT['radii'][pfilt]
+    except:
+        radii = np.array([0.5,1.,2.,4.,7.5]) * aper_scale
     print(f"apertures={radii}")
 
     showme = False
@@ -114,7 +117,7 @@ for pfilt in use_filters:
     for plot in plots:
         os.rename(plot,plot.replace(outdir,plotdir))
     
-    
+
 ### Make matching kernels
 for pfilt in use_filters:
     if pfilt == MATCH_BAND:
@@ -159,7 +162,7 @@ for pfilt in use_filters:
         os.remove(DIR_KERNELS+'kernel_a_to_b.log')
 
     elif method == 'photutils':
-        window = SplitCosineBellWindow(alpha=alpha,beta=beta)
+        window = SplitCosineBellWindow(alpha=alpha, beta=beta)
         kernel =  create_matching_kernel(filt_psf, target_psf, window=window)
     
     else:
@@ -182,7 +185,6 @@ target_psf /= target_psf.sum()
 
 print(f'Plotting kernel checkfile...')
 for i, pfilt in enumerate(use_filters[1:]):
-    # if pfilt.upper() not in ('F444W','F410M'): continue
 
     print(DIR_PSFS)
     print(pfilt.lower())

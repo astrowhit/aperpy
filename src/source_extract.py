@@ -102,6 +102,7 @@ kerneldict['factor']=1
 
 kernel = np.array(kernel_func(**kerneldict))
 sep.set_extract_pixstack(10000000) # big image...
+sep.set_sub_object_limit(10000)
 del DETECTION_PARAMS['kernelfwhm']
 if 'kerneltype' in DETECTION_PARAMS.keys():
     del DETECTION_PARAMS['kerneltype']
@@ -136,14 +137,14 @@ detcoords = detwcs.pixel_to_world(catalog['x'], catalog['y'])
 catalog['RA'] = [c.ra for c in detcoords]
 catalog['DEC'] = [c.dec for c in detcoords]
 
-XCAT_FILENAMES_MAIN = XCAT_FILENAMES_MAIN[DET_NICKNAME.split('_')[0]]
-
 if XCAT_FILENAMES_MAIN is None and ID_FLOOR <= 0:
     os.rename(os.path.join(FULLDIR_CATALOGS, SEGMAP_NAME_ORIG), 
               os.path.join(FULLDIR_CATALOGS, SEGMAP_NAME))
 
 else:
     if XCAT_FILENAMES_MAIN is not None:
+        XCAT_FILENAMES_MAIN = XCAT_FILENAMES_MAIN[DET_NICKNAME.split('_')[0]]
+
         cat_match = Table.read(XCAT_FILENAMES_MAIN)
         _,_,idx1,idx2 = crossmatch(catalog, cat_match, 
                                 thresh=[XCAT_RAD_MAIN*u.arcsec],

@@ -50,7 +50,7 @@ def simple_chi_mean(bands, outname, science_fnames, weight_fnames, is_compressed
     fits.PrimaryHDU(data=img.astype(np.float32), header=head).writeto(chiout, overwrite=True)
 
 # optimum average, so "noise equalized"
-def noise_equalized(bands, outname, science_fnames, weight_fnames, is_compressed=True):
+def noise_equalized(bands, outname, science_fnames, weight_fnames, is_compressed=True, overwrite=False):
 
     avgout = f'{outname}_optavg.fits'
     errout = f'{outname}_opterr.fits'
@@ -61,7 +61,7 @@ def noise_equalized(bands, outname, science_fnames, weight_fnames, is_compressed
         neqout += '.gz'
 
     out_files = [avgout, errout, neqout]
-    if not OVERWRITE and all(os.path.exists(path) for path in out_files):
+    if not overwrite and all(os.path.exists(path) for path in out_files):
         print('Noise-equalized detection image already exists, I will not remake.\n'
               'Check OVERWRITE param in config if this is not the desired effect.')
         return
@@ -146,7 +146,7 @@ def p_dist_chi_mean(x, amplitude=1, N=6):
             np.exp(- 0.5 * g) * (g)**(N/2. - 1.)
 
 
-def scaled_chi_mean(bands, outname, science_fnames, weight_fnames, nreg=3, is_compressed=True, save_reg=False):
+def scaled_chi_mean(bands, outname, science_fnames, weight_fnames, nreg=3, is_compressed=True, save_reg=False, overwrite=False):
     plotpath = os.path.join(outpath, 'detection_figures/')
     if not os.path.exists(plotpath):
         os.mkdir(plotpath)
@@ -158,7 +158,7 @@ def scaled_chi_mean(bands, outname, science_fnames, weight_fnames, nreg=3, is_co
         nout +='.gz'
 
     out_files = [chiout, nout]
-    if not OVERWRITE and all(os.path.exists(path) for path in out_files):
+    if not overwrite and all(os.path.exists(path) for path in out_files):
         print('Chi-mean detection image already exists, I will not remake.\n'
               'Check OVERWRITE param in config if this is not the desired effect.')
         img=fits.getdata(chiout)
@@ -324,7 +324,8 @@ if __name__ == "__main__":
         noise_equalized(bands, os.path.join(outpath, f'{DET_NICKNAME}'),
                         science_fnames= science_fnames,
                         weight_fnames= weight_fnames, 
-                        is_compressed=IS_COMPRESSED)
+                        is_compressed=IS_COMPRESSED,
+                        overwrite=OVERWRITE)
         
     elif DET_TYPE == 'chi-mean':
         if 'n_regions' not in DETECTION_GROUPS[DET_NICKNAME.split('_')[0]].keys():
@@ -334,7 +335,8 @@ if __name__ == "__main__":
         scaled_chi_mean(bands, os.path.join(outpath, f'{DET_NICKNAME}'),
                         science_fnames= science_fnames,
                         weight_fnames= weight_fnames,
-                        nreg= nreg, is_compressed=IS_COMPRESSED)
+                        nreg= nreg, is_compressed=IS_COMPRESSED,
+                        overwrite=OVERWRITE)
 
     else:
         sys.exit('Other detecton choices are deprecated! Edit code at your own risk...')

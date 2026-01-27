@@ -21,16 +21,17 @@ from config import FILTERS, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, DIR_OUTPUT,\
     MAX_SEP, SCI_APER, MAKE_SCIREADY_ALL, TARGET_ZP, ZCONF, ZRA, ZDEC, ZCOL, FLUX_UNIT, \
     PS_WEBB_FLUXRATIO, PS_WEBB_FLUXRATIO_RANGE, PS_WEBB_FILT, PS_WEBB_MAGLIMIT, PS_WEBB_APERSIZE, \
     PS_HST_FLUXRATIO, PS_HST_FLUXRATIO_RANGE, PS_HST_FILT, PS_HST_MAGLIMIT, PS_HST_APERSIZE, \
-    BP_FLUXRATIO, BP_FLUXRATIO_RANGE, BP_FILT, BP_MAGLIMIT, BP_APERSIZE, RA_RANGE, DEC_RANGE, \
+    RA_RANGE, DEC_RANGE, BP_FLUXRATIO, BP_FLUXRATIO_RANGE, BP_FILT, BP_MAGLIMIT, BP_APERSIZE, \
     GAIA_ROW_LIMIT, GAIA_XMATCH_RADIUS, FN_BADWHT, SATURATEDSTAR_MAGLIMIT, SATURATEDSTAR_FILT, \
-    FN_EXTRABAD, EXTRABAD_XMATCH_RADIUS, EXTRABAD_LABEL, PATH_BADOBJECT, \
+    FN_EXTRABAD, EXTRABAD_XMATCH_RADIUS, EXTRABAD_LABEL, PATH_BADOBJECT, BP2_SN_LIMIT, BP2_APERSIZE, \
     SATURATEDSTAR_APERSIZE, PS_WEBB_USE, PS_HST_USE, GAIA_USE, BADWHT_USE, EXTRABAD_USE, \
-    BP_USE, BADOBJECT_USE, PHOT_USEMASK, PROJECT, VERSION, USE_COMBINED_KRON_IMAGE, KRON_COMBINED_BANDS, \
+    BP_USE, BP2_USE, BADOBJECT_USE, PHOT_USEMASK, PROJECT, VERSION, USE_COMBINED_KRON_IMAGE, KRON_COMBINED_BANDS, \
     XCAT_FILENAME, XCAT_NAME, XCAT2_FILENAME, XCAT2_NAME, XCAT3_FILENAME, XCAT3_NAME, \
     ANBP_USE, ANBP_XMATCH_RADIUS, IS_COMPRESSED, ANBP_MIN_NPIX, ANBP_MAX_NPIX, \
     PSF_REF_NAME, EXTERNALSTARS_USE, FN_EXTERNALSTARS, EXTERNALSTARS_XMATCH_RADIUS, REGMASK_USE, FN_REGMASK, \
     AUTOSTAR_USE, AUTOSTAR_BANDS, AUTOSTAR_XMATCH_RADIUS, AUTOSTAR_NFILT, XCAT_RAD, XCAT2_RAD, XCAT3_RAD, \
-    USE_EXPTIME, COVERAGE_USE, COV_FILTS, COV_APERSIZE, COV_NAME, DETECTION_GROUPS, \
+    USE_EXPTIME, DETECTION_GROUPS, COVERAGE_USE, COV_FILTS, COV_APERSIZE, COV_NBAND, COV_NAME, COV_USE_PHOT, \
+    COVERAGE2_USE, COV2_FILTS, COV2_APERSIZE, COV2_NBAND, COV2_NAME, COV2_USE_PHOT, \
     NBANDS_USE, NBANDS_APERSIZE, NBANDS_FILTS, NBANDS_NAME
 
 
@@ -359,14 +360,14 @@ if APPLY_MWDUST is not None:
     print('Building directory of pivot wavelengths')
     for filter in FILTERS:
         for tryfilt in tr.trans:
-            if 'F' not in tr.trans[tryfilt]: 
+            if 'F' not in tr.trans[tryfilt]:
                 continue
             if tryfilt.endswith(filter):
                 num = int(tr.trans[tryfilt][1:])
                 filter_pwav[filter] = res[num].pivot
                 print(filter, tryfilt, filter_pwav[filter])
                 break
-
+    
     atten_mag = extinction.fm07(np.array(list(filter_pwav.values())), Av) # atten_mag in magnitudes from Fitzpatrick + Massa 2007
     atten_factor = 10** (-0.4 * atten_mag) # corresponds in order to FILTERS
     for i, filter in enumerate(FILTERS):
@@ -523,13 +524,26 @@ SEL_GEN = SEL_LOWSNR | SEL_STAR
 if ANBP_USE:
     SEL_GEN |= SEL_ANBP
 
-# coverage flag for chosen filters
+# coverage flags for chosen filters
 if COVERAGE_USE:
     str_aper = str(COV_APERSIZE).replace('.', '_')
-    SEL_COV = np.ones(len(maincat), dtype=bool)
+    N_COV = np.zeros(len(maincat), dtype=int)
     for filt in COV_FILTS:
-        SEL_COV &= np.isfinite(maincat[f'{filt}_FLUX_APER{str_aper}'])
+        N_COV += np.isfinite(maincat[f'{filt}_FLUX_APER{str_aper}']).astype(int)
+    SEL_COV = (N_COV >= COV_NBAND)
     maincat.add_column(Column(SEL_COV.astype(int), name=f'{COV_NAME}_coverage_flag'))
+    if COV_USE_PHOT:
+        SEL_GEN |= SEL_COV
+
+if COVERAGE2_USE:
+    str_aper = str(COV2_APERSIZE).replace('.', '_')
+    N_COV2 = np.zeros(len(maincat), dtype=int)
+    for filt in COV2_FILTS:
+        N_COV2 += np.isfinite(maincat[f'{filt}_FLUX_APER{str_aper}']).astype(int)
+    SEL_COV2 = (N_COV2 >= COV2_NBAND)
+    maincat.add_column(Column(SEL_COV2.astype(int), name=f'{COV2_NAME}_coverage_flag'))
+    if COV2_USE_PHOT:
+        SEL_GEN |= SEL_COV2
 
 # report number of bands for chosen filters
 if NBANDS_USE:
@@ -541,10 +555,13 @@ if NBANDS_USE:
     else:
         NBANDS_NAME = f'_{NBANDS_NAME}'
     for filt in NBANDS_FILTS:
-        NBANDS += np.isfinite(maincat[f'{filt.lower()}_FLUX_APER{str_aper}']).astype(int)
+        try:
+            NBANDS += np.isfinite(maincat[f'{filt.lower()}_FLUX_APER{str_aper}']).astype(int)
+        except KeyError:
+            continue
     maincat.add_column(Column(NBANDS.astype(int), name=f'n_bands{NBANDS_NAME.lower()}'))
 
-# bad pixel flag
+# LW bad pixel flag
 if BP_USE:
     str_aper = str(BP_APERSIZE).replace('.', '_')
     BP_FILT_SEL = BP_FILT[DET_NICKNAME.split('_')[0]]
@@ -554,11 +571,25 @@ if BP_USE:
                     / maincat_unmatched[f'{BP_FILT_SEL}_FLUX_APER{str(BP_FLUXRATIO[1]).replace(".", "_")}']
     SEL_LWBADPIXEL = (size_bp > BP_FLUXRATIO_RANGE[0]) & (size_bp < BP_FLUXRATIO_RANGE[1])
     SEL_LWBADPIXEL &= (mag_bp < BP_MAGLIMIT)
-    print(f'Flagged {np.sum(SEL_LWBADPIXEL)} objects as bad pixels')
+    print(f'Flagged {np.sum(SEL_LWBADPIXEL)} objects as bad pixels vis flux ratios')
     maincat.add_column(Column(SEL_LWBADPIXEL.astype(int), name='bad_pixel_lw_flag'))
     maincat['combined_artifact_flag'][SEL_LWBADPIXEL] = 1
     # SEL_BADPIX = SEL_LWBADPIXEL | SEL_BADWHT
     SEL_GEN |= SEL_LWBADPIXEL
+
+# SNR bad pixel flag
+if BP2_USE:
+    str_aper = str(BP2_APERSIZE).replace('.', '_')
+    N_SNLIM = np.zeros(len(maincat), dtype=int)
+    for bpfilt in FILTERS:
+        snr_bp = maincat[f'{BP_FILT_SEL}_FLUX_APER{str_aper}'] / \
+                 maincat[f'{BP_FILT_SEL}_FLUXERR_APER{str_aper}'] 
+        N_SNLIM += (snr_bp > BP2_SN_LIMIT).astype(int)
+    SEL_SNBADPIXEL = (N_SNLIM == 1)
+    print(f'Flagged {np.sum(SEL_SNBADPIXEL)} objects as bad pixels via S/N')
+    maincat.add_column(Column(SEL_SNBADPIXEL.astype(int), name='bad_pixel_snr_flag'))
+    maincat['combined_artifact_flag'][SEL_SNBADPIXEL] = 1
+    SEL_GEN |= SEL_SNBADPIXEL
 
 # diagnostic plot
 if PS_WEBB_USE or PS_HST_USE or BP_USE:
@@ -820,6 +851,8 @@ for apersize in PHOT_APER:
             cols['extrabad_flag'] = 'flag_nearbcg'
         if COVERAGE_USE:
             cols[f'{COV_NAME}_coverage_flag'] = f'flag_{COV_NAME}_coverage'
+        if COVERAGE2_USE:
+            cols[f'{COV2_NAME}_coverage_flag'] = f'flag_{COV2_NAME}_coverage'
         if NBANDS_USE:
             cols[f'n_bands{NBANDS_NAME.lower()}'] = f'n_bands{NBANDS_NAME.lower()}'
 
