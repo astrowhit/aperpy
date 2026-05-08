@@ -43,7 +43,8 @@ from config import DIR_CATALOGS, DETECTION_GROUPS, TRANSLATE_FNAME, TARGET_ZP, \
                    FILTERS, MATCH_BAND, PROJECT, VERSION, OVERWRITE, \
                    EAZY_FLOOR, COVERAGE_USE, COV_NAME, COV_SEL_EAZY, \
                    SN_LIM_EAZY, SN_FILT_EAZY, COVERAGE2_USE, COV2_NAME, COV2_SEL_EAZY, \
-                   NBANDS_USE, NBANDS_NAME, NBANDS_SEL_EAZY, NBANDS_NLIM_EAZY
+                   NBANDS_USE, NBANDS_NAME, NBANDS_SEL_EAZY, NBANDS_NLIM_EAZY, \
+                   NBANDS2_USE, NBANDS2_NAME, NBANDS2_SEL_EAZY, NBANDS2_NLIM_EAZY
 
 DET_TYPE = DETECTION_GROUPS[DET_NICKNAME.split('_')[0]]['method']
 FULLDIR_CATALOGS = os.path.join(DIR_CATALOGS, f'{DET_NICKNAME}_{DET_TYPE}/{KERNEL}/')
@@ -160,15 +161,19 @@ if OVERWRITE or not os.path.exists(zout_name):
 
     comp_sel = ez.cat['use_phot']==1
     if COVERAGE_USE and COV_SEL_EAZY:
-        comp_sel &= ez.cat[f'flag_{COV_NAME}_coverage'] == 1
+        comp_sel &= ez.cat[f'flag_{COV_NAME.lower()}_coverage'] == 1
     if COVERAGE2_USE and COV2_SEL_EAZY:
-        comp_sel &= ez.cat[f'flag_{COV2_NAME}_coverage'] == 1
+        comp_sel &= ez.cat[f'flag_{COV2_NAME.lower()}_coverage'] == 1
     if NBANDS_USE and NBANDS_SEL_EAZY:
-        comp_sel &= (ez.cat[f'n_bands_{NBANDS_NAME}'] >= NBANDS_NLIM_EAZY)
-    comp_sel &= (ez.cat[f'f_{SN_FILT_EAZY}']/ez.cat[f'e_{SN_FILT_EAZY}']) > SN_LIM_EAZY
+        comp_sel &= (ez.cat[f'n_bands_{NBANDS_NAME.lower()}'] >= NBANDS_NLIM_EAZY)
+    if NBANDS2_USE and NBANDS2_SEL_EAZY:
+        comp_sel &= (ez.cat[f'n_bands_{NBANDS2_NAME.lower()}'] >= NBANDS2_NLIM_EAZY)
+    if SN_FILT_EAZY.lower() != 'kron':
+        comp_sel &= (ez.cat[f'f_{SN_FILT_EAZY}']/ez.cat[f'e_{SN_FILT_EAZY}']) > SN_LIM_EAZY
+    else:
+        comp_sel &= (ez.cat[f'faper_{SN_FILT_EAZY.upper()}']/ez.cat[f'eaper_{SN_FILT_EAZY.upper()}']) > SN_LIM_EAZY
 
-
-    ez.zphot_zspec(include_errors=False, zmax=6.5, selection=comp_sel)
+    ez.zphot_zspec(include_errors=False, zmax=10.5, selection=comp_sel)
     fig = plt.gcf()
     fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{PROJECT}_{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_{nickname}_{is_zpiter}CATALOG_{TEMPLATES}.photoz-specz.pdf'))
 
@@ -184,12 +189,17 @@ else:
 
     selection = pcat['use_phot']==1
     if COVERAGE_USE and COV_SEL_EAZY:
-        selection &= pcat[f'flag_{COV_NAME}_coverage'] == 1
+        selection &= pcat[f'flag_{COV_NAME.lower()}_coverage'] == 1
     if COVERAGE2_USE and COV2_SEL_EAZY:
-        selection &= pcat[f'flag_{COV2_NAME}_coverage'] == 1
+        selection &= pcat[f'flag_{COV2_NAME.lower()}_coverage'] == 1
     if NBANDS_USE and NBANDS_SEL_EAZY:
-        selection &= (pcat[f'n_bands_{NBANDS_NAME}'] >= NBANDS_NLIM_EAZY)
-    selection &= (pcat[f'f_{SN_FILT_EAZY}']/pcat[f'e_{SN_FILT_EAZY}']) > SN_LIM_EAZY
+        selection &= (pcat[f'n_bands_{NBANDS_NAME.lower()}'] >= NBANDS_NLIM_EAZY)
+    if NBANDS2_USE and NBANDS2_SEL_EAZY:
+        selection &= (pcat[f'n_bands_{NBANDS2_NAME.lower()}'] >= NBANDS2_NLIM_EAZY)
+    if SN_FILT_EAZY.lower() != 'kron':
+        selection &= (pcat[f'f_{SN_FILT_EAZY}']/pcat[f'e_{SN_FILT_EAZY}']) > SN_LIM_EAZY
+    else:
+        selection &= (pcat[f'faper_{SN_FILT_EAZY.upper()}']/pcat[f'eaper_{SN_FILT_EAZY.upper()}']) > SN_LIM_EAZY
     
     fig = eazy.utils.zphot_zspec(zbest, ZSPEC, 
                         zlimits=None, 

@@ -355,6 +355,7 @@ def measure_cog(sci_cutout, pos):
 
     return radii, cog
 
+
 # Compute COG for PSF
 def psf_cog(psfmodel, filt, nearrad=None, fix_extrapolation=True, pixel_scale=None, norm_rad=1.0, dir_config=None):
     pos = np.shape(psfmodel)[0]/2.,  np.shape(psfmodel)[1]/2.
@@ -362,10 +363,28 @@ def psf_cog(psfmodel, filt, nearrad=None, fix_extrapolation=True, pixel_scale=No
     radii *= pixel_scale
 
     if fix_extrapolation:
-        sys.path.append(dir_config)
-        from config import SW_FILTERS, LW_FILTERS, HST_FILTERS,\
-            PATH_SW_ENERGY, PATH_LW_ENERGY, PATH_HST_ENERGY, PIXEL_SCALE
-        if pixel_scale is None: pixel_scale = PIXEL_SCALE
+        if dir_config is not None:
+            sys.path.append(dir_config)
+            from config import SW_FILTERS, LW_FILTERS, HST_FILTERS,\
+                PATH_SW_ENERGY, PATH_LW_ENERGY, PATH_HST_ENERGY, PIXEL_SCALE
+            if pixel_scale is None: pixel_scale = PIXEL_SCALE
+        else:
+            # Default FILTERS if dir_config in psf_cog is None
+            FILTERS_UVIS = ['F336WU']
+            FILTERS_ACS = ['F435W','F475W','F606W','F814W','F850LP']
+            FILTERS_WFC = ['F098M','F105W','F110W','F125W','F140W','F160W']
+            HST_FILTERS = FILTERS_UVIS + FILTERS_ACS + FILTERS_WFC
+
+            SW_FILTERS = ['F070W','F090W','F115W','F140M','F150W','F162M','F182M','F200W','F210M']
+            LW_FILTERS = ['F250M','F277W','F300M','F335M','F356W','F360M','F410M','F430M',
+                        'F444W','F460M','F480M']
+
+            script_path = os.path.dirname(os.path.abspath(__file__))
+            data_path = os.path.normpath(os.path.join(script_path, '../config/'))
+            PATH_SW_ENERGY = os.path.join(data_path, 'Encircled_Energy_SW_ETCv2.txt')
+            PATH_LW_ENERGY = os.path.join(data_path, 'Encircled_Energy_LW_ETCv2.txt')
+            PATH_HST_ENERGY = os.path.join(data_path,'Encircled_Energy_HST_ETCv2.txt' )
+
         from astropy.io import ascii
         # Check if filter is valid and get correction term
         if filt in SW_FILTERS:
@@ -388,6 +407,8 @@ def psf_cog(psfmodel, filt, nearrad=None, fix_extrapolation=True, pixel_scale=No
         cog *= large_ee[np.argmin(np.abs(large_rad-norm_rad))] / cog[-1]
         radii = np.array(list(radii)+list(large_rad[large_rad>norm_rad]))
         cog_norm = np.array(list(cog)+list(large_ee[large_rad>norm_rad]))
+    else:
+        cog_norm = 1. * cog
 
     import scipy.interpolate
     modcog_norm = scipy.interpolate.interp1d(radii, cog_norm, fill_value = 'extrapolate')

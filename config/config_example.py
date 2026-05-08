@@ -26,6 +26,7 @@ PHOT_AUTOPARAMS = 2.5, 1.0 # Kron-scaling radius, minimum kron factor
 PHOT_FLUXRADIUS = 0.5, 0.6 # FLUX_RADIUS at 50% and 60% of flux (always keep 0.5!)
 PHOT_KRONPARAM = 6.0 # SE hardcodes this as 6.0
 PHOT_USEMASK = True # masks out neighbors when measuring kron, auto fluxes, and flux radius (not circ apers)
+FLAG_CLEANED = True # flag sources that would be cleaned by SEP
 
 PIXEL_SCALE = 0.04 # arcsec / px
 APPLY_MWDUST = 'MEDIAN'
@@ -39,11 +40,11 @@ SCI_APER = 0.32 # set to the aperture size you expect to use most
 MAKE_SCIREADY_ALL = True # make aperture corrected catalogs for all apertures
 
 ### DIRECTORIES
-PROJECT = 'MINERVA-UDS'
+PROJECT = 'MINERVA-COSMOS'
 SURVEY = PROJECT.split('-')[0]
 FIELD = PROJECT.split('-')[1]
 REDUCTION = 'grizli'
-VERSION = 'n3.0_v1.2'
+VERSION = 'n2.0_v1.1'
 DRIVE = f'/Volumes/SanDisk3/{SURVEY}/'
 WORKING_DIR = f'{DRIVE}{FIELD}/{VERSION}'
 DIR_IMAGES = os.path.join(WORKING_DIR, 'external/')
@@ -67,11 +68,6 @@ BLOCK_WHT_REPLACE = ('sci', 'wht')
 WHT_REPLACE = ('sci', 'wht')
 DIRWHT_REPLACE = (DIR_OUTPUT, DIR_IMAGES)
 DIR_SFD = '~/sfddata-master'
-# ZSPEC = '/Users/secutler/Documents/MINERVA/uds/uds_dja_nirspec_graded_v4.2.csv'
-# ZCOL= 'z'
-# ZRA = 'ra'
-# ZDEC = 'dec'
-# ZCONF = 'grade', 3
 ZSPEC = f'/Users/secutler/Documents/{SURVEY}/{FIELD.lower()}/{FIELD.lower()}_zspec.fits'
 ZCOL= 'z'
 ZRA = 'ra'
@@ -90,15 +86,14 @@ BLOCK_SIZE = 4 # pixels
 BACKPARAMS = dict(bw=128, bh=128, fw=3, fh=3, maskthresh=1, fthresh=0.)
 BACKTYPE = 'var'
 
-FILTERS_ACS = ['F435W','F606W','F775W','F814W','F850LP']
-FILTERS_WFC = ['F098M','F105W','F125W','F140W','F160W']
-HST_FILTERS = FILTERS_ACS + FILTERS_WFC
+FILTERS_UVIS = ['F336WU']
+FILTERS_ACS = ['F435W','F475W','F606W','F814W','F850LP']
+FILTERS_WFC = ['F098M','F105W','F110W','F125W','F140W','F160W']
+HST_FILTERS = FILTERS_UVIS + FILTERS_ACS + FILTERS_WFC
 
-SW_FILTERS = ['F090W','F115W','F140M','F150W','F162M','F182M','F200W','F210M']
+SW_FILTERS = ['F070W','F090W','F115W','F140M','F150W','F162M','F182M','F200W','F210M']
 LW_FILTERS = ['F250M','F277W','F300M','F335M','F356W','F360M','F410M','F430M',
               'F444W','F460M','F480M']
-
-USE_FILTERS = []#LW_FILTERS*1 # Filters to use with WebbPSF
 
 WEBB_FILTERS = SW_FILTERS + LW_FILTERS
 
@@ -108,7 +103,7 @@ FILTERS = [filt.lower() for filt in FILTERS]
 ### DETECTION COADD # use '-' in nicknames, NOT '_'
 DETECTION_GROUPS = {'ACS+WEBB':{},'LW':{}}
 
-CHI_MEAN_FILTS = [filt for filt in FILTERS if filt.upper() not in FILTERS_WFC]
+CHI_MEAN_FILTS = [filt for filt in FILTERS if filt.upper() not in FILTERS_UVIS+FILTERS_WFC]
 
 DETECTION_GROUPS['ACS+WEBB']['filters'] = tuple(CHI_MEAN_FILTS)
 DETECTION_GROUPS['ACS+WEBB']['method'] = 'chi-mean'
@@ -122,6 +117,7 @@ KRON_COMBINED_BANDS = {}
 KRON_COMBINED_BANDS['ACS+WEBB'] = tuple(CHI_MEAN_FILTS)
 KRON_COMBINED_BANDS['LW'] = ('f277w', 'f356w', 'f444w')
 KRON_ZPT = 28.9 # I hope it's the same as all of your combined mosaics!
+KRON_MASKBLENDS = False # if True, mask large Kron radii for blended sources 
 
 DETECTION_NICKNAMES = []
 for nickname in DETECTION_GROUPS:
@@ -138,11 +134,11 @@ for group in DETECTION_GROUPS:
         path = glob.glob(f'{DIR_IMAGES}*{filt}*sci.fits*')[0]
         DETECTION_IMAGES[filt] = path
 
-ID_FLOOR = 1000000 # value to add to all IDs
+ID_FLOOR = 2000000 # value to add to all IDs
 # zero if you want to leave them untouched, will not work with XCAT below
 ### CROSSMATCH to old ID versions
-XCAT_FILENAMES_MAIN = {'ACS+WEBB': f'{DRIVE}/{FIELD}/n2.2_m2.0_v1.0/catalogs/ACS+WEBB_chi-mean/f444w/MINERVA-UDS_n2.2_m2.0_v1.0_ACS+WEBB_Kf444w_SUPER_CATALOG.fits',
-                       'LW': f'{DRIVE}/{FIELD}/n2.2_m2.0_v1.0/catalogs/LW_f277w-f356w-f444w_noise-equal/f444w/MINERVA-UDS_n2.2_m2.0_v1.0_LW_Kf444w_SUPER_CATALOG.fits'}
+XCAT_FILENAMES_MAIN = {'ACS+WEBB': f'{DRIVE}/{FIELD}/n2.0_v1.1/catalogs/ACS+WEBB_chi-mean/f444w/MINERVA-COSMOS_n2.0_v1.1_ACS+WEBB_Kf444w_SUPER_CATALOG.fits',
+                       'LW': f'{DRIVE}/{FIELD}/n2.0_v1.1/catalogs/LW_f277w-f356w-f444w_noise-equal/f444w/MINERVA-COSMOS_n2.0_v1.1_LW_Kf444w_SUPER_CATALOG.fits'}
 XCAT_NAME_MAIN = 'id' # column to include, name to use
 XCAT_RAD_MAIN = 0.08
 
@@ -213,8 +209,8 @@ for filt in FILTERS:
     if filt.upper() in FILTERS_WFC or filt in ['f430m', 'f460m', 'f480m']:
         PSF_DICT['pypher_r'][filt] = 3e-5
     else:
-        PSF_DICT['pypher_r'][filt] = 1e-4
-    PSF_DICT['oversample'][filt] = 1
+        PSF_DICT['pypher_r'][filt] = 1e-4#3e-3
+    PSF_DICT['oversample'][filt] = 1#3
     PSF_DICT['alpha'][filt] = 0.2
     PSF_DICT['beta'][filt] = 0.59
 
@@ -225,7 +221,7 @@ EAZY_FLOOR = False
 TEMPLATE_SETS = ['larson', 'sfhz_blue_agn']#['larson','sfhz_blue_agn','sfhz']
 EAZY_APERS = ['SUPER']#['SUPER',0.32,0.20]
 SN_LIM_EAZY = 5 # S/N cutoff for comparing EAzY photo-z to spec-z
-SN_FILT_EAZY = 'f444w' # filter to check for S/N cutoff
+SN_FILT_EAZY = 'kron' # filter to check for S/N cutoff
 
 
 ### AREA CALCULATIONS
@@ -240,6 +236,11 @@ ra_max = crval1+((L1-crpix1)*PIXEL_SCALE/3600)
 dec_max = crval2+((L2-crpix2)*PIXEL_SCALE/3600)
 RA_RANGE = (ra_min, ra_max)
 DEC_RANGE = (dec_min, dec_max)
+
+# Save flux ratios to catalog for user PS selections
+FLUX_RATIO_USE = True
+FLUX_RATIO_FILTS = ['f200w', 'f444w']
+FLUX_RATIO_APERSIZE = (0.7, 0.32)
 
 ### STARS AND BAD PIXELS -- currrently set for f444w-matched images only!
 # POINT-LIKE FLAG - WEBB
@@ -274,11 +275,12 @@ EXTERNALSTARS_USE = False
 FN_EXTERNALSTARS = f'/Users/secutler/Documents/{SURVEY}/{FIELD.lower()}/{FIELD.lower()}_3dhst_stars.fits'
 EXTERNALSTARS_XMATCH_RADIUS = 1*u.arcsec
 
+
 # COVERAGE FLAGS (flag sources with no coverage in certain bands)
 COVERAGE_USE = True
 COV_FILTS = [f.lower() for f in WEBB_FILTERS]
 COV_APERSIZE = 0.7
-COV_NBAND = 1 # required number of bands with coverage to have flag=0
+COV_NBAND = 4 # required number of bands with coverage to have flag=0
 COV_NAME = 'jwst'
 COV_SEL_EAZY = True
 COV_USE_PHOT = True # include coverage flag in use_phot conditions
@@ -290,17 +292,26 @@ COV2_APERSIZE = 0.7
 COV2_NBAND = 2 # required number of bands with coverage to have flag=0
 COV2_NAME = 'acs'
 COV2_SEL_EAZY = True
-COV2_USE_PHOT = True # include coverage flag in use_phot conditions
+COV2_USE_PHOT = False # include coverage flag in use_phot conditions
 
 # NUMBER OF BANDS (can choose to use specific bands; e.g. medium bands, etc.)
 NBANDS_USE = True
-NBANDS_APERSIZE = 0.7
 # Set to None to use all bands
-NBANDS_FILTS = ['F140M','F162M','F182M','F210M',
+NBANDS_FILTS = WEBB_FILTERS
+NBANDS_NAME = 'JWST'
+# When plotting photoz-specz in eazy, select on NBANDS >= NLIM
+NBANDS_SEL_EAZY = False 
+NBANDS_NLIM_EAZY = None
+
+# NUMBER OF BANDS (can choose to use specific bands; e.g. medium bands, etc.)
+NBANDS2_USE = True
+# Set to None to use all bands
+NBANDS2_FILTS = ['F140M','F162M','F182M','F210M',
                 'F250M','F300M','F335M','F360M','F430M','F460M','F480M'] 
-NBANDS_NAME = 'MB'
-NBANDS_SEL_EAZY = True
-NBANDS_NLIM_EAZY = 8
+NBANDS2_NAME = 'MB'
+# When plotting photoz-specz in eazy, select on NBANDS2 >= NLIM
+NBANDS2_SEL_EAZY = True
+NBANDS2_NLIM_EAZY = 8
 
 # BADWHT
 BADWHT_USE = True
@@ -327,10 +338,11 @@ BP_FILT = {'LW':'f444w','ACS+WEBB':'f444w'}
 BP_MAGLIMIT = 26.
 BP_APERSIZE = 0.7
 
-### SNR-selected BAD PIXELS
-BP2_USE = True
-BP2_SN_LIMIT = 3
-BP2_APERSIZE = 0.2
+### Single-band sources (potential bad pixels and strong emitters)
+SB_USE = True
+SB_SN_LIMIT = 3
+SB_APERSIZE = 0.2
+SB_USE_PHOT = False # include the SB selection in the use_phot selection
 
 ### ARTIFACTS NEAR BAD PIXELS, EDGES (e.g. saturated star segments)
 ANBP_USE = True

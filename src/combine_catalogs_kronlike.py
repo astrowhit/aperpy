@@ -23,16 +23,18 @@ from config import FILTERS, DIR_SFD, APPLY_MWDUST, DIR_CATALOGS, DIR_OUTPUT,\
     PS_HST_FLUXRATIO, PS_HST_FLUXRATIO_RANGE, PS_HST_FILT, PS_HST_MAGLIMIT, PS_HST_APERSIZE, \
     RA_RANGE, DEC_RANGE, BP_FLUXRATIO, BP_FLUXRATIO_RANGE, BP_FILT, BP_MAGLIMIT, BP_APERSIZE, \
     GAIA_ROW_LIMIT, GAIA_XMATCH_RADIUS, FN_BADWHT, SATURATEDSTAR_MAGLIMIT, SATURATEDSTAR_FILT, \
-    FN_EXTRABAD, EXTRABAD_XMATCH_RADIUS, EXTRABAD_LABEL, PATH_BADOBJECT, BP2_SN_LIMIT, BP2_APERSIZE, \
-    SATURATEDSTAR_APERSIZE, PS_WEBB_USE, PS_HST_USE, GAIA_USE, BADWHT_USE, EXTRABAD_USE, \
-    BP_USE, BP2_USE, BADOBJECT_USE, PHOT_USEMASK, PROJECT, VERSION, USE_COMBINED_KRON_IMAGE, KRON_COMBINED_BANDS, \
+    FN_EXTRABAD, EXTRABAD_XMATCH_RADIUS, EXTRABAD_LABEL, PATH_BADOBJECT, SB_SN_LIMIT, SB_APERSIZE, \
+    SB_USE_PHOT, SATURATEDSTAR_APERSIZE, PS_WEBB_USE, PS_HST_USE, GAIA_USE, BADWHT_USE, EXTRABAD_USE, \
+    BP_USE, SB_USE, BADOBJECT_USE, PHOT_USEMASK, PROJECT, VERSION, \
+    USE_COMBINED_KRON_IMAGE, KRON_COMBINED_BANDS, KRON_MASKBLENDS, \
     XCAT_FILENAME, XCAT_NAME, XCAT2_FILENAME, XCAT2_NAME, XCAT3_FILENAME, XCAT3_NAME, \
     ANBP_USE, ANBP_XMATCH_RADIUS, IS_COMPRESSED, ANBP_MIN_NPIX, ANBP_MAX_NPIX, \
     PSF_REF_NAME, EXTERNALSTARS_USE, FN_EXTERNALSTARS, EXTERNALSTARS_XMATCH_RADIUS, REGMASK_USE, FN_REGMASK, \
     AUTOSTAR_USE, AUTOSTAR_BANDS, AUTOSTAR_XMATCH_RADIUS, AUTOSTAR_NFILT, XCAT_RAD, XCAT2_RAD, XCAT3_RAD, \
-    USE_EXPTIME, DETECTION_GROUPS, COVERAGE_USE, COV_FILTS, COV_APERSIZE, COV_NBAND, COV_NAME, COV_USE_PHOT, \
-    COVERAGE2_USE, COV2_FILTS, COV2_APERSIZE, COV2_NBAND, COV2_NAME, COV2_USE_PHOT, \
-    NBANDS_USE, NBANDS_APERSIZE, NBANDS_FILTS, NBANDS_NAME
+    USE_EXPTIME, DETECTION_GROUPS, COVERAGE_USE, COV_FILTS, COV_NBAND, COV_NAME, COV_USE_PHOT, \
+    COVERAGE2_USE, COV2_FILTS, COV2_NBAND, COV2_NAME, COV2_USE_PHOT, \
+    NBANDS_USE, NBANDS_FILTS, NBANDS_NAME, NBANDS2_USE, NBANDS2_FILTS, NBANDS2_NAME, \
+    FLUX_RATIO_USE, FLUX_RATIO_FILTS, FLUX_RATIO_APERSIZE
 
 
 DET_NICKNAME =  sys.argv[2] #'LW_f277w-f356w-f444w'
@@ -92,13 +94,13 @@ def flux_total(flux_aper, tot_cor):
 KRON_MATCH_BAND = None
 USE_FILTERS = FILTERS
 if (KERNEL != 'None') & (USE_COMBINED_KRON_IMAGE):
-    kron_bands = KRON_COMBINED_BANDS[DET_NICKNAME.split('_')[0]]
-    if len(kron_bands)<=3:
-        KRON_MATCH_BAND = '+'.join(kron_bands)
-        if '+' not in KRON_MATCH_BAND:
-            KRON_MATCH_BAND = 'sb-' + KRON_MATCH_BAND
-    else:
-        KRON_MATCH_BAND = 'KRON'
+    # kron_bands = KRON_COMBINED_BANDS[DET_NICKNAME.split('_')[0]]
+    # if len(kron_bands)<=3:
+    #     KRON_MATCH_BAND = '+'.join(kron_bands)
+    #     if '+' not in KRON_MATCH_BAND:
+    #         KRON_MATCH_BAND = 'sb-' + KRON_MATCH_BAND
+    # else:
+    KRON_MATCH_BAND = 'KRON'
     USE_FILTERS = [KRON_MATCH_BAND, ] + list(FILTERS)
 
 # loop over filters
@@ -114,6 +116,8 @@ for filter in USE_FILTERS:
     # rename columns if needed:
     for coln in cat.colnames:
         if 'RADIUS' in coln or 'APER' in coln or 'FLAG' in coln or 'AUTO' in coln or 'WHT' in coln or 'ISO' in coln or 'EXP' in coln:
+            if coln in ['FLAG_DEBLEND', 'FLAG_CLEAN']:
+                continue
 
             newcol = f'{filter}_{coln}'.replace('.', '_')
             # print(f'   {cat[coln].name} --> {newcol}')
@@ -167,13 +171,13 @@ outfilename = os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_COMBINED
 # print(maincat.colnames)
 
 if USE_COMBINED_KRON_IMAGE:
-    kron_bands = KRON_COMBINED_BANDS[DET_NICKNAME.split('_')[0]]
-    if len(kron_bands)<=3:
-        KRON_MATCH_BAND = '+'.join(kron_bands)
-        if '+' not in KRON_MATCH_BAND:
-            KRON_MATCH_BAND = 'sb-' + KRON_MATCH_BAND
-    else:
-        KRON_MATCH_BAND = 'KRON'
+    # kron_bands = KRON_COMBINED_BANDS[DET_NICKNAME.split('_')[0]]
+    # if len(kron_bands)<=3:
+    #     KRON_MATCH_BAND = '+'.join(kron_bands)
+    #     if '+' not in KRON_MATCH_BAND:
+    #         KRON_MATCH_BAND = 'sb-' + KRON_MATCH_BAND
+    # else:
+    KRON_MATCH_BAND = 'KRON'
 else:
     KRON_MATCH_BAND = MATCH_BAND # behaves as usual with a single ref band
 
@@ -210,22 +214,48 @@ maincat['iso_area'] = maincat['tnpix'] * PIXEL_SCALE**2
 maincat['iso_area'].unit = u.arcsec**2
 
 
-# Check if object is really bright in its group, if so then sel_badkron = False
-isofluxes = maincat[f'{KRON_MATCH_BAND}_FLUX_ISO']
-is_dominant = np.ones(len(isofluxes), dtype=bool) # assume dominance. Things without friends should not be flagged as blends.
-import pickle
-assoc = pickle.load(open(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_friends.pickle'), 'rb'))
-for i, id in enumerate(maincat['ID']):
-    if len(assoc[id]) == 0: continue # it has no friends :(
-    friends = np.isin(maincat['ID'], assoc[id])
-    is_dominant[i] = np.all(isofluxes[i] > isofluxes[friends])
-kronrad_area = np.pi * (maincat[f'{KRON_MATCH_BAND}_KRON_RADIUS_CIRC{mask}'] * PIXEL_SCALE)**2
+if KRON_MASKBLENDS:
+    # Check if object is really bright in its group, if so then sel_badkron = False
+    isofluxes = maincat[f'{KRON_MATCH_BAND}_FLUX_ISO']
+    is_dominant = np.ones(len(isofluxes), dtype=bool) # assume dominance. Things without friends should not be flagged as blends.
+    import pickle
+    assoc = pickle.load(open(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_friends.pickle'), 'rb'))
+    for i, id in enumerate(maincat['ID']):
+        if len(assoc[id]) == 0: continue # it has no friends :(
+        friends = np.isin(maincat['ID'], assoc[id])
+        is_dominant[i] = np.all(isofluxes[i] > isofluxes[friends])
+    kronrad_area = np.pi * (maincat[f'{KRON_MATCH_BAND}_KRON_RADIUS_CIRC{mask}'] * PIXEL_SCALE)**2
 
-sel_badkron[(maincat['flag'] > 0)] = True
-sel_badkron[sel_badkron & (kronrad_area < maincat[f'iso_area'])] = False
-sel_badkron[sel_badkron & (is_dominant & (kronrad_area < 1.5*maincat[f'iso_area']))] = False
+    sel_badkron[(maincat['flag'] > 0)] = True
+    sel_badkron[sel_badkron & (kronrad_area < maincat[f'iso_area'])] = False
+    sel_badkron[sel_badkron & (is_dominant & (kronrad_area < 1.5*maincat[f'iso_area']))] = False
+    
+    newsel = maincat['flag'] > 0
+    newsel[newsel & (kronrad_area < maincat[f'iso_area'])] = False
+    newsel[newsel & (is_dominant & (kronrad_area < 1.5*maincat[f'iso_area']))] = False
+
+
+
+    # regs = []
+    # from regions import CircleSkyRegion, Regions
+    # detcoords2 = SkyCoord(maincat[newsel]['RA'], maincat[newsel]['DEC'])
+    # for coord, obj in zip(detcoords2, maincat[newsel]):
+    #     asize = PHOT_APER[np.argmin(np.abs((np.sqrt(obj['iso_area'] / np.pi) * 2.) - PHOT_APER))]
+    #     regs.append(CircleSkyRegion(coord, asize/2.*u.arcsec, visual={'color':'red'}))
+    #     # try:
+    #     regs.append(CircleSkyRegion(coord, obj[f'{KRON_MATCH_BAND}_KRON_RADIUS_CIRC{mask}']*PIXEL_SCALE*u.arcsec,
+    #                                 visual={'color':'green'}))
+    #     # except:
+
+
+    # bigreg = Regions(regs)
+    # bigreg.write(f'{PATH_CONFIG}/big_kron.reg', overwrite=True, format='ds9')
+    # raise
+
+
 print(f'Found {np.sum(sel_badkron)} objects with unreliable kron radii (e.g. blends)')
 
+# raise
 for filter in USE_FILTERS:
     relwht = maincat[f'{filter}_SRC_MEDWHT'] / maincat[f'{filter}_MAX_WHT']
     # relwht[~np.isfinite(wht_ref) | np.isnan(wht_ref)] = np.nan
@@ -241,6 +271,7 @@ for apersize in PHOT_APER:
     kronrad = maincat[f'{KRON_MATCH_BAND}_KRON_RADIUS{mask}'].copy()
 
     f_ref_aper = maincat[f'{KRON_MATCH_BAND}_FLUX_APER{str_aper}'].copy()
+    # f_ref_aper = maincat[f'{KRON_MATCH_BAND}_FLUX_APER{str_aper}{mask}'].copy()
 
     sel_badkron |= np.isnan(f_ref_aper)
     use_circle = (kronrad_circ < (apersize / PIXEL_SCALE / 2.)) | (f_ref_auto <= f_ref_aper) | sel_badkron # either too small (not flagged) OR not reliable.
@@ -267,6 +298,8 @@ for apersize in PHOT_APER:
 
     kronrad[use_circle] = np.nan #
     kronrad_circ[use_circle] = np.nan #
+
+    print(f'Found {np.sum(use_circle)} objects with small or unreliable Kron radii (use_circle==1)')
 
     # idx = np.argwhere(tot_corr < min_corr)
     # for i in idx:
@@ -300,7 +333,7 @@ for apersize in PHOT_APER:
     maincat.add_column(Column(sig_ref_total, newcoln))
 
     for filter in USE_FILTERS:            
-        f_aper =maincat[f'{filter}_FLUX_APER{str_aper}']
+        f_aper =maincat[f'{filter}_FLUX_APER{str_aper}{mask}']
         f_total = flux_total(f_aper, tot_corr)  # f_aper * tot_corr
         wht = maincat[f'{filter}_SRC_MEDWHT']
         # medwht = maincat[f'{filter}_MED_WHT']
@@ -354,7 +387,7 @@ if APPLY_MWDUST is not None:
     except:
         Warning('Could not add symlinks...might be OK.')
 
-    tr = TranslateFile(os.path.join(PATH_CONFIG,TRANSLATE_FNAME))
+    tr = TranslateFile(os.path.join(PATH_CONFIG, TRANSLATE_FNAME))
     res = FilterFile()
     filter_pwav = OrderedDict()
     print('Building directory of pivot wavelengths')
@@ -386,23 +419,25 @@ if APPLY_MWDUST is not None:
             elif 'MAG' in coln:
                 maincat[coln] -= atten_mag[np.array(FILTERS) == filtname][0]
 
-# low-snr flag
-# for coln in maincat.colnames: print(coln)
-str_aper = str(SCI_APER).replace('.', '_')
-snr_ref = maincat[f'{KRON_MATCH_BAND}_FLUX_APER{str_aper}_COLOR'] / maincat[f'{KRON_MATCH_BAND}_FLUXERR_APER{str_aper}_COLOR']
-snr_ref[maincat[f'{KRON_MATCH_BAND}_FLUXERR_APER{str_aper}_COLOR']<=0] = -1
-SEL_LOWSNR = (snr_ref < 3) | np.isnan(maincat[f'{KRON_MATCH_BAND}_RELWHT'])
-print(f'Flagged {np.sum(SEL_LOWSNR)} objects as having low SNR < 3')
-maincat.add_column(Column(SEL_LOWSNR.astype(int), name='lowsnr_flag'))
 
 SEL_STAR = np.zeros(len(maincat),dtype=bool)
+
+# Save specific flux ratios to catalog
+if FLUX_RATIO_USE:
+    str_aperrat = f'{str(FLUX_RATIO_APERSIZE[0]).replace(".", "_")}-{str(FLUX_RATIO_APERSIZE[1]).replace(".", "_")}'
+    for filtR in FLUX_RATIO_FILTS:
+        flux_rats = maincat_unmatched[f'{filtR}_FLUX_APER{str(FLUX_RATIO_APERSIZE[0]).replace(".", "_")}{mask}']  \
+                        / maincat_unmatched[f'{filtR}_FLUX_APER{str(FLUX_RATIO_APERSIZE[1]).replace(".", "_")}{mask}']
+        
+        newcoln = f'{filtR}_FLUX_RATIO_APER{str_aperrat}'
+        maincat.add_column(Column(flux_rats, newcoln))
 
 # Select in F160W
 if PS_HST_USE:
     str_aper = str(PS_HST_APERSIZE).replace('.', '_')
-    mag_hst = TARGET_ZP - 2.5*np.log10(maincat[f'{PS_HST_FILT}_FLUX_APER{str_aper}'])
-    size_hst = maincat_unmatched[f'{PS_HST_FILT}_FLUX_APER{str(PS_HST_FLUXRATIO[0]).replace(".", "_")}']  \
-                    / maincat_unmatched[f'{PS_HST_FILT}_FLUX_APER{str(PS_HST_FLUXRATIO[1]).replace(".", "_")}']
+    mag_hst = TARGET_ZP - 2.5*np.log10(maincat[f'{PS_HST_FILT}_FLUX_APER{str_aper}{mask}'])
+    size_hst = maincat_unmatched[f'{PS_HST_FILT}_FLUX_APER{str(PS_HST_FLUXRATIO[0]).replace(".", "_")}{mask}']  \
+                    / maincat_unmatched[f'{PS_HST_FILT}_FLUX_APER{str(PS_HST_FLUXRATIO[1]).replace(".", "_")}{mask}']
 
     SEL_HST = (size_hst > PS_HST_FLUXRATIO_RANGE[0]) & (size_hst < PS_HST_FLUXRATIO_RANGE[1]) & (mag_hst < PS_HST_MAGLIMIT)
     print(f'Flagged {np.sum(SEL_HST)} objects as point-like (stars) from {PS_HST_FILT}')
@@ -414,9 +449,9 @@ if PS_HST_USE:
 # Select from Webb band
 if PS_WEBB_USE:
     str_aper = str(PS_WEBB_APERSIZE).replace('.', '_')
-    mag = TARGET_ZP - 2.5*np.log10(maincat[f'{PS_WEBB_FILT}_FLUX_APER{str_aper}'])
-    size = maincat_unmatched[f'{PS_WEBB_FILT}_FLUX_APER{str(PS_WEBB_FLUXRATIO[0]).replace(".", "_")}']  \
-                    / maincat_unmatched[f'{PS_WEBB_FILT}_FLUX_APER{str(PS_WEBB_FLUXRATIO[1]).replace(".", "_")}']
+    mag = TARGET_ZP - 2.5*np.log10(maincat[f'{PS_WEBB_FILT}_FLUX_APER{str_aper}{mask}'])
+    size = maincat_unmatched[f'{PS_WEBB_FILT}_FLUX_APER{str(PS_WEBB_FLUXRATIO[0]).replace(".", "_")}{mask}']  \
+                    / maincat_unmatched[f'{PS_WEBB_FILT}_FLUX_APER{str(PS_WEBB_FLUXRATIO[1]).replace(".", "_")}{mask}']
     SEL_WEBB = (size > PS_WEBB_FLUXRATIO_RANGE[0]) & (size < PS_WEBB_FLUXRATIO_RANGE[1]) & (mag < PS_WEBB_MAGLIMIT)
     print(f'Flagged {np.sum(SEL_WEBB)} objects as point-like (stars) from {PS_WEBB_FILT}')
     maincat.add_column(Column(SEL_WEBB.astype(int), name='star_webb_flag'))
@@ -479,7 +514,7 @@ if GAIA_USE:
 if BADWHT_USE:
     weightmap = fits.getdata(FN_BADWHT) # this is lazy, but OK.
     str_aper = str(SATURATEDSTAR_APERSIZE).replace('.', '_')
-    mag_sat = TARGET_ZP - 2.5*np.log10(maincat[f'{SATURATEDSTAR_FILT}_FLUX_APER{str_aper}'])
+    mag_sat = TARGET_ZP - 2.5*np.log10(maincat[f'{SATURATEDSTAR_FILT}_FLUX_APER{str_aper}{mask}'])
     SEL_BADWHT = (weightmap[maincat['y'].astype(int).value, maincat['x'].astype(int).value] == 1)
     sw_wht = maincat[f'{SATURATEDSTAR_FILT}_SRC_MEDWHT'].copy()
     sw_wht[np.isnan(sw_wht)] = 0
@@ -517,79 +552,44 @@ if ANBP_USE:
     SEL_ANBP = np.isin(maincat['ID'], mCATALOG_anbp['ID'])
     maincat.add_column(Column(SEL_ANBP.astype(int), name='artifacts_near_badpixels_flag'))
     maincat['combined_artifact_flag'][SEL_ANBP] = 1
-    print(f'Flagged {np.sum(SEL_ANBP)} objects as being artifacts near staturated pixels (stars) or edges')
+    print(f'Flagged {np.sum(SEL_ANBP)} objects as being artifacts near saturated pixels (stars) or edges')
     del det_img, labels, badmap
 
-SEL_GEN = SEL_LOWSNR | SEL_STAR
+SEL_GEN = np.copy(SEL_STAR)
 if ANBP_USE:
     SEL_GEN |= SEL_ANBP
 
-# coverage flags for chosen filters
-if COVERAGE_USE:
-    str_aper = str(COV_APERSIZE).replace('.', '_')
-    N_COV = np.zeros(len(maincat), dtype=int)
-    for filt in COV_FILTS:
-        N_COV += np.isfinite(maincat[f'{filt}_FLUX_APER{str_aper}']).astype(int)
-    SEL_COV = (N_COV >= COV_NBAND)
-    maincat.add_column(Column(SEL_COV.astype(int), name=f'{COV_NAME}_coverage_flag'))
-    if COV_USE_PHOT:
-        SEL_GEN |= SEL_COV
-
-if COVERAGE2_USE:
-    str_aper = str(COV2_APERSIZE).replace('.', '_')
-    N_COV2 = np.zeros(len(maincat), dtype=int)
-    for filt in COV2_FILTS:
-        N_COV2 += np.isfinite(maincat[f'{filt}_FLUX_APER{str_aper}']).astype(int)
-    SEL_COV2 = (N_COV2 >= COV2_NBAND)
-    maincat.add_column(Column(SEL_COV2.astype(int), name=f'{COV2_NAME}_coverage_flag'))
-    if COV2_USE_PHOT:
-        SEL_GEN |= SEL_COV2
-
-# report number of bands for chosen filters
-if NBANDS_USE:
-    str_aper = str(NBANDS_APERSIZE).replace('.', '_')
-    NBANDS = np.zeros(len(maincat), dtype=int)
-    if NBANDS_FILTS == None:
-        NBANDS_FILTS = FILTERS
-        NBANDS_NAME = ''
-    else:
-        NBANDS_NAME = f'_{NBANDS_NAME}'
-    for filt in NBANDS_FILTS:
-        try:
-            NBANDS += np.isfinite(maincat[f'{filt.lower()}_FLUX_APER{str_aper}']).astype(int)
-        except KeyError:
-            continue
-    maincat.add_column(Column(NBANDS.astype(int), name=f'n_bands{NBANDS_NAME.lower()}'))
 
 # LW bad pixel flag
 if BP_USE:
     str_aper = str(BP_APERSIZE).replace('.', '_')
     BP_FILT_SEL = BP_FILT[DET_NICKNAME.split('_')[0]]
     # BP_FILT_SEL = 'f410m'
-    mag_bp = TARGET_ZP - 2.5*np.log10(maincat[f'{BP_FILT_SEL}_FLUX_APER{str_aper}'])
-    size_bp = maincat_unmatched[f'{BP_FILT_SEL}_FLUX_APER{str(BP_FLUXRATIO[0]).replace(".", "_")}']  \
-                    / maincat_unmatched[f'{BP_FILT_SEL}_FLUX_APER{str(BP_FLUXRATIO[1]).replace(".", "_")}']
+    mag_bp = TARGET_ZP - 2.5*np.log10(maincat[f'{BP_FILT_SEL}_FLUX_APER{str_aper}{mask}'])
+    size_bp = maincat_unmatched[f'{BP_FILT_SEL}_FLUX_APER{str(BP_FLUXRATIO[0]).replace(".", "_")}{mask}']  \
+                    / maincat_unmatched[f'{BP_FILT_SEL}_FLUX_APER{str(BP_FLUXRATIO[1]).replace(".", "_")}{mask}']
     SEL_LWBADPIXEL = (size_bp > BP_FLUXRATIO_RANGE[0]) & (size_bp < BP_FLUXRATIO_RANGE[1])
     SEL_LWBADPIXEL &= (mag_bp < BP_MAGLIMIT)
-    print(f'Flagged {np.sum(SEL_LWBADPIXEL)} objects as bad pixels vis flux ratios')
+    print(f'Flagged {np.sum(SEL_LWBADPIXEL)} objects as bad pixels via flux ratios')
     maincat.add_column(Column(SEL_LWBADPIXEL.astype(int), name='bad_pixel_lw_flag'))
     maincat['combined_artifact_flag'][SEL_LWBADPIXEL] = 1
     # SEL_BADPIX = SEL_LWBADPIXEL | SEL_BADWHT
     SEL_GEN |= SEL_LWBADPIXEL
 
 # SNR bad pixel flag
-if BP2_USE:
-    str_aper = str(BP2_APERSIZE).replace('.', '_')
+if SB_USE:
+    str_aper = str(SB_APERSIZE).replace('.', '_')
     N_SNLIM = np.zeros(len(maincat), dtype=int)
     for bpfilt in FILTERS:
-        snr_bp = maincat[f'{BP_FILT_SEL}_FLUX_APER{str_aper}'] / \
-                 maincat[f'{BP_FILT_SEL}_FLUXERR_APER{str_aper}'] 
-        N_SNLIM += (snr_bp > BP2_SN_LIMIT).astype(int)
-    SEL_SNBADPIXEL = (N_SNLIM == 1)
-    print(f'Flagged {np.sum(SEL_SNBADPIXEL)} objects as bad pixels via S/N')
-    maincat.add_column(Column(SEL_SNBADPIXEL.astype(int), name='bad_pixel_snr_flag'))
-    maincat['combined_artifact_flag'][SEL_SNBADPIXEL] = 1
-    SEL_GEN |= SEL_SNBADPIXEL
+        snr_bp = maincat[f'{bpfilt}_FLUX_APER{str_aper}_COLOR'] / \
+                 maincat[f'{bpfilt}_FLUXERR_APER{str_aper}_COLOR'] 
+        N_SNLIM += ((snr_bp > SB_SN_LIMIT) & np.isfinite(snr_bp)).astype(int)
+    SEL_SINGLEBAND = (N_SNLIM == 1)
+    print(f'Flagged {np.sum(SEL_SINGLEBAND)} objects as single band sources')
+    maincat.add_column(Column(SEL_SINGLEBAND.astype(int), name='single_band_flag'))
+    if SB_USE_PHOT:
+        maincat['combined_artifact_flag'][SEL_SINGLEBAND] = 1
+        SEL_GEN |= SEL_SINGLEBAND
 
 # diagnostic plot
 if PS_WEBB_USE or PS_HST_USE or BP_USE:
@@ -651,7 +651,7 @@ if PS_WEBB_USE or PS_HST_USE or BP_USE:
 
         axes[3].scatter(mag_bp[SEL_LWBADPIXEL], size_bp[SEL_LWBADPIXEL], s=12, alpha=0.8, c='firebrick')
         axes[3].invert_yaxis()
-        axes[3].set(xlim=(15.2, 30.2), ylim=(0, 2), ylabel=(f'$\\mathcal{{F}}~{BP_FLUXRATIO[0]} / {BP_FLUXRATIO[1]})$'), xlabel=f'${BP_FILT_SEL}$ Mag (AB)')
+        axes[3].set(xlim=(15.2, 30.2), ylim=(0, 2), ylabel=(f'$\\mathcal{{F}}~({BP_FLUXRATIO[0]} / {BP_FLUXRATIO[1]})$'), xlabel=f'${BP_FILT_SEL}$ Mag (AB)')
 
 
     for stars, color, label in plot_elts:
@@ -700,6 +700,7 @@ if REGMASK_USE:
     wcs = WCS(fits.getheader(os.path.join(DIR_CATALOGS, DETIMG_NAME)))
     for reg in regs:
         SEL_REGMASK |= reg.contains(catcoords, wcs=wcs)
+    print(f'Flagged {np.sum(SEL_REGMASK)} objects in masked regions')
     maincat['combined_artifact_flag'][SEL_REGMASK] = 1 # this one is more debatable since bright stars will get caught.
     SEL_GEN |= SEL_REGMASK
 
@@ -718,6 +719,80 @@ if EXTRABAD_USE:
 SEL_STAR &= maincat['combined_artifact_flag'] == 0
 print(f'Flagged {np.sum(SEL_STAR)} total objects as stars ({np.sum(SEL_STAR)/len(SEL_STAR)*100:2.2f}%)')
 maincat.add_column(Column(SEL_STAR.astype(int), name='star_flag'))
+
+for apersize in PHOT_APER:
+    print(f'\nFlagging in {apersize} arcsec apertures:')
+    SEL_GEN_APER = np.copy(SEL_GEN)
+
+    # low-snr flag
+    # for coln in maincat.colnames: print(coln)
+    str_aper = str(apersize).replace('.', '_')
+    snr_ref = maincat[f'{KRON_MATCH_BAND}_FLUX_APER{str_aper}_COLOR'] / maincat[f'{KRON_MATCH_BAND}_FLUXERR_APER{str_aper}_COLOR']
+    snr_ref[maincat[f'{KRON_MATCH_BAND}_FLUXERR_APER{str_aper}_COLOR']<=0] = -1
+    SEL_LOWSNR = (snr_ref < 3) | np.isnan(maincat[f'{KRON_MATCH_BAND}_RELWHT'])
+    print(f'Flagged {np.sum(SEL_LOWSNR)} objects as having low SNR < 3')
+    maincat.add_column(Column(SEL_LOWSNR.astype(int), name=f'lowsnr_flag{str_aper}'))
+
+
+    # coverage flags for chosen filters
+    if COVERAGE_USE:
+        N_COV = np.zeros(len(maincat), dtype=int)
+        for filt in COV_FILTS:
+            N_COV += np.isfinite(maincat[f'{filt}_FLUX_APER{str_aper}_COLOR']).astype(int)
+        SEL_COV = (N_COV < COV_NBAND)
+        print(f'Flagged {np.sum(SEL_COV)} objects as missing {COV_NAME.upper()} coverage')
+        maincat.add_column(Column((~SEL_COV).astype(int), name=f'{COV_NAME}_coverage_flag{str_aper}'))
+        if COV_USE_PHOT:
+            SEL_GEN_APER |= SEL_COV
+
+    if COVERAGE2_USE:
+        N_COV2 = np.zeros(len(maincat), dtype=int)
+        for filt in COV2_FILTS:
+            N_COV2 += np.isfinite(maincat[f'{filt}_FLUX_APER{str_aper}_COLOR']).astype(int)
+        SEL_COV2 = (N_COV2 < COV2_NBAND)
+        print(f'Flagged {np.sum(SEL_COV2)} objects as missing {COV2_NAME.upper()} coverage')
+        maincat.add_column(Column((~SEL_COV2).astype(int), name=f'{COV2_NAME}_coverage_flag{str_aper}'))
+        if COV2_USE_PHOT:
+            SEL_GEN_APER |= SEL_COV2
+
+    # report number of bands for chosen filters
+    if NBANDS_USE:
+        NBANDS = np.zeros(len(maincat), dtype=int)
+        if NBANDS_FILTS == None:
+            NBANDS_FILTS = FILTERS
+            NBANDS_NAME = ''
+        else:
+            NBANDS_NAME_str = f'_{NBANDS_NAME}'.lower()
+        for filt in NBANDS_FILTS:
+            try:
+                NBANDS += np.isfinite(maincat[f'{filt.lower()}_FLUX_APER{str_aper}{mask}']).astype(int)
+            except KeyError:
+                continue
+        maincat.add_column(Column(NBANDS.astype(int), name=f'n_bands{NBANDS_NAME_str}{str_aper}'))
+
+    # report number of bands for chosen filters
+    if NBANDS2_USE:
+        NBANDS2 = np.zeros(len(maincat), dtype=int)
+        if NBANDS2_FILTS == None:
+            NBANDS2_FILTS = FILTERS
+            NBANDS2_NAME = ''
+        else:
+            NBANDS2_NAME_str = f'_{NBANDS2_NAME}'.lower()
+        for filt in NBANDS2_FILTS:
+            try:
+                NBANDS2 += np.isfinite(maincat[f'{filt.lower()}_FLUX_APER{str_aper}{mask}']).astype(int)
+            except KeyError:
+                continue
+        maincat.add_column(Column(NBANDS2.astype(int), name=f'n_bands{NBANDS2_NAME_str}{str_aper}'))
+
+    
+    # use flag (minimum SNR cut + not a star)
+    use_phot = np.zeros(len(maincat)).astype(int)
+    use_phot[~SEL_LOWSNR] = 1
+    use_phot[SEL_GEN_APER] = 0
+    print(f'Flagged {np.sum(use_phot)} objects as reliable ({np.sum(use_phot)/len(use_phot)*100:2.1f}%)')
+    maincat.add_column(Column(use_phot, name=f'use_phot{str_aper}'))
+    # use 1 only
 
 
 # z-spec
@@ -749,13 +824,6 @@ if ZSPEC is not None:
             colname = f'z_spec_{colname}'
         maincat.add_column(Column(filler, name=colname))
 
-# use flag (minimum SNR cut + not a star)
-use_phot = np.zeros(len(maincat)).astype(int)
-use_phot[~SEL_LOWSNR] = 1
-use_phot[SEL_GEN] = 0
-print(f'Flagged {np.sum(use_phot)} objects as reliable ({np.sum(use_phot)/len(use_phot)*100:2.1f}%)')
-maincat.add_column(Column(use_phot, name='use_phot'))
-# use 1 only
 
 # Spit it out!
 from datetime import date
@@ -830,33 +898,44 @@ for apersize in PHOT_APER:
             cols[f'{filter}_RELWHT'] = f'w_{filter}'
             if USE_EXPTIME:
                 cols[f'{filter}_SRC_MEDEXP'] = f't_{filter}'
+        
+        if FLUX_RATIO_USE:
+            for filtR in FLUX_RATIO_FILTS:
+                cols[f'{filtR}_FLUX_RATIO_APER{str_aperrat}'] = f'flux_ratio_{filtR}'
 
         cols[f'TOTAL_CORR_APER{str_aper}'] = 'tot_cor'
 
         # cols[f'{KRON_MATCH_BAND}_FLAG_AUTO{mask}'] = 'flag_auto'
         cols[f'{KRON_MATCH_BAND}_KRON_RADIUS_APER{str_aper}'] = 'kron_radius'   # this is the modified KR where KR = sci_aper/2 for small things.
         cols[f'{KRON_MATCH_BAND}_KRON_RADIUS_CIRC_APER{str_aper}'] = 'kron_radius_circ' # ditto
-        cols[f'{KRON_MATCH_BAND}_USE_CIRCLE_APER{str_aper}'] = 'use_circle' # where kron radius is not used.
-        cols[f'{KRON_MATCH_BAND}_FLAG_KRON_APER{str_aper}'] = 'flag_kron'
         cols['iso_area'] = 'iso_area'
         cols['a'] = 'a_image'
         cols['b'] = 'b_image'
         cols['theta'] = 'theta_J2000'
         cols[f'{KRON_MATCH_BAND}_FLUX_RADIUS_FRAC0_5'] = 'flux_radius'
-        cols['use_phot'] = 'use_phot'
-        cols['lowsnr_flag'] = 'flag_lowsnr'
+        cols['z_spec'] = 'z_spec'
+        cols[f'lowsnr_flag{str_aper}'] = 'flag_lowsnr'
         cols['star_flag'] = 'flag_star'
         cols['combined_artifact_flag'] = 'flag_artifact'
         if EXTRABAD_USE:
             cols['extrabad_flag'] = 'flag_nearbcg'
         if COVERAGE_USE:
-            cols[f'{COV_NAME}_coverage_flag'] = f'flag_{COV_NAME}_coverage'
+            cols[f'{COV_NAME}_coverage_flag{str_aper}'] = f'flag_{COV_NAME.lower()}_coverage'
+        cols[f'use_phot{str_aper}'] = 'use_phot'
         if COVERAGE2_USE:
-            cols[f'{COV2_NAME}_coverage_flag'] = f'flag_{COV2_NAME}_coverage'
+            cols[f'{COV2_NAME}_coverage_flag{str_aper}'] = f'flag_{COV2_NAME.lower()}_coverage'
+        if SB_USE:
+            cols['single_band_flag'] = 'flag_singleband'
         if NBANDS_USE:
-            cols[f'n_bands{NBANDS_NAME.lower()}'] = f'n_bands{NBANDS_NAME.lower()}'
+            cols[f'n_bands{NBANDS_NAME_str}{str_aper}'] = f'n_bands{NBANDS_NAME_str}'
+        if NBANDS2_USE:
+            cols[f'n_bands{NBANDS2_NAME_str}{str_aper}'] = f'n_bands{NBANDS2_NAME_str}'
 
-        cols['z_spec'] = 'z_spec'
+        cols['FLAG_DEBLEND'] = 'flag_deblend'
+        cols['FLAG_CLEAN'] = 'flag_clean'
+        cols[f'{KRON_MATCH_BAND}_FLAG_KRON_APER{str_aper}'] = 'flag_kron'
+        cols[f'{KRON_MATCH_BAND}_USE_CIRCLE_APER{str_aper}'] = 'use_circle' # where kron radius is not used.
+
 
         subcat = maincat[list(cols.keys())].copy()
         subcat.meta['APER_DIAM'] = apersize

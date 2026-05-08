@@ -26,6 +26,7 @@ PHOT_AUTOPARAMS = 2.5, 1.0 # Kron-scaling radius, mimumum kron factor
 PHOT_FLUXRADIUS = 0.5, 0.6 # FLUX_RADIUS at 50% and 60% of flux (always keep 0.5!)
 PHOT_KRONPARAM = 6.0 # SE hardcodes this as 6.0
 PHOT_USEMASK = True # masks out neighbors when measuring kron, auto fluxes, and flux radius (not circ apers)
+FLAG_CLEANED = True # flag sources that would be cleaned by SEP
 
 PIXEL_SCALE = 0.04 # arcsec / px
 APPLY_MWDUST = 'MEDIAN'
@@ -102,6 +103,7 @@ USE_COMBINED_KRON_IMAGE = True   # uses a REF_BAND PSF-matched NE image for kron
 KRON_COMBINED_BANDS = {}
 KRON_COMBINED_BANDS['LW'] = ('f277w', 'f356w', 'f444w')
 KRON_ZPT = 28.9 # I hope it's the same as all of your combined mosaics!
+KRON_MASKBLENDS = False # if True, mask large Kron radii for blended sources 
 
 DETECTION_NICKNAMES = []
 for nickname in DETECTION_GROUPS:
@@ -184,8 +186,8 @@ ITERATE_ZP = False
 EAZY_FLOOR = False
 TEMPLATE_SETS = ('fsps_full', 'sfhz')
 EAZY_APERS = ['SUPER', 0.32] #Catalogs to run eazy on
-SN_LIM_EAZY = 5
-SN_FILT_EAZY = 'f444w'
+SN_LIM_EAZY = 5 # S/N cutoff for comparing EAzY photo-z to spec-z
+SN_FILT_EAZY = 'kron' # filter to check for S/N cutoff
 
 ### AREA CALCULATIONS
 FNAME = glob.glob(f'{DIR_IMAGES}*{LW_FILTERS[-1].lower()}*sci.fits*')[0]
@@ -199,6 +201,11 @@ ra_max = crval1+((L1-crpix1)*PIXEL_SCALE/3600)
 dec_max = crval2+((L2-crpix2)*PIXEL_SCALE/3600)
 RA_RANGE = (ra_min, ra_max)
 DEC_RANGE = (dec_min, dec_max)
+
+# Save flux ratios to catalog for user PS selections
+FLUX_RATIO_USE = True
+FLUX_RATIO_FILTS = ['f200w', 'f444w']
+FLUX_RATIO_APERSIZE = (0.7, 0.32)
 
 ### STARS AND BAD PIXELS -- currrently set for f444w-matched images only!
 # POINT-LIKE FLAG - WEBB
@@ -253,13 +260,22 @@ COV2_USE_PHOT = True # include coverage flag in use_phot conditions
 
 # NUMBER OF BANDS (can choose to use specific bands; e.g. medium bands, etc.)
 NBANDS_USE = True
-NBANDS_APERSIZE = 0.7
 # Set to None to use all bands
-NBANDS_FILTS = [filt.lower() for filt in SW_FILTERS]
-NBANDS_NAME = 'NIRCAM_SW'
-NBANDS_SEL_EAZY = True
-NBANDS_NLIM_EAZY = 4
+NBANDS_FILTS = WEBB_FILTERS
+NBANDS_NAME = 'JWST'
+# When plotting photoz-specz in eazy, select on NBANDS >= NLIM
+NBANDS_SEL_EAZY = False
+NBANDS_NLIM_EAZY = None
 
+# NUMBER OF BANDS (can choose to use specific bands; e.g. medium bands, etc.)
+NBANDS2_USE = True
+NBANDS2_APERSIZE = 0.7
+# Set to None to use all bands
+NBANDS2_FILTS = [filt.lower() for filt in SW_FILTERS]
+NBANDS2_NAME = 'NIRCAM_SW'
+# When plotting photoz-specz in eazy, select on NBANDS2 >= NLIM
+NBANDS2_SEL_EAZY = True
+NBANDS2_NLIM_EAZY = 4
 
 # BADWHT (useful for bad regions of the images)
 BADWHT_USE = True 
@@ -267,6 +283,12 @@ FN_BADWHT = os.path.join(os.path.join(WORKING_DIR, DIR_IMAGES), 'uncover_v7.0_ab
 SATURATEDSTAR_MAGLIMIT = 21
 SATURATEDSTAR_FILT = 'f200w'
 SATURATEDSTAR_APERSIZE = 0.7
+
+### Single-band sources (potential bad pixels and strong emitters)
+SB_USE = True
+SB_SN_LIMIT = 3
+SB_APERSIZE = 0.2
+SB_USE_PHOT = False # include the SB selection in the use_phot selection
 
 # EXTRABAD (e.g. bCGs)
 EXTRABAD_USE = True
@@ -286,10 +308,11 @@ BP_FILT = {'LW':'f444w'}
 BP_MAGLIMIT = 26.
 BP_APERSIZE = 0.7
 
-### SNR-selected BAD PIXELS
-BP2_USE = True
-BP2_SN_LIMIT = 3
-BP2_APERSIZE = 0.2
+### Single-band sources (potential bad pixels and strong emitters)
+SB_USE = True
+SB_SN_LIMIT = 3
+SB_APERSIZE = 0.2
+SB_USE_PHOT = False # include the SB selection in the use_phot selection
 
 ### ARTIFACTS NEAR BAD PIXELS, EDGES
 ANBP_USE = True

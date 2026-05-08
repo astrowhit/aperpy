@@ -18,7 +18,7 @@ sys.path.insert(0, PATH_CONFIG)
 from config import TARGET_ZP, PHOT_APER, PHOT_AUTOPARAMS, PHOT_FLUXRADIUS, DETECTION_PARAMS, SKYEXT,\
         DIR_IMAGES, PHOT_ZP, FILTERS, DIR_OUTPUT, DIR_CATALOGS, IS_COMPRESSED, PIXEL_SCALE, PHOT_KRONPARAM,\
         USE_COMBINED_KRON_IMAGE, KRON_COMBINED_BANDS, KRON_ZPT, PHOT_EMPTYAPER_DIAMS, USE_EXPTIME, DETECTION_GROUPS,\
-        OVERWRITE, ID_FLOOR, XCAT_FILENAMES_MAIN, XCAT_NAME_MAIN, XCAT_RAD_MAIN
+        OVERWRITE, ID_FLOOR, XCAT_FILENAMES_MAIN, XCAT_NAME_MAIN, XCAT_RAD_MAIN, FLAG_CLEANED
 
 # MAIN PARAMETERS
 DET_NICKNAME = sys.argv[2]
@@ -136,6 +136,37 @@ catalog.add_column(Column(idlist_init, name='ID'), 0)
 detcoords = detwcs.pixel_to_world(catalog['x'], catalog['y'])
 catalog['RA'] = [c.ra for c in detcoords]
 catalog['DEC'] = [c.dec for c in detcoords]
+catalog['FLAG_DEBLEND'] = catalog['flag'] & sep.OBJ_MERGED
+
+if FLAG_CLEANED and not DETECTION_PARAMS['clean']:
+    print('Finding would-be cleaned sources...')
+    DETECTION_PARAMS['clean'] = True
+
+    obj_cleaned, _ = sep.extract(
+                detsci,
+                err=deterr,
+                filter_type='matched',
+                filter_kernel=kernel,
+                segmentation_map=True,
+                **DETECTION_PARAMS
+                )
+    
+    clean_cat = Table(obj_cleaned)
+    cleancoords = detwcs.pixel_to_world(clean_cat['x'], clean_cat['y'])
+    clean_cat['RA'] = [c.ra for c in cleancoords]
+    clean_cat['DEC'] = [c.dec for c in cleancoords]
+    
+    xmc,_ = crossmatch(catalog, clean_cat, 
+                        thresh=[0.08*u.arcsec],
+                        unique=True, return_idx=False)
+    
+    is_cleaned = ~np.isin(catalog['ID'], xmc['ID'])
+    print(f'{np.sum(is_cleaned)} preserved from cleaning.')
+    catalog['FLAG_CLEAN'] = is_cleaned.astype(int)
+
+    del obj_cleaned
+    del clean_cat
+    del cleancoords
 
 if XCAT_FILENAMES_MAIN is None and ID_FLOOR <= 0:
     os.rename(os.path.join(FULLDIR_CATALOGS, SEGMAP_NAME_ORIG), 
@@ -144,6 +175,8 @@ if XCAT_FILENAMES_MAIN is None and ID_FLOOR <= 0:
 else:
     if XCAT_FILENAMES_MAIN is not None:
         XCAT_FILENAMES_MAIN = XCAT_FILENAMES_MAIN[DET_NICKNAME.split('_')[0]]
+
+        print(f'Crossmatching IDs to {os.path.basename(XCAT_FILENAMES_MAIN)}...')
 
         cat_match = Table.read(XCAT_FILENAMES_MAIN)
         _,_,idx1,idx2 = crossmatch(catalog, cat_match, 
@@ -160,8 +193,8 @@ else:
         new_labels[new_labels<0] = new_ids
 
     else:
+        print(f'\n Adding ID floor of {ID_FLOOR}...')
         new_labels = idlist_init + ID_FLOOR
-
 
     catalog['ID'] = new_labels.astype(np.int32)
     catalog.sort('ID')
@@ -169,7 +202,6 @@ else:
     mapping = Table({'old_ids':idlist_init, 'new_ids':new_labels})
     mapping.write(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_NEW_ID_MAPPING.txt'),
                   overwrite=True, format='ascii')
-
 
     label_mapping = {id_o:id_n for id_o,id_n in zip(idlist_init, new_labels)}
     label_mapping[0] = 0
@@ -182,7 +214,6 @@ else:
     hdul['SEGMAP'].data = segmap
     hdul.writeto(os.path.join(FULLDIR_CATALOGS, SEGMAP_NAME), overwrite=True)
 
-
 print('CONSTRUCTING ASSOCIATION TABLE OF NEIGHBORS...')
 friends = find_friends(segmap)
 import pickle
@@ -191,6 +222,7 @@ with open(os.path.join(FULLDIR_CATALOGS, f'{DET_NICKNAME}_K{KERNEL}_friends.pick
 
 print('BUILDING REGION FILE...')
 regs = []
+detcoords = detwcs.pixel_to_world(catalog['x'], catalog['y'])
 for coord, obj in zip(detcoords, catalog):
     width = 2*obj['a'] * pixel_scale / 3600. * u.deg
     height = 2*obj['b'] * pixel_scale / 3600. * u.deg
@@ -268,13 +300,13 @@ if (KERNEL != 'None') & (USE_COMBINED_KRON_IMAGE):
 KRON_MATCH_BAND = None
 USE_FILTERS = FILTERS
 if (KERNEL != 'None') & (USE_COMBINED_KRON_IMAGE):
-    kron_bands = KRON_COMBINED_BANDS[DET_NICKNAME.split('_')[0]]
-    if len(kron_bands)<=3:
-        KRON_MATCH_BAND = '+'.join(kron_bands)
-        if '+' not in KRON_MATCH_BAND:
-            KRON_MATCH_BAND = 'sb-' + KRON_MATCH_BAND
-    else:
-        KRON_MATCH_BAND = 'KRON'
+    # kron_bands = KRON_COMBINED_BANDS[DET_NICKNAME.split('_')[0]]
+    # if len(kron_bands)<=3:
+    #     KRON_MATCH_BAND = '+'.join(kron_bands)
+    #     if '+' not in KRON_MATCH_BAND:
+    #         KRON_MATCH_BAND = 'sb-' + KRON_MATCH_BAND
+    # else:
+    KRON_MATCH_BAND = 'KRON'
     USE_FILTERS = [KRON_MATCH_BAND, ] + list(FILTERS)
 
 
@@ -286,6 +318,26 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
             print(f'{PHOT_NICKNAME}_{DET_NICKNAME}_K{use_kernel}_PHOT_CATALOG exists, ' 
                   'I will not overwrite.\nCheck OVERWRITE param in config '
                   'if this is not the desired effect.')
+            
+            ### BAND-AID for the one time I messed up ID matching ###
+            # catalog = Table.read(os.path.join(FULLDIR_CATALOGS, DETCATALOG_NAME))
+            
+            # tabtemp = Table.read(photcatalog_name)
+            # if not np.all((tabtemp['ID'].data - catalog['ID'].data) == 0):
+            #     print('resetting IDs')
+            #     tabtemp['ID'] = new_labels.astype(np.int32)
+            #     tabtemp.sort('ID')
+            #     assert(np.all((tabtemp['ID'].data - catalog['ID'].data) == 0))
+            # if 'FLAG_DEBLEND' in tabtemp.colnames:
+            #     tabtemp['FLAG_DEBLEND'] = catalog['FLAG_DEBLEND']
+            # else:
+            #     tabtemp.add_column(catalog['FLAG_DEBLEND'], tabtemp.colnames.index('DEC')+1)
+            # if FLAG_CLEANED:
+            #     if 'FLAG_CLEAN' in tabtemp.colnames:
+            #         tabtemp['FLAG_CLEAN'] = catalog['FLAG_CLEAN']
+            #     else:
+            #         tabtemp.add_column(catalog['FLAG_CLEAN'], tabtemp.colnames.index('DEC')+2)
+            # tabtemp.write(photcatalog_name, overwrite=True)
             continue
 
         # areas = {}
@@ -355,18 +407,18 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
         # We actually run AUTO fluxes on each band
         # So just do again for each band and take their coverage -- uber consistent this way.)
         elif PHOT_NICKNAME == KRON_MATCH_BAND:
-                photsci = fits.getdata(PATH_KRONSCI)#.byteswap().newbyteorder()
-                photsci = photsci.astype(photsci.dtype.newbyteorder('='))
-                photerr = fits.getdata(PATH_KRONERR)#.byteswap().newbyteorder()
-                photerr = photerr.astype(photerr.dtype.newbyteorder('='))
-                photwht = np.where(photerr<=0., 0, 1/(photerr**2))
-                phothead = fits.getheader(PATH_KRONSCI, 0)
-                photwcs = WCS(phothead)
-                print(photwcs)
-                PHOT_ZPT = KRON_ZPT
-                photmask = np.where((photerr<=0.)|~np.isfinite(photerr), 1., 0.)
-                
-                if USE_EXPTIME: photexp = None
+            photsci = fits.getdata(PATH_KRONSCI)#.byteswap().newbyteorder()
+            photsci = photsci.astype(photsci.dtype.newbyteorder('='))
+            photerr = fits.getdata(PATH_KRONERR)#.byteswap().newbyteorder()
+            photerr = photerr.astype(photerr.dtype.newbyteorder('='))
+            photwht = np.where(photerr<=0., 0, 1/(photerr**2))
+            phothead = fits.getheader(PATH_KRONSCI, 0)
+            photwcs = WCS(phothead)
+            print(photwcs)
+            PHOT_ZPT = KRON_ZPT
+            photmask = np.where((photerr<=0.)|~np.isfinite(photerr), 1., 0.)
+            
+            if USE_EXPTIME: photexp = None
 
         # SOME BASIC INFO
         pixel_scale = utils.proj_plane_pixel_scales(photwcs)[0] * 3600
@@ -375,7 +427,7 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
         print(f'Usable area of photometry image: {area} deg2')
         # areas[PHOT_NICKNAME] = area
 
-        catalog=Table.read(os.path.join(FULLDIR_CATALOGS, DETCATALOG_NAME))
+        catalog = Table.read(os.path.join(FULLDIR_CATALOGS, DETCATALOG_NAME))
 
         # Compute isophotal fluxes based on segmentation
         # if use_kernel == KERNEL:
@@ -389,47 +441,55 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
 
         # Hack the x,y coords
         xphot,yphot = photwcs.wcs_world2pix(catalog['RA'], catalog['DEC'],1)
-
-        # APERTURE PHOTOMETRY -- NOTE: we do NOT apply ANY masking here. Color apertures are small enough.
-        sep_fluxes = {}
-        for diam in PHOT_APER:
-            rad = diam / 2. / pixel_scale
-            print(f"{PHOT_NICKNAME} :: MEASURING PHOTOMETRY in {diam:2.2f}\" apertures... ({2*rad:2.1f} px)")
-            flux, fluxerr, flag = sep.sum_circle(photsci, xphot, yphot,
-                                                mask = photmask,
-                                                err = photerr, subpix=0,
-                                                r=rad, gain=1.0)
-
-            badflux = (flux == 0.) | ~np.isfinite(flux) | (flag > 0)
-            badfluxerr = (fluxerr <= 0.) | ~np.isfinite(fluxerr) | (flag > 0)
-            pc_badflux = np.sum(badflux) / len(flux)
-            pc_badfluxerr = np.sum(badfluxerr) / len(flux)
-            pc_ORbad = np.sum(badflux | badfluxerr) / len(flux)
-            pc_ANDbad = np.sum(badflux & badfluxerr) / len(flux)
-            print(f'{pc_badflux*100:2.5f}% have BAD fluxes')
-            print(f'{pc_badfluxerr*100:2.5f}% have BAD fluxerrs')
-            print(f'{pc_ORbad*100:2.5f}% have BAD fluxes OR fluxerrs')
-            print(f'{pc_ANDbad*100:2.5f}% have BAD fluxes AND fluxerrs')
-
-            bad = badflux | badfluxerr
-
-            flux[bad] = np.nan
-            fluxerr[bad] = np.nan
-
-            sep_fluxes[diam] = (flux, fluxerr, flag)
-
-            # show the first 10 objects results:
-            for i in range(3):
-                print("object {:d}: flux = {:f} +/- {:f}".format(i, flux[i], fluxerr[i]))
-
-            catalog[f'FLUX_APER{diam}'] = flux * conv_flux(PHOT_ZPT)
-            catalog[f'FLUXERR_APER{diam}'] = fluxerr * conv_flux(PHOT_ZPT)
-            # catalog[f'MAG_APER{diam}'] = PHOT_ZPT - 2.5*np.log10(flux)
-            # catalog[f'MAGERR_APER{diam}'] = 2.5 / np.log(10) / ( flux / fluxerr )
-            catalog[f'FLAG_APER{diam}'] = flag
+        flag_aperdict = {}
 
         # Compute Kron, flux radii with and without segmap masking
         for seg, seg_id, ext in ((None, None, ''), (segmap, catalog['ID'], '_masked')):
+            
+            sep_fluxes = {}
+
+             # APERTURE PHOTOMETRY -- NOTE: we DO apply masking here
+            for diam in PHOT_APER:
+                rad = diam / 2. / pixel_scale
+                print(f"{PHOT_NICKNAME} :: MEASURING{ext.replace('_',' ').upper()} PHOTOMETRY in {diam:2.2f}\" apertures... ({2*rad:2.1f} px)")
+                flux, fluxerr, flag = sep.sum_circle(photsci, xphot, yphot,
+                                                    mask = photmask,
+                                                    err = photerr, subpix=0,
+                                                    r=rad, gain=1.0,
+                                                    segmap=seg, seg_id=seg_id)
+                if ext == '':
+                    flag_aperdict[diam] = flag
+                
+                flag_apers = flag_aperdict[diam]
+
+                badflux = (flux == 0.) | ~np.isfinite(flux) | (flag_apers > 0)
+                badfluxerr = (fluxerr <= 0.) | ~np.isfinite(fluxerr) | (flag_apers > 0)
+                pc_badflux = np.sum(badflux) / len(flux)
+                pc_badfluxerr = np.sum(badfluxerr) / len(flux)
+                pc_ORbad = np.sum(badflux | badfluxerr) / len(flux)
+                pc_ANDbad = np.sum(badflux & badfluxerr) / len(flux)
+                print(f'{pc_badflux*100:2.5f}% have BAD fluxes')
+                print(f'{pc_badfluxerr*100:2.5f}% have BAD fluxerrs')
+                print(f'{pc_ORbad*100:2.5f}% have BAD fluxes OR fluxerrs')
+                print(f'{pc_ANDbad*100:2.5f}% have BAD fluxes AND fluxerrs')
+
+                bad = badflux | badfluxerr
+
+                flux[bad] = np.nan
+                fluxerr[bad] = np.nan
+
+                sep_fluxes[diam] = (flux, fluxerr, flag)
+
+                # show the first 10 objects results:
+                for i in range(3):
+                    print("object {:d}: flux = {:f} +/- {:f}".format(i, flux[i], fluxerr[i]))
+
+                catalog[f'FLUX_APER{diam}{ext}'] = flux * conv_flux(PHOT_ZPT)
+                catalog[f'FLUXERR_APER{diam}{ext}'] = fluxerr * conv_flux(PHOT_ZPT)
+                # catalog[f'MAG_APER{diam}'] = PHOT_ZPT - 2.5*np.log10(flux)
+                # catalog[f'MAGERR_APER{diam}'] = 2.5 / np.log(10) / ( flux / fluxerr )
+                catalog[f'FLAG_APER{diam}{ext}'] = flag
+
             if use_kernel == KERNEL:
                 # KRON RADII AND MAG_AUTO
                 print(f"{PHOT_NICKNAME} :: MEASURING PHOTOMETRY in kron-corrected AUTO apertures...")
