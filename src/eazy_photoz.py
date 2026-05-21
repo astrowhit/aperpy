@@ -173,7 +173,7 @@ if OVERWRITE or not os.path.exists(zout_name):
     else:
         comp_sel &= (ez.cat[f'faper_{SN_FILT_EAZY.upper()}']/ez.cat[f'eaper_{SN_FILT_EAZY.upper()}']) > SN_LIM_EAZY
 
-    ez.zphot_zspec(include_errors=False, zmax=10.5, selection=comp_sel)
+    ez.zphot_zspec(include_errors=False, zmax=10.5, selection=comp_sel, title=PROJECT.upper())
     fig = plt.gcf()
     fig.savefig(os.path.join(FULLDIR_CATALOGS, f'figures/{PROJECT}_{VERSION}_{DET_NICKNAME.split("_")[0]}_K{KERNEL}_{nickname}_{is_zpiter}CATALOG_{TEMPLATES}.photoz-specz.pdf'))
 
@@ -202,7 +202,7 @@ else:
         selection &= (pcat[f'faper_{SN_FILT_EAZY.upper()}']/pcat[f'eaper_{SN_FILT_EAZY.upper()}']) > SN_LIM_EAZY
     
     fig = eazy.utils.zphot_zspec(zbest, ZSPEC, 
-                        zlimits=None, 
+                        zlimits=None, title=PROJECT.upper(),
                         selection=selection, min_zphot=0.02, 
                         zmin=0, zmax=10.5)
     fig = plt.gcf()

@@ -463,17 +463,14 @@ def find_stars(filename=None, block_size=5, npeaks=1000, size=15, radii=[0.5,1.,
 import cv2
 from astropy.wcs import WCS
 from astropy.nddata import Cutout2D
-from scipy.ndimage import shift
 from photutils.aperture import CircularAperture, aperture_photometry
 from astropy.table import hstack
 import pickle
 from astropy.io import fits
 
-import cv2
-
 from astropy.stats import sigma_clip
 
-from scipy.ndimage import binary_dilation, binary_erosion
+from scipy.ndimage import shift, binary_dilation, binary_erosion
 from skimage.morphology import (square, rectangle, diamond, disk, cube,
                                 octahedron, ball, octagon, star)
 
@@ -1050,6 +1047,7 @@ def renorm_psf(psfmodel, filt, fov=4.04, pixscl=0.04):
     encircled['F350LPU'] = 0.98036
     encircled['F390WU'] = 0.98865
     encircled['F435W'] = 0.979
+    encircled['F475W'] = 0.979
     encircled['F606W'] = 0.975
     encircled['F625W'] = 0.974
     encircled['F775W'] = 0.972

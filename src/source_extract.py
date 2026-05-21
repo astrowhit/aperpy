@@ -161,12 +161,20 @@ if FLAG_CLEANED and not DETECTION_PARAMS['clean']:
                         unique=True, return_idx=False)
     
     is_cleaned = ~np.isin(catalog['ID'], xmc['ID'])
-    print(f'{np.sum(is_cleaned)} preserved from cleaning.')
+    print(f'{np.sum(is_cleaned)} removed by cleaning.')
     catalog['FLAG_CLEAN'] = is_cleaned.astype(int)
 
     del obj_cleaned
     del clean_cat
     del cleancoords
+
+try:
+    XCAT_FILENAMES_MAIN = XCAT_FILENAMES_MAIN[DET_NICKNAME.split('_')[0]]
+except:
+    if XCAT_FILENAMES_MAIN is None:
+        pass
+    else:
+        print('XCAT_FILENAMES_MAIN must be a dict or None, see config')
 
 if XCAT_FILENAMES_MAIN is None and ID_FLOOR <= 0:
     os.rename(os.path.join(FULLDIR_CATALOGS, SEGMAP_NAME_ORIG), 
@@ -174,7 +182,6 @@ if XCAT_FILENAMES_MAIN is None and ID_FLOOR <= 0:
 
 else:
     if XCAT_FILENAMES_MAIN is not None:
-        XCAT_FILENAMES_MAIN = XCAT_FILENAMES_MAIN[DET_NICKNAME.split('_')[0]]
 
         print(f'Crossmatching IDs to {os.path.basename(XCAT_FILENAMES_MAIN)}...')
 
@@ -319,7 +326,7 @@ for ind, PHOT_NICKNAME in enumerate(USE_FILTERS):
                   'I will not overwrite.\nCheck OVERWRITE param in config '
                   'if this is not the desired effect.')
             
-            ### BAND-AID for the one time I messed up ID matching ###
+            ### BAND-AID for the ONE time I messed up ID matching ###
             # catalog = Table.read(os.path.join(FULLDIR_CATALOGS, DETCATALOG_NAME))
             
             # tabtemp = Table.read(photcatalog_name)
